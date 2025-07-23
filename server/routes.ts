@@ -273,6 +273,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/employees/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+      const employee = await storage.getEmployee(employeeId);
+      
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      // Check if this employee belongs to the admin
+      const adminEmployees = await storage.getEmployeesByAdmin(req.user!.id);
+      if (!adminEmployees.find(emp => emp.id === employeeId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      res.json(employee);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch employee' });
+    }
+  });
+
+  app.get('/api/admin/employees/:id/attendance', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+      const attendance = await storage.getEmployeeAttendance(employeeId);
+      res.json(attendance);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch attendance records' });
+    }
+  });
+
+  app.get('/api/admin/employees/:id/locations', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+      const locations = await storage.getEmployeeLocationHistory(employeeId);
+      res.json(locations);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch location history' });
+    }
+  });
+
   app.post('/api/admin/employees', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       console.log('Employee creation request body:', JSON.stringify(req.body, null, 2));

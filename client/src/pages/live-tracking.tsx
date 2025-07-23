@@ -30,6 +30,8 @@ export default function LiveTracking() {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [employeeLocations, setEmployeeLocations] = useState<EmployeeLocation[]>([]);
   const [mapCenter, setMapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
+  const [mapZoom, setMapZoom] = useState(10);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const token = getAuthToken();
@@ -137,6 +139,16 @@ export default function LiveTracking() {
     return site?.name || 'Unknown Site';
   };
 
+  // Map control functions
+  const handleZoomIn = () => setMapZoom(prev => Math.min(prev + 1, 20));
+  const handleZoomOut = () => setMapZoom(prev => Math.max(prev - 1, 1));
+  const toggleFullscreen = () => setIsFullscreen(prev => !prev);
+
+  // Navigate to employee profile
+  const goToEmployeeProfile = (employeeId: number) => {
+    setLocation(`/admin/employees/${employeeId}`);
+  };
+
   if (!getAuthToken() || getUserType() !== 'admin') {
     return null;
   }
@@ -194,14 +206,18 @@ export default function LiveTracking() {
                   </div>
                 ) : (
                   employeeLocations.map((item) => (
-                    <div key={item.employee.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg">
+                    <div 
+                      key={item.employee.id} 
+                      onClick={() => goToEmployeeProfile(item.employee.id)}
+                      className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
                       <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
                         <span className="text-xs font-medium text-gray-700">
                           {item.employee.firstName[0]}{item.employee.lastName[0]}
                         </span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-gray-900 hover:text-blue-600">
                           {item.employee.firstName} {item.employee.lastName}
                         </p>
                         <p className="text-xs text-gray-600">
@@ -233,11 +249,11 @@ export default function LiveTracking() {
               </div>
               
               {/* Interactive Map Container */}
-              <div className="h-96 lg:h-[500px] relative">
+              <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'h-96 lg:h-[500px]'} relative`}>
                 {mapLoaded ? (
                   <GoogleMap
                     center={mapCenter}
-                    zoom={12}
+                    zoom={mapZoom}
                     markers={getMapMarkers()}
                     geofences={getMapGeofences()}
                     className="w-full h-full"
@@ -253,13 +269,13 @@ export default function LiveTracking() {
                 
                 {/* Map Controls */}
                 <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2 space-y-2">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={handleZoomIn}>
                     <Plus className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={handleZoomOut}>
                     <Minus className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={toggleFullscreen}>
                     <Maximize className="h-4 w-4" />
                   </Button>
                 </div>
