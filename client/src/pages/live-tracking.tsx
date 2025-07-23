@@ -39,6 +39,7 @@ export default function LiveTracking() {
         variant: 'destructive',
       });
       setLocation('/admin/login');
+      return;
     }
 
     // Load Google Maps API
@@ -52,7 +53,7 @@ export default function LiveTracking() {
           variant: 'destructive',
         });
       });
-  }, []);
+  }, [toast, setLocation]);
 
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['/api/admin/locations'],
@@ -74,23 +75,28 @@ export default function LiveTracking() {
             item.employee.id === data.employeeId 
               ? {
                   ...item,
-                  location: {
-                    latitude: data.latitude,
-                    longitude: data.longitude,
-                    isOnSite: data.isOnSite,
-                    timestamp: data.timestamp,
-                  }
+                  location: data.location
                 }
               : item
           );
+          
+          // If employee not found, add them
+          if (!prev.find(item => item.employee.id === data.employeeId)) {
+            updated.push({
+              employee: data.employee,
+              location: data.location
+            });
+          }
+          
           return updated;
         });
       }
-    },
+    }
   });
 
+  // Update employee locations from query data
   useEffect(() => {
-    if (locations) {
+    if (locations && Array.isArray(locations)) {
       setEmployeeLocations(locations);
       
       // Center map on first location with valid coordinates
@@ -119,7 +125,7 @@ export default function LiveTracking() {
   };
 
   const getMapGeofences = () => {
-    return sites?.map((site: any) => ({
+    return Array.isArray(sites) ? sites.map((site: any) => ({
       id: site.id.toString(),
       center: {
         lat: parseFloat(site.latitude),
@@ -127,11 +133,11 @@ export default function LiveTracking() {
       },
       radius: site.geofenceRadius,
       color: '#1976D2',
-    })) || [];
+    })) : [];
   };
 
   const getSiteName = (siteId: number) => {
-    const site = sites?.find((s: any) => s.id === siteId);
+    const site = Array.isArray(sites) ? sites.find((s: any) => s.id === siteId) : null;
     return site?.name || 'Unknown Site';
   };
 

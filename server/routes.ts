@@ -434,6 +434,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/employee/location', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { latitude, longitude } = req.body;
+      const employee = await storage.getEmployee(req.user!.id);
+      
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      // Calculate if employee is on site
+      const assignedSite = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
+      let isOnSite = false;
+      
+      if (assignedSite) {
+        const distance = calculateDistance(
+          parseFloat(latitude),
+          parseFloat(longitude),
+          parseFloat(assignedSite.latitude),
+          parseFloat(assignedSite.longitude)
+        );
+        isOnSite = distance <= assignedSite.geofenceRadius;
+      }
+
+      // Save location tracking
+      await storage.createLocationTracking({
+        employeeId: employee.id,
+        latitude,
+        longitude,
+        isOnSite,
+      });
+
+      res.json({ success: true, isOnSite });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to update location' });
+    }
+  });
+
   app.get('/api/employee/status', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
     try {
       const currentAttendance = await storage.getCurrentAttendance(req.user!.id);

@@ -140,6 +140,24 @@ export default function EmployeeManagement() {
     }
   };
 
+  const handleDeleteEmployee = (employee: any) => {
+    if (window.confirm(`Are you sure you want to delete ${employee.firstName} ${employee.lastName}?`)) {
+      deleteEmployeeMutation.mutate(employee.id);
+    }
+  };
+
+  const handleViewEmployee = (employee: any) => {
+    // Navigate to live tracking with focus on this employee
+    setLocation('/admin/tracking');
+  };
+
+  const handleEditEmployee = (employee: any) => {
+    toast({
+      title: 'Edit Employee',
+      description: `Edit functionality for ${employee.firstName} ${employee.lastName} coming soon`,
+    });
+  };
+
   const filteredEmployees = Array.isArray(employees) ? employees.filter((employee: any) => {
     const matchesSearch = 
       employee.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -405,17 +423,29 @@ export default function EmployeeManagement() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex space-x-2">
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleEditEmployee(employee)}
+                            title="Edit Employee"
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleViewEmployee(employee)}
+                            title="View Employee Location"
+                          >
                             <MapPin className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            onClick={() => handleDelete(employee.id)}
-                            className="text-error hover:text-red-700"
+                            onClick={() => handleDeleteEmployee(employee)}
+                            className="text-red-600 hover:text-red-700"
+                            title="Delete Employee"
+                            disabled={deleteEmployeeMutation.isPending}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

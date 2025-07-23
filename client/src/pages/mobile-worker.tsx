@@ -68,6 +68,23 @@ export default function MobileWorker() {
     enabled: !!status?.assignedSite,
   });
 
+  // Location tracking mutation
+  const updateLocationMutation = useMutation({
+    mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
+      const response = await apiRequest('POST', '/api/employee/location', {
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee/status'] });
+    },
+    onError: (error: any) => {
+      console.error('Failed to update location:', error);
+    },
+  });
+
   // WebSocket for location updates
   const { sendMessage, isConnected } = useWebSocket({
     onMessage: (data) => {
@@ -76,6 +93,23 @@ export default function MobileWorker() {
       }
     },
   });
+
+  // Send location updates automatically every 30 seconds when available
+  useEffect(() => {
+    if (latitude && longitude) {
+      // Send immediate location update
+      updateLocationMutation.mutate({ latitude, longitude });
+      
+      // Set up periodic location updates
+      const interval = setInterval(() => {
+        if (latitude && longitude) {
+          updateLocationMutation.mutate({ latitude, longitude });
+        }
+      }, 30000); // Every 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [latitude, longitude]);
 
   // Send location updates via WebSocket when available
   useEffect(() => {
