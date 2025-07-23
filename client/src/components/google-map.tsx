@@ -3,14 +3,13 @@ import { useEffect, useRef } from 'react';
 interface GoogleMapProps {
   center: { lat: number; lng: number };
   zoom?: number;
+  mapType?: 'roadmap' | 'satellite';
   markers?: Array<{
-    id: string;
     position: { lat: number; lng: number };
-    title?: string;
-    color?: 'red' | 'green' | 'yellow' | 'blue';
+    title: string;
+    color?: string;
   }>;
   geofences?: Array<{
-    id: string;
     center: { lat: number; lng: number };
     radius: number;
     color?: string;
@@ -22,6 +21,7 @@ interface GoogleMapProps {
 export default function GoogleMap({
   center,
   zoom = 13,
+  mapType = 'roadmap',
   markers = [],
   geofences = [],
   className = '',
@@ -39,6 +39,7 @@ export default function GoogleMap({
     mapInstanceRef.current = new google.maps.Map(mapRef.current, {
       center,
       zoom,
+      mapTypeId: mapType === 'satellite' ? google.maps.MapTypeId.SATELLITE : google.maps.MapTypeId.ROADMAP,
       zoomControl: false,
       mapTypeControl: false,
       scaleControl: false,
@@ -67,7 +68,7 @@ export default function GoogleMap({
 
   // Update map center when prop changes
   useEffect(() => {
-    if (mapInstanceRef.current) {
+    if (mapInstanceRef.current && center && typeof center.lat === 'number' && typeof center.lng === 'number') {
       mapInstanceRef.current.setCenter(center);
     }
   }, [center]);
@@ -125,6 +126,21 @@ export default function GoogleMap({
       circlesRef.current.push(circle);
     });
   }, [geofences]);
+
+  // Update zoom when prop changes
+  useEffect(() => {
+    if (mapInstanceRef.current && typeof zoom === 'number') {
+      mapInstanceRef.current.setZoom(zoom);
+    }
+  }, [zoom]);
+
+  // Update map type when prop changes
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      const mapTypeId = mapType === 'satellite' ? google.maps.MapTypeId.SATELLITE : google.maps.MapTypeId.ROADMAP;
+      mapInstanceRef.current.setMapTypeId(mapTypeId);
+    }
+  }, [mapType]);
 
   return (
     <div className={`w-full h-full ${className}`}>

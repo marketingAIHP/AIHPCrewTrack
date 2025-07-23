@@ -15,6 +15,8 @@ import {
   Download, 
   Users, 
   MapPin, 
+  Plus,
+  Minus,
   Maximize 
 } from 'lucide-react';
 
@@ -29,6 +31,8 @@ export default function LiveTracking() {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [employeeLocations, setEmployeeLocations] = useState<EmployeeLocation[]>([]);
   const [mapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
+  const [mapZoom, setMapZoom] = useState(12);
+  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const initializeCalledRef = useRef(false);
 
@@ -176,6 +180,20 @@ export default function LiveTracking() {
     const site = Array.isArray(sites) ? sites.find((s: any) => s.id === siteId) : null;
     return site?.name || 'Unknown Site';
   };
+
+  const handleZoom = useCallback((direction: 'in' | 'out') => {
+    setMapZoom(prev => {
+      if (direction === 'in') {
+        return Math.min(prev + 1, 20);
+      } else {
+        return Math.max(prev - 1, 1);
+      }
+    });
+  }, []);
+
+  const toggleMapType = useCallback(() => {
+    setMapType(prev => prev === 'roadmap' ? 'satellite' : 'roadmap');
+  }, []);
 
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => {
@@ -374,7 +392,8 @@ export default function LiveTracking() {
                 {mapLoaded ? (
                   <GoogleMap
                     center={mapCenter}
-                    zoom={12}
+                    zoom={mapZoom}
+                    mapType={mapType}
                     markers={getMapMarkers()}
                     geofences={getMapGeofences()}
                     className="w-full h-full"
@@ -389,7 +408,16 @@ export default function LiveTracking() {
                 )}
                 
                 {/* Map Controls */}
-                <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2">
+                <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2 space-y-2">
+                  <Button variant="ghost" size="sm" onClick={() => handleZoom('in')} title="Zoom In">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleZoom('out')} title="Zoom Out">
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={toggleMapType} title="Toggle Satellite View">
+                    {mapType === 'roadmap' ? 'Satellite' : 'Map'}
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen">
                     <Maximize className="h-4 w-4" />
                   </Button>
