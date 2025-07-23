@@ -64,6 +64,13 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Configuration endpoint
+  app.get('/api/config', (req, res) => {
+    res.json({
+      GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY
+    });
+  });
+
   const httpServer = createServer(app);
   
   // WebSocket server for real-time location updates

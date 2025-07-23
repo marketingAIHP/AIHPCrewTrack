@@ -9,7 +9,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { getAuthToken, getUser, logout, getUserType } from '@/lib/auth';
 import { useGeolocation } from '@/hooks/use-geolocation';
 import { useWebSocket } from '@/hooks/use-websocket';
-import GoogleMap, { loadGoogleMapsAPI } from '@/components/google-map';
+import GoogleMap from '@/components/google-map';
+import { loadGoogleMapsAPI } from '@/lib/google-maps';
 import { 
   Settings, 
   MapPin, 

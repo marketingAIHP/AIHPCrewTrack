@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { getAuthToken, getUserType } from '@/lib/auth';
-import GoogleMap, { loadGoogleMapsAPI } from '@/components/google-map';
+import GoogleMap from '@/components/google-map';
+import { loadGoogleMapsAPI } from '@/lib/google-maps';
 import { 
   ArrowLeft, 
   Plus, 
