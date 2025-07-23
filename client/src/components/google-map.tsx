@@ -39,6 +39,12 @@ export default function GoogleMap({
     mapInstanceRef.current = new google.maps.Map(mapRef.current, {
       center,
       zoom,
+      zoomControl: false,
+      mapTypeControl: false,
+      scaleControl: false,
+      streetViewControl: false,
+      rotateControl: false,
+      fullscreenControl: false,
       styles: [
         {
           featureType: 'poi',

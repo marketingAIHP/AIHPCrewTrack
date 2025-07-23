@@ -47,17 +47,39 @@ export default function LiveTracking() {
     }
 
     // Load Google Maps API only once
-    loadGoogleMapsAPI()
-      .then(() => setMapLoaded(true))
-      .catch((error) => {
-        console.error('Failed to load Google Maps:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load Google Maps. Map features will not work.',
-          variant: 'destructive',
+    if (!mapLoaded) {
+      loadGoogleMapsAPI()
+        .then(() => setMapLoaded(true))
+        .catch((error) => {
+          console.error('Failed to load Google Maps:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to load Google Maps. Map features will not work.',
+            variant: 'destructive',
+          });
         });
-      });
-  }, []);
+    }
+
+    // Listen for fullscreen changes
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    // Listen for escape key to exit fullscreen
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullscreen]);
 
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['/api/admin/locations'],
@@ -138,14 +160,22 @@ export default function LiveTracking() {
 
   // Map control functions
   const toggleFullscreen = () => {
-    setIsFullscreen(prev => !prev);
-    if (!isFullscreen) {
-      // Entering fullscreen
-      document.documentElement.requestFullscreen?.();
-    } else {
-      // Exiting fullscreen
-      document.exitFullscreen?.();
-    }
+    setIsFullscreen(prev => {
+      const newFullscreenState = !prev;
+      
+      // Handle browser fullscreen
+      if (newFullscreenState) {
+        // Entering fullscreen
+        document.documentElement.requestFullscreen?.();
+      } else {
+        // Exiting fullscreen
+        if (document.fullscreenElement) {
+          document.exitFullscreen?.();
+        }
+      }
+      
+      return newFullscreenState;
+    });
   };
 
   // Navigate to employee profile
