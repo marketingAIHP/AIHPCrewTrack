@@ -89,9 +89,10 @@ export default function SiteManagement() {
   const createSiteMutation = useMutation({
     mutationFn: async (data: SiteForm) => {
       const payload = {
-        ...data,
-        latitude: parseFloat(data.latitude),
-        longitude: parseFloat(data.longitude),
+        name: data.name,
+        address: data.address,
+        latitude: data.latitude,
+        longitude: data.longitude,
         geofenceRadius: parseInt(data.geofenceRadius),
       };
       const response = await apiRequest('POST', '/api/admin/sites', payload);

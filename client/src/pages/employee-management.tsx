@@ -85,7 +85,7 @@ export default function EmployeeManagement() {
         email: data.email,
         phone: data.phone,
         password: data.password,
-        siteId: data.siteId && data.siteId !== 'unassigned' ? parseInt(data.siteId) : undefined,
+        ...(data.siteId && data.siteId !== 'unassigned' && data.siteId !== '' ? { siteId: parseInt(data.siteId) } : {}),
       };
       const response = await apiRequest('POST', '/api/admin/employees', payload);
       return response.json();
