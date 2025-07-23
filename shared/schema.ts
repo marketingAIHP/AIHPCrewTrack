@@ -1,0 +1,145 @@
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, jsonb } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// Admin users table
+export const admins = pgTable("admins", {
+  id: serial("id").primaryKey(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  companyName: text("company_name").notNull(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Labor employees table
+export const employees = pgTable("employees", {
+  id: serial("id").primaryKey(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull().unique(),
+  phone: text("phone").notNull(),
+  password: text("password").notNull(),
+  adminId: integer("admin_id").notNull().references(() => admins.id),
+  siteId: integer("site_id").references(() => workSites.id),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Work sites table
+export const workSites = pgTable("work_sites", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
+  geofenceRadius: integer("geofence_radius").notNull().default(200), // in meters
+  adminId: integer("admin_id").notNull().references(() => admins.id),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Location tracking table
+export const locationTracking = pgTable("location_tracking", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
+  isOnSite: boolean("is_on_site").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Attendance tracking table
+export const attendance = pgTable("attendance", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
+  siteId: integer("site_id").notNull().references(() => workSites.id),
+  checkInTime: timestamp("check_in_time").defaultNow(),
+  checkOutTime: timestamp("check_out_time"),
+  checkInLatitude: decimal("check_in_latitude", { precision: 10, scale: 8 }),
+  checkInLongitude: decimal("check_in_longitude", { precision: 11, scale: 8 }),
+  checkOutLatitude: decimal("check_out_latitude", { precision: 10, scale: 8 }),
+  checkOutLongitude: decimal("check_out_longitude", { precision: 11, scale: 8 }),
+});
+
+// Relations
+export const adminsRelations = relations(admins, ({ many }) => ({
+  employees: many(employees),
+  workSites: many(workSites),
+}));
+
+export const employeesRelations = relations(employees, ({ one, many }) => ({
+  admin: one(admins, {
+    fields: [employees.adminId],
+    references: [admins.id],
+  }),
+  assignedSite: one(workSites, {
+    fields: [employees.siteId],
+    references: [workSites.id],
+  }),
+  locationHistory: many(locationTracking),
+  attendanceHistory: many(attendance),
+}));
+
+export const workSitesRelations = relations(workSites, ({ one, many }) => ({
+  admin: one(admins, {
+    fields: [workSites.adminId],
+    references: [admins.id],
+  }),
+  assignedEmployees: many(employees),
+  attendanceRecords: many(attendance),
+}));
+
+export const locationTrackingRelations = relations(locationTracking, ({ one }) => ({
+  employee: one(employees, {
+    fields: [locationTracking.employeeId],
+    references: [employees.id],
+  }),
+}));
+
+export const attendanceRelations = relations(attendance, ({ one }) => ({
+  employee: one(employees, {
+    fields: [attendance.employeeId],
+    references: [employees.id],
+  }),
+  site: one(workSites, {
+    fields: [attendance.siteId],
+    references: [workSites.id],
+  }),
+}));
+
+// Insert schemas
+export const insertAdminSchema = createInsertSchema(admins).omit({ id: true, createdAt: true });
+export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, isActive: true });
+export const insertWorkSiteSchema = createInsertSchema(workSites).omit({ id: true, createdAt: true, isActive: true });
+export const insertLocationTrackingSchema = createInsertSchema(locationTracking).omit({ id: true, timestamp: true });
+export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true, checkInTime: true });
+
+// Types
+export type Admin = typeof admins.$inferSelect;
+export type Employee = typeof employees.$inferSelect;
+export type WorkSite = typeof workSites.$inferSelect;
+export type LocationTracking = typeof locationTracking.$inferSelect;
+export type Attendance = typeof attendance.$inferSelect;
+
+export type InsertAdmin = z.infer<typeof insertAdminSchema>;
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+export type InsertWorkSite = z.infer<typeof insertWorkSiteSchema>;
+export type InsertLocationTracking = z.infer<typeof insertLocationTrackingSchema>;
+export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
+
+// Auth schemas
+export const adminLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+export const employeeLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+export type AdminLogin = z.infer<typeof adminLoginSchema>;
+export type EmployeeLogin = z.infer<typeof employeeLoginSchema>;
