@@ -276,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/employees', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       console.log('Employee creation request body:', JSON.stringify(req.body, null, 2));
-      const validatedData = insertEmployeeSchema.parse(req.body);
+      const validatedData = insertEmployeeSchema.omit({ adminId: true }).parse(req.body);
       console.log('Validated data:', JSON.stringify(validatedData, null, 2));
       const hashedPassword = await bcrypt.hash(validatedData.password, 10);
       
@@ -332,7 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/sites', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       console.log('Site creation request body:', JSON.stringify(req.body, null, 2));
-      const validatedData = insertWorkSiteSchema.parse(req.body);
+      const validatedData = insertWorkSiteSchema.omit({ adminId: true }).parse(req.body);
       console.log('Validated site data:', JSON.stringify(validatedData, null, 2));
       
       const site = await storage.createWorkSite({
