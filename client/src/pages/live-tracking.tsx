@@ -30,7 +30,6 @@ export default function LiveTracking() {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [employeeLocations, setEmployeeLocations] = useState<EmployeeLocation[]>([]);
   const [mapCenter, setMapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
-  const [mapZoom, setMapZoom] = useState(10);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -48,19 +47,17 @@ export default function LiveTracking() {
     }
 
     // Load Google Maps API only once
-    if (!mapLoaded) {
-      loadGoogleMapsAPI()
-        .then(() => setMapLoaded(true))
-        .catch((error) => {
-          console.error('Failed to load Google Maps:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to load Google Maps. Map features will not work.',
-            variant: 'destructive',
-          });
+    loadGoogleMapsAPI()
+      .then(() => setMapLoaded(true))
+      .catch((error) => {
+        console.error('Failed to load Google Maps:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load Google Maps. Map features will not work.',
+          variant: 'destructive',
         });
-    }
-  }, []); // Empty dependency array to run only once
+      });
+  }, []);
 
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['/api/admin/locations'],
@@ -140,9 +137,16 @@ export default function LiveTracking() {
   };
 
   // Map control functions
-  const handleZoomIn = () => setMapZoom(prev => Math.min(prev + 1, 20));
-  const handleZoomOut = () => setMapZoom(prev => Math.max(prev - 1, 1));
-  const toggleFullscreen = () => setIsFullscreen(prev => !prev);
+  const toggleFullscreen = () => {
+    setIsFullscreen(prev => !prev);
+    if (!isFullscreen) {
+      // Entering fullscreen
+      document.documentElement.requestFullscreen?.();
+    } else {
+      // Exiting fullscreen
+      document.exitFullscreen?.();
+    }
+  };
 
   // Navigate to employee profile
   const goToEmployeeProfile = (employeeId: number) => {
@@ -253,7 +257,7 @@ export default function LiveTracking() {
                 {mapLoaded ? (
                   <GoogleMap
                     center={mapCenter}
-                    zoom={mapZoom}
+                    zoom={12}
                     markers={getMapMarkers()}
                     geofences={getMapGeofences()}
                     className="w-full h-full"
@@ -268,14 +272,8 @@ export default function LiveTracking() {
                 )}
                 
                 {/* Map Controls */}
-                <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2 space-y-2">
-                  <Button variant="ghost" size="sm" onClick={handleZoomIn}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={handleZoomOut}>
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={toggleFullscreen}>
+                <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2">
+                  <Button variant="ghost" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen">
                     <Maximize className="h-4 w-4" />
                   </Button>
                 </div>
