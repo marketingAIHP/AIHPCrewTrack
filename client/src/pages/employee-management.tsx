@@ -81,7 +81,7 @@ export default function EmployeeManagement() {
     mutationFn: async (data: EmployeeForm) => {
       const payload = {
         ...data,
-        siteId: data.siteId ? parseInt(data.siteId) : null,
+        siteId: data.siteId && data.siteId !== 'unassigned' ? parseInt(data.siteId) : null,
       };
       const response = await apiRequest('POST', '/api/admin/employees', payload);
       return response.json();
@@ -179,9 +179,12 @@ export default function EmployeeManagement() {
                   Add Employee
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md" aria-describedby="add-employee-description">
                 <DialogHeader>
                   <DialogTitle>Add New Employee</DialogTitle>
+                  <p id="add-employee-description" className="text-sm text-gray-600">
+                    Fill out the information below to add a new employee to your workforce.
+                  </p>
                 </DialogHeader>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -264,7 +267,7 @@ export default function EmployeeManagement() {
                         <SelectValue placeholder="Select a site" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No assignment</SelectItem>
+                        <SelectItem value="unassigned">No assignment</SelectItem>
                         {sites?.map((site: any) => (
                           <SelectItem key={site.id} value={site.id.toString()}>
                             {site.name}
