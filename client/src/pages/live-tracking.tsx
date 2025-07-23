@@ -1,21 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'wouter';
+import React, { useState, useRef, useCallback } from 'react';
+import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken, getUserType } from '@/lib/auth';
-import { useWebSocket } from '@/hooks/use-websocket';
-import GoogleMap from '@/components/google-map';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
+import GoogleMap from '@/components/google-map';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { 
   ArrowLeft, 
   Download, 
   Users, 
   MapPin, 
-  Plus, 
-  Minus, 
   Maximize 
 } from 'lucide-react';
 
@@ -29,10 +28,15 @@ export default function LiveTracking() {
   const { toast } = useToast();
   const [mapLoaded, setMapLoaded] = useState(false);
   const [employeeLocations, setEmployeeLocations] = useState<EmployeeLocation[]>([]);
-  const [mapCenter, setMapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
+  const [mapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const initializeCalledRef = useRef(false);
 
-  useEffect(() => {
+  // Initialize component only once
+  React.useEffect(() => {
+    if (initializeCalledRef.current) return;
+    initializeCalledRef.current = true;
+
     const token = getAuthToken();
     const userType = getUserType();
     
@@ -46,28 +50,25 @@ export default function LiveTracking() {
       return;
     }
 
-    // Load Google Maps API only once
-    if (!mapLoaded) {
-      loadGoogleMapsAPI()
-        .then(() => setMapLoaded(true))
-        .catch((error) => {
-          console.error('Failed to load Google Maps:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to load Google Maps. Map features will not work.',
-            variant: 'destructive',
-          });
+    // Load Google Maps API
+    loadGoogleMapsAPI()
+      .then(() => setMapLoaded(true))
+      .catch((error) => {
+        console.error('Failed to load Google Maps:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load Google Maps. Map features will not work.',
+          variant: 'destructive',
         });
-    }
+      });
 
-    // Listen for fullscreen changes
+    // Fullscreen event listeners
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
 
-    // Listen for escape key to exit fullscreen
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isFullscreen) {
+      if (event.key === 'Escape') {
         setIsFullscreen(false);
       }
     };
@@ -84,7 +85,7 @@ export default function LiveTracking() {
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['/api/admin/locations'],
     enabled: !!getAuthToken() && getUserType() === 'admin',
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000,
   });
 
   const { data: sites = [] } = useQuery({
@@ -99,14 +100,10 @@ export default function LiveTracking() {
         setEmployeeLocations(prev => {
           const updated = prev.map(item => 
             item.employee.id === data.employeeId 
-              ? {
-                  ...item,
-                  location: data.location
-                }
+              ? { ...item, location: data.location }
               : item
           );
           
-          // If employee not found, add them
           if (!prev.find(item => item.employee.id === data.employeeId)) {
             updated.push({
               employee: data.employee,
@@ -120,37 +117,59 @@ export default function LiveTracking() {
     }
   });
 
-  // Update employee locations from query data (no map center update to avoid loops)
-  useEffect(() => {
-    if (locations && Array.isArray(locations)) {
-      setEmployeeLocations(locations);
+  const getStatusColor = (employee: any, location: any) => {
+    if (!location) return 'bg-gray-500';
+    
+    const assignedSites = Array.isArray(sites) ? sites.filter((site: any) => 
+      Array.isArray(employee.assignedSites) && employee.assignedSites.includes(site.id)
+    ) : [];
+    
+    if (assignedSites.length === 0) return 'bg-gray-500';
+    
+    for (const site of assignedSites) {
+      const distance = calculateDistance(
+        location.latitude, location.longitude,
+        site.latitude, site.longitude
+      );
+      if (distance <= site.geofenceRadius) {
+        return 'bg-green-500';
+      }
     }
-  }, [locations]);
-
-  const getMapMarkers = () => {
-    return employeeLocations
-      .filter(item => item.location)
-      .map(item => ({
-        id: item.employee.id.toString(),
-        position: {
-          lat: parseFloat(item.location.latitude),
-          lng: parseFloat(item.location.longitude),
-        },
-        title: `${item.employee.firstName} ${item.employee.lastName}`,
-        color: item.location.isOnSite ? 'green' : 'yellow' as 'green' | 'yellow',
-      }));
+    
+    return 'bg-red-500';
   };
 
-  const getMapGeofences = () => {
-    return Array.isArray(sites) ? sites.map((site: any) => ({
-      id: site.id.toString(),
-      center: {
-        lat: parseFloat(site.latitude),
-        lng: parseFloat(site.longitude),
-      },
-      radius: site.geofenceRadius,
-      color: '#1976D2',
-    })) : [];
+  const getStatusText = (employee: any, location: any) => {
+    if (!location) return 'No Location';
+    
+    const assignedSites = Array.isArray(sites) ? sites.filter((site: any) => 
+      Array.isArray(employee.assignedSites) && employee.assignedSites.includes(site.id)
+    ) : [];
+    
+    if (assignedSites.length === 0) return 'No Assigned Site';
+    
+    for (const site of assignedSites) {
+      const distance = calculateDistance(
+        location.latitude, location.longitude,
+        site.latitude, site.longitude
+      );
+      if (distance <= site.geofenceRadius) {
+        return `On Site: ${site.name}`;
+      }
+    }
+    
+    return 'Outside Site Boundary';
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
   };
 
   const getSiteName = (siteId: number) => {
@@ -158,17 +177,13 @@ export default function LiveTracking() {
     return site?.name || 'Unknown Site';
   };
 
-  // Map control functions
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => {
       const newFullscreenState = !prev;
       
-      // Handle browser fullscreen
       if (newFullscreenState) {
-        // Entering fullscreen
         document.documentElement.requestFullscreen?.();
       } else {
-        // Exiting fullscreen
         if (document.fullscreenElement) {
           document.exitFullscreen?.();
         }
@@ -176,108 +191,180 @@ export default function LiveTracking() {
       
       return newFullscreenState;
     });
-  };
+  }, []);
 
-  // Navigate to employee profile
-  const goToEmployeeProfile = (employeeId: number) => {
+  const goToEmployeeProfile = useCallback((employeeId: number) => {
     setLocation(`/admin/employees/${employeeId}`);
+  }, [setLocation]);
+
+  const getMapMarkers = () => {
+    const markers: any[] = [];
+    
+    if (Array.isArray(locations)) {
+      locations.forEach((item: any) => {
+        if (item.location?.latitude && item.location?.longitude) {
+          markers.push({
+            position: { lat: item.location.latitude, lng: item.location.longitude },
+            title: `${item.employee.firstName} ${item.employee.lastName}`,
+            color: getStatusColor(item.employee, item.location) === 'bg-green-500' ? 'green' : 
+                   getStatusColor(item.employee, item.location) === 'bg-red-500' ? 'red' : 'gray',
+          });
+        }
+      });
+    }
+    
+    return markers;
   };
 
-  if (!getAuthToken() || getUserType() !== 'admin') {
-    return null;
-  }
+  const getMapGeofences = () => {
+    if (!Array.isArray(sites)) return [];
+    
+    return sites.map((site: any) => ({
+      center: { lat: site.latitude, lng: site.longitude },
+      radius: site.geofenceRadius,
+      color: '#1976D2',
+    }));
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <Link href="/admin/dashboard">
-                <Button variant="ghost" size="sm" className="mr-4">
-                  <ArrowLeft />
-                </Button>
-              </Link>
-              <h1 className="text-xl font-semibold text-gray-900">Live Employee Tracking</h1>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={() => setLocation('/admin/dashboard')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900">Live Employee Tracking</h1>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-gray-600">
+                {isConnected ? 'Live Updates' : 'Connecting...'}
+              </span>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full animate-pulse ${isConnected ? 'bg-success' : 'bg-error'}`}></div>
-                <span className="text-sm text-gray-600">
-                  {isConnected ? 'Live Updates' : 'Disconnected'}
-                </span>
-              </div>
-              <Button className="bg-primary text-white hover:bg-blue-700">
-                <Download className="mr-2 h-4 w-4" />
-                Export Data
-              </Button>
-            </div>
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export Data
+            </Button>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Employee List Sidebar */}
-          <div className="lg:col-span-1">
-            <Card>
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">Active Employees</h3>
-                <p className="text-sm text-gray-600">
-                  {employeeLocations.filter(item => item.location).length} currently tracked
-                </p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Currently Tracked</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {Array.isArray(locations) ? locations.length : 0}
               </div>
-              <CardContent className="p-4 space-y-3 max-h-96 overflow-y-auto">
-                {isLoading ? (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-gray-500">Loading employees...</p>
-                  </div>
-                ) : employeeLocations.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-500">No employees tracked</p>
+              <p className="text-xs text-muted-foreground">employees online</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">On Site</CardTitle>
+              <MapPin className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {Array.isArray(locations) ? 
+                  locations.filter((item: any) => 
+                    getStatusColor(item.employee, item.location) === 'bg-green-500'
+                  ).length : 0
+                }
+              </div>
+              <p className="text-xs text-muted-foreground">within boundaries</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Outside Boundary</CardTitle>
+              <MapPin className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {Array.isArray(locations) ? 
+                  locations.filter((item: any) => 
+                    getStatusColor(item.employee, item.location) === 'bg-red-500'
+                  ).length : 0
+                }
+              </div>
+              <p className="text-xs text-muted-foreground">need attention</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Employee List */}
+          <div className="lg:col-span-1 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Employee Status</h2>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {Array.isArray(locations) && locations.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No employees currently tracked
                   </div>
                 ) : (
-                  employeeLocations.map((item) => (
-                    <div 
-                      key={item.employee.id} 
-                      onClick={() => goToEmployeeProfile(item.employee.id)}
-                      className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                    >
-                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-medium text-gray-700">
-                          {item.employee.firstName[0]}{item.employee.lastName[0]}
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900 hover:text-blue-600">
-                          {item.employee.firstName} {item.employee.lastName}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {item.employee.siteId ? getSiteName(item.employee.siteId) : 'No site assigned'}
-                        </p>
-                      </div>
-                      <div className={`w-2 h-2 rounded-full ${
-                        item.location?.isOnSite ? 'bg-success' : 
-                        item.location ? 'bg-warning' : 'bg-gray-400'
-                      }`}></div>
-                    </div>
+                  Array.isArray(locations) && locations.map((item: any) => (
+                    <Card key={item.employee.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                      <CardContent className="p-4" onClick={() => goToEmployeeProfile(item.employee.id)}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-3 h-3 rounded-full ${getStatusColor(item.employee, item.location)}`}></div>
+                            <div>
+                              <p className="font-medium text-gray-900 hover:text-blue-600">
+                                {item.employee.firstName} {item.employee.lastName}
+                              </p>
+                              <p className="text-sm text-gray-500">{item.employee.email}</p>
+                            </div>
+                          </div>
+                          <Badge variant={getStatusColor(item.employee, item.location) === 'bg-green-500' ? 'default' : 'destructive'}>
+                            {getStatusText(item.employee, item.location)}
+                          </Badge>
+                        </div>
+                        
+                        {item.location && (
+                          <div className="mt-2 text-xs text-gray-500">
+                            Last updated: {new Date(item.location.timestamp).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   ))
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            )}
           </div>
-
-          {/* Main Map Area */}
-          <div className="lg:col-span-3">
-            <Card className="overflow-hidden">
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-semibold text-gray-900">Real-Time Location Map</h3>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">Satellite</Button>
-                    <Button size="sm" className="bg-primary text-white">Map</Button>
+          
+          {/* Interactive Map */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Real-time Map</h2>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2 text-sm">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span>On Site</span>
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <span>Outside Boundary</span>
+                    <div className="w-3 h-3 bg-blue-500 rounded-full opacity-30"></div>
+                    <span>Site Boundary</span>
                   </div>
                 </div>
               </div>
@@ -293,9 +380,9 @@ export default function LiveTracking() {
                     className="w-full h-full"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
                     <div className="text-center">
-                      <MapPin className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
                       <p className="text-gray-600">Loading map...</p>
                     </div>
                   </div>
@@ -308,33 +395,10 @@ export default function LiveTracking() {
                   </Button>
                 </div>
               </div>
-              
-              {/* Map Legend */}
-              <div className="p-4 border-t border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex space-x-6">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-success rounded-full"></div>
-                      <span className="text-sm text-gray-600">On Site</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-warning rounded-full"></div>
-                      <span className="text-sm text-gray-600">Outside Boundary</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 border-2 border-dashed border-primary rounded-full"></div>
-                      <span className="text-sm text-gray-600">Site Boundary</span>
-                    </div>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Last updated: <span className="font-medium">just now</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

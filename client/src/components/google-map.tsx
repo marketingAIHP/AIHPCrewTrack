@@ -135,6 +135,10 @@ export default function GoogleMap({
         .gm-fullscreen-control { display: none !important; }
         .gmnoprint { display: none !important; }
         .gm-control-active { display: none !important; }
+        .gm-style .gm-style-mtc { display: none !important; }
+        [title="Toggle between map and satellite imagery"] { display: none !important; }
+        .gm-style-cc { display: none !important; }
+        .gmnoprint div { display: none !important; }
       `}</style>
     </div>
   );
