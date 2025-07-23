@@ -275,7 +275,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/employees', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
+      console.log('Employee creation request body:', JSON.stringify(req.body, null, 2));
       const validatedData = insertEmployeeSchema.parse(req.body);
+      console.log('Validated data:', JSON.stringify(validatedData, null, 2));
       const hashedPassword = await bcrypt.hash(validatedData.password, 10);
       
       const employee = await storage.createEmployee({
@@ -286,6 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json(employee);
     } catch (error) {
+      console.error('Employee creation error:', error);
       res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to create employee' });
     }
   });
@@ -328,7 +331,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/sites', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
+      console.log('Site creation request body:', JSON.stringify(req.body, null, 2));
       const validatedData = insertWorkSiteSchema.parse(req.body);
+      console.log('Validated site data:', JSON.stringify(validatedData, null, 2));
       
       const site = await storage.createWorkSite({
         ...validatedData,
@@ -337,6 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json(site);
     } catch (error) {
+      console.error('Site creation error:', error);
       res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to create work site' });
     }
   });
