@@ -4,6 +4,17 @@
 
 This is a full-stack labor tracking and workforce management application built with React (frontend), Express.js (backend), and PostgreSQL database. The application enables administrators to manage employees and work sites while providing real-time location tracking and geofencing capabilities for field workers.
 
+## Recent Changes (July 23, 2025)
+
+### Live Tracking Map Controls Implementation
+- **Fixed infinite loop issues** that were causing browser crashes in the live tracking component
+- **Added functional map controls** including zoom in (+), zoom out (-), satellite toggle, and fullscreen buttons
+- **Removed all Google Maps default UI** controls for clean interface
+- **Implemented clickable employee names** that navigate to detailed profile pages
+- **Created employee profile pages** showing personal info, attendance records, and location history
+- **Added WebSocket integration** for real-time location updates every 30 seconds
+- **Fixed Google Maps coordinate validation** to prevent setCenter errors
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -52,9 +63,11 @@ Preferred communication style: Simple, everyday language.
 - **Site Information**: Current work site details and status display
 
 ### Map Integration
-- **Google Maps**: Interactive maps for site visualization and location tracking
+- **Google Maps**: Interactive maps for site visualization and location tracking with custom controls
+- **Map Controls**: Zoom in/out, satellite/map toggle, and fullscreen functionality
 - **Custom Markers**: Different marker types for employees, sites, and geofences
-- **Real-time Updates**: Live position updates via WebSocket connections
+- **Real-time Updates**: Live position updates via WebSocket connections every 30 seconds
+- **Employee Profiles**: Clickable employee names leading to detailed profile pages
 
 ## Data Flow
 
