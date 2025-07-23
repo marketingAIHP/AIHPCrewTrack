@@ -80,8 +80,12 @@ export default function EmployeeManagement() {
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: EmployeeForm) => {
       const payload = {
-        ...data,
-        siteId: data.siteId && data.siteId !== 'unassigned' ? parseInt(data.siteId) : null,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        password: data.password,
+        siteId: data.siteId && data.siteId !== 'unassigned' ? parseInt(data.siteId) : undefined,
       };
       const response = await apiRequest('POST', '/api/admin/employees', payload);
       return response.json();
@@ -136,7 +140,7 @@ export default function EmployeeManagement() {
     }
   };
 
-  const filteredEmployees = employees?.filter((employee: any) => {
+  const filteredEmployees = Array.isArray(employees) ? employees.filter((employee: any) => {
     const matchesSearch = 
       employee.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employee.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -147,10 +151,10 @@ export default function EmployeeManagement() {
       employee.siteId?.toString() === selectedSite;
     
     return matchesSearch && matchesSite;
-  }) || [];
+  }) : [];
 
   const getSiteName = (siteId: number) => {
-    const site = sites?.find((s: any) => s.id === siteId);
+    const site = Array.isArray(sites) ? sites.find((s: any) => s.id === siteId) : null;
     return site?.name || 'Unknown Site';
   };
 
@@ -268,7 +272,7 @@ export default function EmployeeManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="unassigned">No assignment</SelectItem>
-                        {sites?.map((site: any) => (
+                        {Array.isArray(sites) && sites.map((site: any) => (
                           <SelectItem key={site.id} value={site.id.toString()}>
                             {site.name}
                           </SelectItem>

@@ -201,7 +201,7 @@ export default function SiteManagement() {
                         id="latitude"
                         {...form.register('latitude')}
                         placeholder="40.7128"
-                        readOnly
+                        step="any"
                       />
                       {form.formState.errors.latitude && (
                         <p className="text-error text-sm mt-1">
@@ -215,7 +215,7 @@ export default function SiteManagement() {
                         id="longitude"
                         {...form.register('longitude')}
                         placeholder="-74.0060"
-                        readOnly
+                        step="any"
                       />
                       {form.formState.errors.longitude && (
                         <p className="text-error text-sm mt-1">
