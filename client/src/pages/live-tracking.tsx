@@ -79,7 +79,7 @@ export default function LiveTracking() {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isFullscreen]);
+  }, []);
 
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['/api/admin/locations'],

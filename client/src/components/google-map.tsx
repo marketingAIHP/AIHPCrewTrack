@@ -45,6 +45,7 @@ export default function GoogleMap({
       streetViewControl: false,
       rotateControl: false,
       fullscreenControl: false,
+      disableDefaultUI: true,
       styles: [
         {
           featureType: 'poi',
@@ -128,6 +129,13 @@ export default function GoogleMap({
   return (
     <div className={`w-full h-full ${className}`}>
       <div ref={mapRef} className="w-full h-full rounded-lg" />
+      <style>{`
+        .gm-style-mtc { display: none !important; }
+        .gm-bundled-control { display: none !important; }
+        .gm-fullscreen-control { display: none !important; }
+        .gmnoprint { display: none !important; }
+        .gm-control-active { display: none !important; }
+      `}</style>
     </div>
   );
 }
