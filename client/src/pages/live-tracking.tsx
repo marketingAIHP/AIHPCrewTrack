@@ -29,7 +29,7 @@ export default function LiveTracking() {
   const { toast } = useToast();
   const [mapLoaded, setMapLoaded] = useState(false);
   const [employeeLocations, setEmployeeLocations] = useState<EmployeeLocation[]>([]);
-  const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.0060 });
+  const [mapCenter, setMapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
 
   useEffect(() => {
     const token = getAuthToken();
@@ -99,19 +99,10 @@ export default function LiveTracking() {
     }
   });
 
-  // Update employee locations from query data
+  // Update employee locations from query data (no map center update to avoid loops)
   useEffect(() => {
     if (locations && Array.isArray(locations)) {
       setEmployeeLocations(locations);
-      
-      // Center map on first location with valid coordinates
-      const firstLocation = locations.find((loc: any) => loc.location);
-      if (firstLocation?.location) {
-        setMapCenter({
-          lat: parseFloat(firstLocation.location.latitude),
-          lng: parseFloat(firstLocation.location.longitude),
-        });
-      }
     }
   }, [locations]);
 
