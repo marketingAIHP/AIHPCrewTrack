@@ -32,7 +32,10 @@ export default function LiveTracking() {
   const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.0060 });
 
   useEffect(() => {
-    if (!getAuthToken() || getUserType() !== 'admin') {
+    const token = getAuthToken();
+    const userType = getUserType();
+    
+    if (!token || userType !== 'admin') {
       toast({
         title: 'Unauthorized',
         description: 'Please log in as an admin to access this page.',
@@ -42,18 +45,20 @@ export default function LiveTracking() {
       return;
     }
 
-    // Load Google Maps API
-    loadGoogleMapsAPI()
-      .then(() => setMapLoaded(true))
-      .catch((error) => {
-        console.error('Failed to load Google Maps:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load Google Maps. Map features will not work.',
-          variant: 'destructive',
+    // Load Google Maps API only once
+    if (!mapLoaded) {
+      loadGoogleMapsAPI()
+        .then(() => setMapLoaded(true))
+        .catch((error) => {
+          console.error('Failed to load Google Maps:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to load Google Maps. Map features will not work.',
+            variant: 'destructive',
+          });
         });
-      });
-  }, [toast, setLocation]);
+    }
+  }, []); // Empty dependency array to run only once
 
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['/api/admin/locations'],
