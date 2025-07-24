@@ -64,28 +64,50 @@ export default function AdminDashboard() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <div className="bg-primary rounded-lg w-10 h-10 flex items-center justify-center">
-                <Users className="text-white" />
+            <Link href="/admin/dashboard">
+              <div className="flex items-center cursor-pointer hover:opacity-80 transition-opacity">
+                <div className="bg-primary rounded-lg w-10 h-10 flex items-center justify-center">
+                  <Users className="text-white" />
+                </div>
+                <div className="ml-3">
+                  <h1 className="text-xl font-semibold text-gray-900">WorkSite Tracker</h1>
+                  <p className="text-sm text-gray-600">Admin Dashboard</p>
+                </div>
               </div>
-              <div className="ml-3">
-                <h1 className="text-xl font-semibold text-gray-900">WorkSite Tracker</h1>
-                <p className="text-sm text-gray-600">Admin Dashboard</p>
-              </div>
-            </div>
+            </Link>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm">
-                <Bell className="text-xl" />
+              <Link href="/admin/notifications">
+                <div className="relative cursor-pointer hover:opacity-80 transition-opacity">
+                  <Bell className="h-6 w-6 text-gray-600" />
+                  {stats.alerts > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {stats.alerts}
+                    </span>
+                  )}
+                </div>
+              </Link>
+              
+              <Link href="/admin/profile">
+                <div className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium">
+                      {user?.firstName?.[0]}{user?.lastName?.[0]}
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">
+                    {user?.firstName} {user?.lastName}
+                  </span>
+                </div>
+              </Link>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleLogout}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                Logout
               </Button>
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-700">
-                  {user.firstName} {user.lastName}
-                </span>
-                <Button onClick={handleLogout} variant="outline" size="sm">
-                  Logout
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -95,69 +117,77 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="bg-success bg-opacity-10 rounded-lg p-3">
-                  <UserCheck className="text-success text-xl" />
+          <Link href="/admin/active-employees">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <div className="bg-green-100 rounded-lg p-3">
+                    <UserCheck className="text-green-600 text-xl" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Active Employees</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {isLoading ? '...' : stats?.activeEmployees || 0}
+                    </p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Active Employees</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {isLoading ? '...' : stats?.activeEmployees || 0}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
           
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="bg-primary bg-opacity-10 rounded-lg p-3">
-                  <MapPin className="text-primary text-xl" />
+          <Link href="/admin/work-sites">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <div className="bg-blue-100 rounded-lg p-3">
+                    <MapPin className="text-blue-600 text-xl" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Work Sites</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {isLoading ? '...' : stats?.workSites || 0}
+                    </p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Work Sites</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {isLoading ? '...' : stats?.workSites || 0}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
           
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="bg-warning bg-opacity-10 rounded-lg p-3">
-                  <Clock className="text-warning text-xl" />
+          <Link href="/admin/on-site-now">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <div className="bg-orange-100 rounded-lg p-3">
+                    <Clock className="text-orange-600 text-xl" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">On Site Now</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {isLoading ? '...' : stats?.onSiteNow || 0}
+                    </p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">On Site Now</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {isLoading ? '...' : stats?.onSiteNow || 0}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
           
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="bg-error bg-opacity-10 rounded-lg p-3">
-                  <AlertTriangle className="text-error text-xl" />
+          <Link href="/admin/notifications">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <div className="bg-red-100 rounded-lg p-3">
+                    <AlertTriangle className="text-red-600 text-xl" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Alerts</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {isLoading ? '...' : stats?.alerts || 0}
+                    </p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Alerts</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {isLoading ? '...' : stats?.alerts || 0}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Recent Activity & Live Map */}

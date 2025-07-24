@@ -14,6 +14,11 @@ import LiveTracking from "@/pages/live-tracking";
 import MobileWorker from "@/pages/mobile-worker";
 import EmployeeLogin from "@/pages/employee-login";
 import EmployeeDashboard from "@/pages/employee-dashboard";
+import ActiveEmployees from "@/pages/active-employees";
+import WorkSitesList from "@/pages/work-sites-list";
+import OnSiteNow from "@/pages/on-site-now";
+import Notifications from "@/pages/notifications";
+import AdminProfile from "@/pages/admin-profile";
 
 function Router() {
   return (
@@ -24,8 +29,15 @@ function Router() {
       <Route path="/admin/dashboard" component={AdminDashboard} />
       <Route path="/admin/employees" component={EmployeeManagement} />
       <Route path="/admin/employees/:id" component={EmployeeProfile} />
+      <Route path="/admin/employees/:id/profile" component={EmployeeProfile} />
+      <Route path="/admin/active-employees" component={ActiveEmployees} />
       <Route path="/admin/sites" component={SiteManagement} />
+      <Route path="/admin/work-sites" component={WorkSitesList} />
+      <Route path="/admin/on-site-now" component={OnSiteNow} />
+      <Route path="/admin/notifications" component={Notifications} />
+      <Route path="/admin/profile" component={AdminProfile} />
       <Route path="/admin/tracking" component={LiveTracking} />
+      <Route path="/admin/live-tracking" component={LiveTracking} />
       <Route path="/employee/login" component={EmployeeLogin} />
       <Route path="/employee/dashboard" component={EmployeeDashboard} />
       <Route path="/worker" component={MobileWorker} />

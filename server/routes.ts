@@ -446,6 +446,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin profile route
+  app.get('/api/admin/profile', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminId = req.user!.id;
+      const admin = await storage.getAdmin(adminId);
+      if (!admin) {
+        return res.status(404).json({ message: 'Admin not found' });
+      }
+      res.json(admin);
+    } catch (error) {
+      console.error('Error fetching admin profile:', error);
+      res.status(500).json({ message: 'Failed to fetch admin profile' });
+    }
+  });
+
   // Employee Management Routes
   app.get('/api/admin/employees', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
