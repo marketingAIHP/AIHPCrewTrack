@@ -127,13 +127,33 @@ export default function AdminLogin() {
               {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
             </Button>
             
-            <div className="text-center">
+            <div className="text-center space-y-3">
               <p className="text-sm text-gray-600">
                 Don't have an admin account?{' '}
                 <Link href="/admin/signup" className="text-primary hover:underline font-medium">
                   Create one
                 </Link>
               </p>
+              
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-gray-500">Or</span>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">Are you an employee?</p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setLocation('/employee/login')}
+                  className="w-full border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                >
+                  Employee Portal
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>

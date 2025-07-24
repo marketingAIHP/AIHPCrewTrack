@@ -36,14 +36,23 @@ export default function EmployeeLogin() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: EmployeeLoginForm) => {
-      const response = await apiRequest('/api/employee/login', {
+      const response = await fetch('/api/employee/login', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(data),
       });
-      return response;
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      return response.json();
     },
     onSuccess: (data) => {
-      localStorage.setItem('token', data.token);
+      localStorage.setItem('authToken', data.token);
       localStorage.setItem('userType', 'employee');
       toast({
         title: 'Welcome!',
