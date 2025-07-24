@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken, getUser, logout, getUserType } from '@/lib/auth';
+import MiniMap from '@/components/MiniMap';
 import { 
   Users, 
   MapPin, 
@@ -40,7 +41,12 @@ export default function AdminDashboard() {
     workSites: 0,
     onSiteNow: 0,
     alerts: 0
-  }, isLoading } = useQuery({
+  }, isLoading } = useQuery<{
+    activeEmployees: number;
+    workSites: number;
+    onSiteNow: number;
+    alerts: number;
+  }>({
     queryKey: ['/api/admin/dashboard'],
     enabled: !!getAuthToken() && userType === 'admin',
   });
@@ -228,16 +234,8 @@ export default function AdminDashboard() {
                 </Link>
               </div>
             </div>
-            <CardContent className="p-6">
-              <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                <div className="bg-white bg-opacity-90 rounded-lg p-4 text-center">
-                  <MapPin className="text-primary text-2xl mb-2 mx-auto" />
-                  <p className="text-sm font-medium text-gray-900">Interactive Map</p>
-                  <p className="text-xs text-gray-600">
-                    {stats?.onSiteNow || 0} employees currently tracked
-                  </p>
-                </div>
-              </div>
+            <CardContent className="p-0">
+              <MiniMap height="256px" showEmployeeCount={true} />
             </CardContent>
           </Card>
         </div>
