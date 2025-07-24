@@ -6,6 +6,13 @@ This is a full-stack labor tracking and workforce management application built w
 
 ## Recent Changes (July 24, 2025)
 
+### Data Validation and Security Implementation
+- **Enhanced password security** with strong validation requiring 8+ characters, letters, numbers, and special characters
+- **Implemented email uniqueness validation** across both admin and employee tables to prevent duplicates
+- **Added organization uniqueness constraint** ensuring only one admin account per organization
+- **Created comprehensive error handling** with detailed validation messages for user guidance
+- **Updated database constraints** for data integrity and security compliance
+
 ### Employee Authentication System Implementation
 - **Added employee sign-in portal** with separate login page and dashboard
 - **Implemented geofence-based attendance tracking** for automatic check-in/out

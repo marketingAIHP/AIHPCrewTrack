@@ -22,6 +22,8 @@ export interface IStorage {
   // Admin operations
   getAdmin(id: number): Promise<Admin | undefined>;
   getAdminByEmail(email: string): Promise<Admin | undefined>;
+  getAdminByCompanyName(companyName: string): Promise<Admin | undefined>;
+  checkEmailExists(email: string): Promise<boolean>;
   createAdmin(admin: InsertAdmin): Promise<Admin>;
 
   // Employee operations
@@ -69,6 +71,27 @@ export class DatabaseStorage implements IStorage {
   async getAdminByEmail(email: string): Promise<Admin | undefined> {
     const [admin] = await db.select().from(admins).where(eq(admins.email, email));
     return admin || undefined;
+  }
+
+  async getAdminByCompanyName(companyName: string): Promise<Admin | undefined> {
+    const [admin] = await db.select().from(admins).where(eq(admins.companyName, companyName));
+    return admin || undefined;
+  }
+
+  async checkEmailExists(email: string): Promise<boolean> {
+    // Check if email exists in admins table
+    const [adminResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(admins)
+      .where(eq(admins.email, email));
+    
+    // Check if email exists in employees table
+    const [employeeResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(employees)
+      .where(eq(employees.email, email));
+    
+    return adminResult.count > 0 || employeeResult.count > 0;
   }
 
   async createAdmin(admin: InsertAdmin): Promise<Admin> {

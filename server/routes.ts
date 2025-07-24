@@ -347,6 +347,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/signup', async (req, res) => {
     try {
       const validatedData = insertAdminSchema.parse(req.body);
+      
+      // Check if email already exists across both admin and employee tables
+      const emailExists = await storage.checkEmailExists(validatedData.email);
+      if (emailExists) {
+        return res.status(400).json({ 
+          message: 'Email address already exists. Please use a different email address.' 
+        });
+      }
+
+      // Check if organization already exists
+      const existingAdmin = await storage.getAdminByCompanyName(validatedData.companyName);
+      if (existingAdmin) {
+        return res.status(400).json({ 
+          message: 'An admin account for this organization already exists. Only one admin account per organization is allowed.' 
+        });
+      }
+
       const hashedPassword = await bcrypt.hash(validatedData.password, 10);
       
       const admin = await storage.createAdmin({
@@ -371,6 +388,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } 
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+        return res.status(400).json({ message: errorMessages.join(', ') });
+      }
       res.status(400).json({ message: error instanceof Error ? error.message : 'Signup failed' });
     }
   });
@@ -517,6 +538,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Employee creation request body:', JSON.stringify(req.body, null, 2));
       const validatedData = insertEmployeeSchema.omit({ adminId: true }).parse(req.body);
       console.log('Validated data:', JSON.stringify(validatedData, null, 2));
+      
+      // Check if email already exists across both admin and employee tables
+      const emailExists = await storage.checkEmailExists(validatedData.email);
+      if (emailExists) {
+        return res.status(400).json({ 
+          message: 'Email address already exists. Please use a different email address.' 
+        });
+      }
+
       const hashedPassword = await bcrypt.hash(validatedData.password, 10);
       
       const employee = await storage.createEmployee({
@@ -528,6 +558,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(employee);
     } catch (error) {
       console.error('Employee creation error:', error);
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+        return res.status(400).json({ message: errorMessages.join(', ') });
+      }
       res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to create employee' });
     }
   });

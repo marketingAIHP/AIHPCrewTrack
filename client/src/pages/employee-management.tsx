@@ -29,7 +29,10 @@ const employeeSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email address'),
   phone: z.string().min(1, 'Phone number is required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters long')
+    .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
+      'Password must contain at least one letter, one number, and one special character'),
   siteId: z.string().optional(),
 });
 
@@ -275,6 +278,9 @@ export default function EmployeeManagement() {
                       {...form.register('password')}
                       placeholder="••••••••"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Must be 8+ characters with letters, numbers, and special characters (@$!%*?&)
+                    </p>
                     {form.formState.errors.password && (
                       <p className="text-error text-sm mt-1">
                         {form.formState.errors.password.message}
@@ -335,7 +341,7 @@ export default function EmployeeManagement() {
                 <SelectContent>
                   <SelectItem value="all">All Sites</SelectItem>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {sites?.map((site: any) => (
+                  {Array.isArray(sites) && sites.map((site: any) => (
                     <SelectItem key={site.id} value={site.id.toString()}>
                       {site.name}
                     </SelectItem>

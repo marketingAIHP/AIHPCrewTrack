@@ -8,7 +8,7 @@ export const admins = pgTable("admins", {
   id: serial("id").primaryKey(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  companyName: text("company_name").notNull(),
+  companyName: text("company_name").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -110,9 +110,21 @@ export const attendanceRelations = relations(attendance, ({ one }) => ({
   }),
 }));
 
-// Insert schemas
-export const insertAdminSchema = createInsertSchema(admins).omit({ id: true, createdAt: true });
-export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, isActive: true });
+// Password validation schema
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters long")
+  .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
+    "Password must contain at least one letter, one number, and one special character");
+
+// Insert schemas with password validation
+export const insertAdminSchema = createInsertSchema(admins).omit({ id: true, createdAt: true }).extend({
+  password: passwordSchema,
+});
+
+export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, isActive: true }).extend({
+  password: passwordSchema,
+});
+
 export const insertWorkSiteSchema = createInsertSchema(workSites).omit({ id: true, createdAt: true, isActive: true });
 export const insertLocationTrackingSchema = createInsertSchema(locationTracking).omit({ id: true, timestamp: true });
 export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true, checkInTime: true });

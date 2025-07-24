@@ -17,8 +17,11 @@ const signupSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   companyName: z.string().min(1, 'Company name is required'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string().min(6, 'Password confirmation is required'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters long')
+    .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
+      'Password must contain at least one letter, one number, and one special character'),
+  confirmPassword: z.string().min(8, 'Password confirmation is required'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -154,6 +157,9 @@ export default function AdminSignup() {
                 placeholder="••••••••"
                 {...form.register('password')}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Must be 8+ characters with letters, numbers, and special characters (@$!%*?&)
+              </p>
               {form.formState.errors.password && (
                 <p className="text-error text-sm mt-1">{form.formState.errors.password.message}</p>
               )}

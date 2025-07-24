@@ -3,10 +3,10 @@ import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MapPin, Users, Radius } from 'lucide-react';
+import { ArrowLeft, MapPin, Users, Navigation } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth';
 
-interface Site {
+interface WorkSite {
   id: number;
   name: string;
   address: string;
@@ -35,7 +35,7 @@ export default function WorkSitesList() {
           'Authorization': `Bearer ${getAuthToken()}`,
         },
       });
-      if (!response.ok) throw new Error('Failed to fetch sites');
+      if (!response.ok) throw new Error('Failed to fetch work sites');
       return response.json();
     },
   });
@@ -54,8 +54,11 @@ export default function WorkSitesList() {
   });
 
   const getEmployeeCount = (siteId: number) => {
-    return employees?.filter((emp: Employee) => emp.siteId === siteId && emp.isActive).length || 0;
+    if (!employees) return 0;
+    return employees.filter((emp: Employee) => emp.siteId === siteId && emp.isActive).length;
   };
+
+  const activeSites = sites?.filter((site: WorkSite) => site.isActive) || [];
 
   if (sitesLoading) {
     return (
@@ -95,55 +98,57 @@ export default function WorkSitesList() {
           </Link>
           <h1 className="text-2xl font-bold">Work Sites</h1>
         </div>
-        <Badge variant="secondary" className="text-lg px-3 py-1">
-          {sites?.length || 0} Sites
+        <Badge variant="secondary" className="text-lg px-3 py-1 bg-blue-100 text-blue-800">
+          {activeSites.length} Sites
         </Badge>
       </div>
 
       <div className="grid gap-4">
-        {!sites || sites.length === 0 ? (
+        {activeSites.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
+              <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">No work sites found</p>
-              <Link href="/admin/sites">
-                <Button className="mt-4">Add Your First Site</Button>
-              </Link>
+              <p className="text-sm text-gray-400 mt-1">
+                Create work sites to track employee locations and attendance
+              </p>
             </CardContent>
           </Card>
         ) : (
-          sites.map((site: Site) => (
+          activeSites.map((site: WorkSite) => (
             <Card key={site.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-start space-x-4">
+                  <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <MapPin className="h-6 w-6 text-blue-600" />
+                      <MapPin className="text-blue-600 h-6 w-6" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{site.name}</h3>
-                      <p className="text-gray-600 mb-2">{site.address}</p>
-                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                    <div>
+                      <h3 className="font-semibold text-lg">
+                        {site.name}
+                      </h3>
+                      <p className="text-gray-600 flex items-center">
+                        <Navigation className="h-4 w-4 mr-1" />
+                        {site.address}
+                      </p>
+                      <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                         <div className="flex items-center">
                           <Users className="h-4 w-4 mr-1" />
                           <span>{getEmployeeCount(site.id)} employees</span>
                         </div>
-                        <div className="flex items-center">
-                          <Radius className="h-4 w-4 mr-1" />
-                          <span>{site.geofenceRadius}m radius</span>
-                        </div>
+                        <span>Radius: {site.geofenceRadius}m</span>
                       </div>
                     </div>
                   </div>
                   
                   <div className="text-right space-y-2">
-                    <Badge 
-                      variant={site.isActive ? "default" : "secondary"}
-                      className={site.isActive ? "bg-green-100 text-green-800" : ""}
-                    >
-                      {site.isActive ? 'Active' : 'Inactive'}
+                    <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      Active
                     </Badge>
                     <div className="text-sm text-gray-500">
-                      Created {new Date(site.createdAt).toLocaleDateString()}
+                      <div>Lat: {parseFloat(site.latitude).toFixed(4)}</div>
+                      <div>Lng: {parseFloat(site.longitude).toFixed(4)}</div>
                     </div>
                     <div className="space-x-2">
                       <Link href={`/admin/live-tracking?siteId=${site.id}`}>
@@ -158,6 +163,14 @@ export default function WorkSitesList() {
             </Card>
           ))
         )}
+      </div>
+
+      <div className="mt-6 text-center">
+        <Link href="/admin/sites">
+          <Button>
+            Manage Work Sites
+          </Button>
+        </Link>
       </div>
     </div>
   );
