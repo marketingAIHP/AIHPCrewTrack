@@ -46,7 +46,7 @@ export interface IStorage {
 
   // Attendance operations
   createAttendance(attendance: InsertAttendance): Promise<Attendance>;
-  updateAttendance(id: number, attendance: Partial<InsertAttendance>): Promise<Attendance>;
+  updateAttendance(id: number, attendance: Partial<Attendance>): Promise<Attendance>;
   getCurrentAttendance(employeeId: number): Promise<Attendance | undefined>;
   getAttendanceByAdmin(adminId: number, date?: Date): Promise<Attendance[]>;
 
@@ -210,27 +210,7 @@ export class DatabaseStorage implements IStorage {
     return currentAttendance || undefined;
   }
 
-  async getEmployeeAttendance(employeeId: number): Promise<Attendance[]> {
-    const attendanceRecords = await db
-      .select()
-      .from(attendance)
-      .where(eq(attendance.employeeId, employeeId))
-      .orderBy(desc(attendance.checkInTime))
-      .limit(50);
-    
-    return attendanceRecords;
-  }
 
-  async getEmployeeLocationHistory(employeeId: number): Promise<LocationTracking[]> {
-    const locations = await db
-      .select()
-      .from(locationTrackings)
-      .where(eq(locationTrackings.employeeId, employeeId))
-      .orderBy(desc(locationTrackings.timestamp))
-      .limit(100);
-    
-    return locations;
-  }
 
   async getAttendanceByAdmin(adminId: number, date?: Date): Promise<Attendance[]> {
     if (date) {

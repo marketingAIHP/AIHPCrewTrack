@@ -71,8 +71,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  const httpServer = createServer(app);
-
   // Employee Authentication Routes
   app.post('/api/employee/login', async (req, res) => {
     try {
@@ -255,6 +253,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to check out' });
     }
   });
+
+  const httpServer = createServer(app);
   
   // WebSocket server for real-time location updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
