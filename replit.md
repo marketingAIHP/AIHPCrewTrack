@@ -4,9 +4,17 @@
 
 This is a full-stack labor tracking and workforce management application built with React (frontend), Express.js (backend), and PostgreSQL database. The application enables administrators to manage employees and work sites while providing real-time location tracking and geofencing capabilities for field workers.
 
-## Recent Changes (July 23, 2025)
+## Recent Changes (July 24, 2025)
 
-### Live Tracking Map Controls Implementation
+### Employee Authentication System Implementation
+- **Added employee sign-in portal** with separate login page and dashboard
+- **Implemented geofence-based attendance tracking** for automatic check-in/out
+- **Added role-based access control** separating admin and employee functionality
+- **Created employee dashboard** with attendance controls and work site information
+- **Added real-time location validation** to ensure employees are on-site before marking attendance
+- **Implemented distance calculation** for geofence compliance verification
+
+### Live Tracking Map Controls Implementation (July 23, 2025)
 - **Fixed infinite loop issues** that were causing browser crashes in the live tracking component
 - **Added functional map controls** including zoom in (+), zoom out (-), satellite toggle, and fullscreen buttons
 - **Removed all Google Maps default UI** controls for clean interface
@@ -43,8 +51,11 @@ Preferred communication style: Simple, everyday language.
 
 ### Authentication System
 - **Dual User Types**: Separate login flows for administrators and employees
+- **Employee Portal**: Independent sign-in system for workers with restricted access
+- **Role-Based Access Control**: Admin functions completely separated from employee features
 - **JWT Tokens**: Secure token-based authentication with role-based access control
 - **Password Security**: Bcrypt hashing for secure password storage
+- **Geofence Authentication**: Location-based attendance validation for employees
 
 ### Location Tracking
 - **Real-time GPS**: Browser geolocation API for continuous location monitoring
@@ -57,10 +68,13 @@ Preferred communication style: Simple, everyday language.
 - **Live Tracking**: Real-time map visualization of employee locations and site boundaries
 - **Dashboard Analytics**: Overview statistics and attendance monitoring
 
-### Mobile Worker Interface
+### Employee Interface
+- **Employee Dashboard**: Dedicated portal for worker attendance and site information
 - **Location Services**: Automatic GPS tracking with permission handling
-- **Attendance Management**: Clock in/out functionality with geofence validation
-- **Site Information**: Current work site details and status display
+- **Geofence Validation**: Attendance marking only allowed within work site boundaries
+- **Attendance Management**: Clock in/out functionality with real-time location verification
+- **Site Information**: Current work site details, distance calculation, and status display
+- **Work Hours Tracking**: Automatic calculation of daily hours worked
 
 ### Map Integration
 - **Google Maps**: Interactive maps for site visualization and location tracking with custom controls

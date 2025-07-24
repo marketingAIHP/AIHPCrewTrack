@@ -72,6 +72,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+
+  // Employee Authentication Routes
+  app.post('/api/employee/login', async (req, res) => {
+    try {
+      const { email, password } = employeeLoginSchema.parse(req.body);
+
+      const employee = await storage.getEmployeeByEmail(email);
+      if (!employee) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, employee.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const token = jwt.sign(
+        { id: employee.id, type: 'employee' },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      res.json({ 
+        token,
+        employee: {
+          id: employee.id,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          email: employee.email,
+          phone: employee.phone,
+          siteId: employee.siteId,
+        }
+      });
+    } catch (error) {
+      console.error('Employee login error:', error);
+      res.status(400).json({ message: 'Invalid request data' });
+    }
+  });
+
+  // Employee Profile Routes
+  app.get('/api/employee/profile', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const employee = await storage.getEmployee(req.user!.id);
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      res.json({
+        id: employee.id,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        email: employee.email,
+        phone: employee.phone,
+        siteId: employee.siteId,
+      });
+    } catch (error) {
+      console.error('Error fetching employee profile:', error);
+      res.status(500).json({ message: 'Failed to fetch profile' });
+    }
+  });
+
+  // Employee Work Site Route
+  app.get('/api/employee/site', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const employee = await storage.getEmployee(req.user!.id);
+      if (!employee || !employee.siteId) {
+        return res.status(404).json({ message: 'No work site assigned' });
+      }
+
+      const site = await storage.getWorkSite(employee.siteId);
+      if (!site) {
+        return res.status(404).json({ message: 'Work site not found' });
+      }
+
+      res.json(site);
+    } catch (error) {
+      console.error('Error fetching employee site:', error);
+      res.status(500).json({ message: 'Failed to fetch work site' });
+    }
+  });
+
+  // Employee Attendance Routes
+  app.get('/api/employee/attendance/current', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const attendance = await storage.getCurrentAttendance(req.user!.id);
+      res.json(attendance || null);
+    } catch (error) {
+      console.error('Error fetching current attendance:', error);
+      res.status(500).json({ message: 'Failed to fetch attendance' });
+    }
+  });
+
+  app.post('/api/employee/attendance/checkin', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { latitude, longitude } = req.body;
+      const employeeId = req.user!.id;
+
+      // Get employee and assigned work site
+      const employee = await storage.getEmployee(employeeId);
+      if (!employee || !employee.siteId) {
+        return res.status(400).json({ message: 'No work site assigned' });
+      }
+
+      const site = await storage.getWorkSite(employee.siteId);
+      if (!site) {
+        return res.status(400).json({ message: 'Work site not found' });
+      }
+
+      // Check if employee is within geofence
+      const distance = calculateDistance(
+        latitude,
+        longitude,
+        parseFloat(site.latitude),
+        parseFloat(site.longitude)
+      );
+
+      if (distance > site.geofenceRadius) {
+        return res.status(400).json({ 
+          message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(distance)}m away.`
+        });
+      }
+
+      // Check if already checked in
+      const currentAttendance = await storage.getCurrentAttendance(employeeId);
+      if (currentAttendance && !currentAttendance.checkOutTime) {
+        return res.status(400).json({ message: 'Already checked in' });
+      }
+
+      // Create attendance record
+      const attendance = await storage.createAttendance({
+        employeeId,
+        siteId: employee.siteId,
+        checkInLatitude: latitude.toString(),
+        checkInLongitude: longitude.toString(),
+      });
+
+      // Create location tracking record
+      await storage.createLocationTracking({
+        employeeId,
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+        isOnSite: true,
+      });
+
+      res.json(attendance);
+    } catch (error) {
+      console.error('Error checking in:', error);
+      res.status(500).json({ message: 'Failed to check in' });
+    }
+  });
+
+  app.post('/api/employee/attendance/checkout', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { latitude, longitude } = req.body;
+      const employeeId = req.user!.id;
+
+      // Get current attendance
+      const currentAttendance = await storage.getCurrentAttendance(employeeId);
+      if (!currentAttendance || currentAttendance.checkOutTime) {
+        return res.status(400).json({ message: 'Not currently checked in' });
+      }
+
+      // Update attendance record
+      const updatedAttendance = await storage.updateAttendance(currentAttendance.id, {
+        checkOutTime: new Date(),
+        checkOutLatitude: latitude.toString(),
+        checkOutLongitude: longitude.toString(),
+      });
+
+      // Create location tracking record
+      await storage.createLocationTracking({
+        employeeId,
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+        isOnSite: false,
+      });
+
+      res.json(updatedAttendance);
+    } catch (error) {
+      console.error('Error checking out:', error);
+      res.status(500).json({ message: 'Failed to check out' });
+    }
+  });
   
   // WebSocket server for real-time location updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });

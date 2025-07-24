@@ -12,6 +12,8 @@ import EmployeeProfile from "@/pages/employee-profile";
 import SiteManagement from "@/pages/site-management";
 import LiveTracking from "@/pages/live-tracking";
 import MobileWorker from "@/pages/mobile-worker";
+import EmployeeLogin from "@/pages/employee-login";
+import EmployeeDashboard from "@/pages/employee-dashboard";
 
 function Router() {
   return (
@@ -24,6 +26,8 @@ function Router() {
       <Route path="/admin/employees/:id" component={EmployeeProfile} />
       <Route path="/admin/sites" component={SiteManagement} />
       <Route path="/admin/tracking" component={LiveTracking} />
+      <Route path="/employee/login" component={EmployeeLogin} />
+      <Route path="/employee/dashboard" component={EmployeeDashboard} />
       <Route path="/worker" component={MobileWorker} />
       <Route component={NotFound} />
     </Switch>
