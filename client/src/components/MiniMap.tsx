@@ -19,6 +19,7 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   // Fetch work sites and employees data
   const { data: sites = [] } = useQuery<any[]>({
@@ -56,11 +57,13 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
 
     // Load Google Maps script
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&callback=initMap`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&callback=initMap&loading=async`;
     script.async = true;
     script.defer = true;
     script.onerror = () => {
-      console.error('Failed to load Google Maps API');
+      console.error('Failed to load Google Maps API - Invalid API key');
+      setHasError(true);
+      setIsLoaded(false);
     };
     document.head.appendChild(script);
 
@@ -74,7 +77,7 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
 
   // Initialize map when Google Maps is loaded
   useEffect(() => {
-    if (!isLoaded || !mapRef.current || mapInstance) return;
+    if (!isLoaded || !mapRef.current || mapInstance || hasError) return;
 
     // Default center (can be customized based on sites)
     let center = { lat: 37.7749, lng: -122.4194 }; // San Francisco default
@@ -157,7 +160,7 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
 
   const activeEmployees = employees.filter((emp: any) => emp.isActive).length;
 
-  if (!isLoaded) {
+  if (hasError || (!isLoaded && !window.google)) {
     return (
       <div 
         className="bg-gray-100 rounded-lg flex items-center justify-center"
@@ -165,10 +168,13 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
       >
         <div className="bg-white bg-opacity-90 rounded-lg p-4 text-center">
           <MapPin className="text-primary text-2xl mb-2 mx-auto" />
-          <p className="text-sm font-medium text-gray-900">Loading Map...</p>
+          <p className="text-sm font-medium text-gray-900">Interactive Map</p>
+          <p className="text-xs text-gray-600 mt-1">
+            Configure Google Maps API key to view locations
+          </p>
           {showEmployeeCount && (
-            <p className="text-xs text-gray-600">
-              {activeEmployees} employees tracked
+            <p className="text-xs text-gray-600 mt-2">
+              {sites.length} sites • {activeEmployees} employees
             </p>
           )}
         </div>
