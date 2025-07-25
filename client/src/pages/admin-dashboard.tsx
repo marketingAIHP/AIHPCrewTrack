@@ -197,7 +197,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* Recent Activity */}
-        <div className="mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Recent Activity */}
           <Card>
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
@@ -217,6 +218,47 @@ export default function AdminDashboard() {
                     <p className="text-sm">Add employees and work sites to start tracking</p>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Live Locations */}
+          <Card>
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900">Live Locations</h3>
+                <Link href="/admin/tracking">
+                  <Button variant="link" className="text-primary hover:text-blue-700 text-sm font-medium">
+                    View Full Map
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <CardContent className="p-6">
+              <div className="text-center text-gray-500 py-8">
+                <MapPin className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <p className="font-medium text-gray-900 mb-2">Real-time Location Tracking</p>
+                <p className="text-sm text-gray-600 mb-4">
+                  Monitor employee locations and work site attendance
+                </p>
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium text-gray-700">Work Sites</p>
+                      <p className="text-lg font-bold text-primary">{stats?.workSites || 0}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700">Active Employees</p>
+                      <p className="text-lg font-bold text-green-600">{stats?.activeEmployees || 0}</p>
+                    </div>
+                  </div>
+                </div>
+                <Link href="/admin/tracking">
+                  <Button className="w-full">
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Open Live Tracking Map
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
