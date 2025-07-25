@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer } from "ws";
+import WebSocket from "ws";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -24,16 +25,25 @@ const adminConnections = new Map<number, WebSocket[]>(); // adminId -> WebSocket
 // Helper function to send notification to admin
 function notifyAdmin(adminId: number, notification: any) {
   const connections = adminConnections.get(adminId) || [];
+  console.log(`Attempting to notify admin ${adminId}, found ${connections.length} connections`);
+  
   const message = JSON.stringify({
     type: 'notification',
     data: notification
   });
   
+  let sentCount = 0;
   connections.forEach(ws => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
+      sentCount++;
+      console.log(`Notification sent to admin ${adminId}`);
+    } else {
+      console.log(`WebSocket for admin ${adminId} is not open, state:`, ws.readyState);
     }
   });
+  
+  console.log(`Sent notification to ${sentCount} out of ${connections.length} connections for admin ${adminId}`);
   
   // Clean up closed connections
   const activeConnections = connections.filter(ws => ws.readyState === WebSocket.OPEN);
@@ -240,6 +250,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Send real-time notification to admin
+      console.log(`Sending check-in notification for employee ${employee.firstName} ${employee.lastName} to admin ${employee.adminId}`);
+      console.log(`Admin connections available:`, Array.from(adminConnections.keys()));
       notifyAdmin(employee.adminId, {
         type: 'employee_checkin',
         message: `${employee.firstName} ${employee.lastName} checked in at ${site.name}`,
@@ -344,6 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const connections = adminConnections.get(decoded.id) || [];
         connections.push(ws);
         adminConnections.set(decoded.id, connections);
+        console.log(`Admin ${decoded.id} connected to WebSocket. Total connections: ${connections.length}`);
         
         // Send initial connection confirmation
         ws.send(JSON.stringify({
