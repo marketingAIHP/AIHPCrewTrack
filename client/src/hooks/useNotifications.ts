@@ -27,55 +27,101 @@ export function useNotifications() {
   const [isConnected, setIsConnected] = useState(false);
   const { toast } = useToast();
 
+  // Load recent notifications from server on mount
+  useEffect(() => {
+    const loadRecentNotifications = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+
+        const response = await fetch('/api/admin/notifications/recent', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const recentNotifications = await response.json();
+          setNotifications(recentNotifications);
+        }
+      } catch (error) {
+        console.error('Error loading recent notifications:', error);
+      }
+    };
+
+    loadRecentNotifications();
+  }, []);
+
   useEffect(() => {
     const token = getAuthToken();
     if (!token) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws?token=${token}`;
-    const ws = new WebSocket(wsUrl);
+    let ws: WebSocket;
+    let reconnectTimer: NodeJS.Timeout;
 
-    ws.onopen = () => {
-      setIsConnected(true);
-      console.log('Connected to notification system');
-    };
+    const connect = () => {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws?token=${token}`;
+      ws = new WebSocket(wsUrl);
 
-    ws.onclose = () => {
-      setIsConnected(false);
-      console.log('Disconnected from notification system');
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setIsConnected(false);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        
-        if (message.type === 'notification') {
-          const notification = message.data as Notification;
-          
-          // Add to notifications list
-          setNotifications(prev => [notification, ...prev.slice(0, 49)]); // Keep last 50
-          
-          // Show toast notification
-          toast({
-            title: notification.type === 'employee_checkin' ? 'Employee Check-in' : 'Employee Check-out',
-            description: notification.message,
-            duration: 5000,
-          });
-        } else if (message.type === 'connection_established') {
-          console.log(message.message);
+      ws.onopen = () => {
+        setIsConnected(true);
+        console.log('Connected to notification system');
+        // Clear any reconnect timer
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
         }
-      } catch (error) {
-        console.error('Error parsing notification:', error);
-      }
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        console.log('Disconnected from notification system');
+        // Attempt to reconnect after 3 seconds
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setIsConnected(false);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          if (message.type === 'notification') {
+            const notification = message.data as Notification;
+            
+            // Add to notifications list (keep last 5)
+            setNotifications(prev => {
+              const newNotifications = [notification, ...prev];
+              return newNotifications.slice(0, 5); // Keep only last 5
+            });
+            
+            // Show toast notification
+            toast({
+              title: notification.type === 'employee_checkin' ? 'Employee Check-in' : 'Employee Check-out',
+              description: notification.message,
+              duration: 5000,
+            });
+          } else if (message.type === 'connection_established') {
+            console.log(message.message);
+          }
+        } catch (error) {
+          console.error('Error parsing notification:', error);
+        }
+      };
     };
+
+    connect();
 
     return () => {
-      ws.close();
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      if (ws) {
+        ws.close();
+      }
     };
   }, [toast]);
 

@@ -22,8 +22,24 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 // WebSocket connections for real-time notifications
 const adminConnections = new Map<number, WebSocket[]>(); // adminId -> WebSocket[]
 
+// Notification stack to maintain last 5 transactions per admin
+const notificationStacks = new Map<number, any[]>(); // adminId -> notifications[]
+
+// Helper to add notification to stack
+function addToNotificationStack(adminId: number, notification: any) {
+  const stack = notificationStacks.get(adminId) || [];
+  stack.unshift(notification); // Add to beginning
+  if (stack.length > 5) {
+    stack.pop(); // Remove oldest if more than 5
+  }
+  notificationStacks.set(adminId, stack);
+}
+
 // Helper function to send notification to admin
 function notifyAdmin(adminId: number, notification: any) {
+  // Add to notification stack first
+  addToNotificationStack(adminId, notification);
+  
   const connections = adminConnections.get(adminId) || [];
   console.log(`Attempting to notify admin ${adminId}, found ${connections.length} connections`);
   
@@ -363,6 +379,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: 'connection_established',
           message: 'Connected to notification system'
         }));
+
+        // Send last 5 notifications if any
+        const recentNotifications = notificationStacks.get(decoded.id) || [];
+        if (recentNotifications.length > 0) {
+          recentNotifications.forEach(notification => {
+            ws.send(JSON.stringify({
+              type: 'notification',
+              data: notification
+            }));
+          });
+        }
       } else if (decoded.type === 'employee') {
         employeeConnections.set(decoded.id, ws);
       }
@@ -376,6 +403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             adminConnections.delete(decoded.id);
           }
+          console.log(`Admin ${decoded.id} disconnected. Remaining connections: ${updatedConnections.length}`);
         } else if (decoded.type === 'employee') {
           employeeConnections.delete(decoded.id);
         }
@@ -436,6 +464,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       ws.close(1008, 'Invalid token');
+    }
+  });
+
+  // Add endpoint to get recent notifications
+  app.get('/api/admin/notifications/recent', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminId = req.user!.id;
+      const recentNotifications = notificationStacks.get(adminId) || [];
+      res.json(recentNotifications);
+    } catch (error) {
+      console.error('Error fetching recent notifications:', error);
+      res.status(500).json({ message: 'Failed to fetch notifications' });
     }
   });
 

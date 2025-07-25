@@ -14,6 +14,9 @@ This is a full-stack labor tracking and workforce management application built w
 - **Integrated toast notifications** for immediate visual feedback when employees change status
 - **Removed notification panel from dashboard** as per user request (notifications still work via toast alerts)
 - **Added NotificationDropdown component** to header bell icon with real-time notifications, badge counts, and connection status
+- **Implemented notification stack system** to maintain last 5 transactions per admin with persistent storage
+- **Added automatic WebSocket reconnection** with 3-second retry intervals for improved reliability
+- **Enhanced connection tracking** with improved debugging and connection state management
 
 ### Email Export Report Implementation
 - **Added comprehensive email export functionality** for 30-day attendance reports
