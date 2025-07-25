@@ -6,6 +6,14 @@ This is a full-stack labor tracking and workforce management application built w
 
 ## Recent Changes (July 25, 2025)
 
+### Email Export Report Implementation
+- **Added comprehensive email export functionality** for 30-day attendance reports
+- **Integrated SendGrid email service** for reliable report delivery to admin-specified email addresses
+- **Created ExportReportDialog component** with form validation for email settings
+- **Generated professional HTML reports** including employee details, check-in/out times, hours worked, and site assignments
+- **Enhanced admin dashboard** with functional Export Report button using dialog interface
+- **Implemented proper error handling** for email sending failures and validation
+
 ### Location Tracking Enhancements and Custom Map Icons
 - **Replaced red dot markers with custom person icons** in red color for better employee identification on maps
 - **Added green building icons for work sites** to clearly distinguish sites from employees on the map

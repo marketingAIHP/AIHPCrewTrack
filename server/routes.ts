@@ -14,6 +14,7 @@ import {
   insertLocationTrackingSchema,
   insertAttendanceSchema,
 } from "@shared/schema";
+import { sendEmail } from './sendgrid';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -545,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/employees/:id/attendance', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const employeeId = parseInt(req.params.id);
-      const attendance = await storage.getEmployeeAttendance(employeeId);
+      const attendance = await storage.getEmployeeAttendanceHistory(employeeId, new Date(0));
       res.json(attendance);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch attendance records' });
@@ -743,7 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Calculate if employee is within geofence
             let isWithinGeofence = false;
-            const siteId = employee.siteId || employee.site_id;
+            const siteId = employee.siteId;
             if (location && siteId) {
               const assignedSite = await storage.getWorkSite(siteId);
               if (assignedSite) {
@@ -834,5 +835,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export Report endpoint
+  app.post('/api/admin/export-report', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { email, fromEmail, subject } = req.body;
+      
+      if (!email || !fromEmail || !subject) {
+        return res.status(400).json({ message: 'Email, fromEmail, and subject are required' });
+      }
+
+      // Get all employees for this admin
+      const employees = await storage.getEmployeesByAdmin(req.user!.id);
+      
+      // Get 30-day attendance data for all employees
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const attendanceData = await Promise.all(
+        employees.map(async (employee) => {
+          const history = await storage.getEmployeeAttendanceHistory(employee.id, thirtyDaysAgo);
+          const site = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
+          
+          return {
+            employee,
+            site,
+            attendance: history
+          };
+        })
+      );
+
+      // Generate HTML report
+      const reportHtml = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
+      
+      // Send email
+      const emailSent = await sendEmail({
+        to: email,
+        from: fromEmail,
+        subject: subject,
+        html: reportHtml,
+        text: 'Please view this email in HTML format to see the attendance report.'
+      });
+
+      if (emailSent) {
+        res.json({ message: 'Report sent successfully' });
+      } else {
+        res.status(500).json({ message: 'Failed to send email' });
+      }
+    } catch (error) {
+      console.error('Export report error:', error);
+      res.status(500).json({ message: 'Failed to generate and send report' });
+    }
+  });
+
   return httpServer;
+}
+
+// Helper function to generate HTML report
+function generateAttendanceReportHtml(attendanceData: any[], fromDate: Date): string {
+  const formatDate = (date: Date | string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (date: Date | string) => {
+    return new Date(date).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const calculateHours = (checkIn: Date | string, checkOut: Date | string | null) => {
+    if (!checkOut) return 'In Progress';
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    const diffMs = end.getTime() - start.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Employee Attendance Report</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+        .employee-section { margin-bottom: 30px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
+        .employee-header { background: #e9ecef; padding: 15px; }
+        .attendance-table { width: 100%; border-collapse: collapse; }
+        .attendance-table th, .attendance-table td { padding: 10px; text-align: left; border-bottom: 1px solid #dee2e6; }
+        .attendance-table th { background: #f8f9fa; font-weight: bold; }
+        .no-data { text-align: center; padding: 20px; color: #6c757d; }
+        .summary { background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 10px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>Employee Attendance Report</h1>
+        <p><strong>Report Period:</strong> ${formatDate(fromDate)} - ${formatDate(new Date())}</p>
+        <p><strong>Generated on:</strong> ${formatDate(new Date())} at ${formatTime(new Date())}</p>
+      </div>
+
+      ${attendanceData.map(({ employee, site, attendance }) => `
+        <div class="employee-section">
+          <div class="employee-header">
+            <h2>${employee.firstName} ${employee.lastName}</h2>
+            <p><strong>Email:</strong> ${employee.email}</p>
+            <p><strong>Assigned Site:</strong> ${site ? site.name : 'No assigned site'}</p>
+            ${site ? `<p><strong>Site Address:</strong> ${site.address}</p>` : ''}
+          </div>
+          
+          <div class="summary">
+            <strong>Summary:</strong> ${attendance.length} attendance records in the last 30 days
+          </div>
+
+          ${attendance.length > 0 ? `
+            <table class="attendance-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Check In</th>
+                  <th>Check Out</th>
+                  <th>Hours Worked</th>
+                  <th>Site</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${attendance.map((record: any) => `
+                  <tr>
+                    <td>${formatDate(record.checkInTime)}</td>
+                    <td>${formatTime(record.checkInTime)}</td>
+                    <td>${record.checkOutTime ? formatTime(record.checkOutTime) : 'Still checked in'}</td>
+                    <td>${calculateHours(record.checkInTime, record.checkOutTime)}</td>
+                    <td>${site ? site.name : 'Unknown'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : `
+            <div class="no-data">
+              No attendance records found for this employee in the last 30 days.
+            </div>
+          `}
+        </div>
+      `).join('')}
+
+      <div class="header">
+        <p><em>This report was automatically generated by the Labor Tracking System.</em></p>
+      </div>
+    </body>
+    </html>
+  `;
 }

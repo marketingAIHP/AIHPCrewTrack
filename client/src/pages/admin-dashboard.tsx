@@ -16,8 +16,10 @@ import {
   Plus,
   FileText,
   Settings,
-  Bell
+  Bell,
+  Download
 } from 'lucide-react';
+import ExportReportDialog from '@/components/ExportReportDialog';
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -281,10 +283,12 @@ export default function AdminDashboard() {
                   <span className="font-medium text-gray-900">Add Work Site</span>
                 </Button>
               </Link>
-              <Button variant="outline" className="w-full flex items-center p-4 h-auto">
-                <FileText className="text-primary text-xl mr-3" />
-                <span className="font-medium text-gray-900">Export Report</span>
-              </Button>
+              <ExportReportDialog>
+                <Button variant="outline" className="w-full flex items-center p-4 h-auto">
+                  <Download className="text-primary text-xl mr-3" />
+                  <span className="font-medium text-gray-900">Export Report</span>
+                </Button>
+              </ExportReportDialog>
               <Button variant="outline" className="w-full flex items-center p-4 h-auto">
                 <Settings className="text-primary text-xl mr-3" />
                 <span className="font-medium text-gray-900">Settings</span>
