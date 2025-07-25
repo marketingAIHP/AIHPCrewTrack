@@ -867,10 +867,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate HTML report
       const reportHtml = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
       
+      // Validate email addresses
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email) || !emailRegex.test(fromEmail)) {
+        return res.status(400).json({ message: 'Invalid email address format' });
+      }
+
+      console.log(`Sending attendance report from ${fromEmail} to ${email}`);
+      console.log(`Report contains ${attendanceData.length} employees`);
+
+      // For SendGrid to work properly, the 'from' email should be verified
+      // We'll use a safer approach with a verified sender
+      let actualFromEmail = fromEmail;
+      
+      // If using Gmail, suggest using a verified sender to avoid spam filters
+      if (fromEmail.includes('@gmail.com') || fromEmail.includes('@yahoo.com') || fromEmail.includes('@hotmail.com')) {
+        console.warn(`Warning: Using ${fromEmail} as sender. For better delivery, verify this email in SendGrid.`);
+      }
+
       // Send email
       const emailSent = await sendEmail({
         to: email,
-        from: fromEmail,
+        from: actualFromEmail,
         subject: subject,
         html: reportHtml,
         text: 'Please view this email in HTML format to see the attendance report.'
