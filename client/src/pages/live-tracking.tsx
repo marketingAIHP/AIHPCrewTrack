@@ -124,20 +124,17 @@ export default function LiveTracking() {
   const getStatusColor = (employee: any, location: any) => {
     if (!location) return 'bg-gray-500';
     
-    const assignedSites = Array.isArray(sites) ? sites.filter((site: any) => 
-      Array.isArray(employee.assignedSites) && employee.assignedSites.includes(site.id)
-    ) : [];
+    // Check if employee has a siteId (assigned site)
+    if (!employee.siteId) return 'bg-gray-500';
     
-    if (assignedSites.length === 0) return 'bg-gray-500';
+    // Find the assigned site
+    const assignedSite = Array.isArray(sites) ? sites.find((site: any) => site.id === employee.siteId) : null;
     
-    for (const site of assignedSites) {
-      const distance = calculateDistance(
-        location.latitude, location.longitude,
-        site.latitude, site.longitude
-      );
-      if (distance <= site.geofenceRadius) {
-        return 'bg-green-500';
-      }
+    if (!assignedSite) return 'bg-gray-500';
+    
+    // Check if location is within the geofence using isWithinGeofence from server
+    if (location.isWithinGeofence) {
+      return 'bg-green-500';
     }
     
     return 'bg-red-500';
@@ -146,20 +143,17 @@ export default function LiveTracking() {
   const getStatusText = (employee: any, location: any) => {
     if (!location) return 'No Location';
     
-    const assignedSites = Array.isArray(sites) ? sites.filter((site: any) => 
-      Array.isArray(employee.assignedSites) && employee.assignedSites.includes(site.id)
-    ) : [];
+    // Check if employee has a siteId (assigned site)
+    if (!employee.siteId) return 'No Assigned Site';
     
-    if (assignedSites.length === 0) return 'No Assigned Site';
+    // Find the assigned site
+    const assignedSite = Array.isArray(sites) ? sites.find((site: any) => site.id === employee.siteId) : null;
     
-    for (const site of assignedSites) {
-      const distance = calculateDistance(
-        location.latitude, location.longitude,
-        site.latitude, site.longitude
-      );
-      if (distance <= site.geofenceRadius) {
-        return `On Site: ${site.name}`;
-      }
+    if (!assignedSite) return 'Unknown Site';
+    
+    // Use server-calculated isWithinGeofence status
+    if (location.isWithinGeofence) {
+      return `On Site: ${assignedSite.name}`;
     }
     
     return 'Outside Site Boundary';
@@ -333,9 +327,10 @@ export default function LiveTracking() {
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
                 {Array.isArray(locations) ? 
-                  locations.filter((item: any) => 
-                    getStatusColor(item.employee, item.location) === 'bg-green-500'
-                  ).length : 0
+                  locations.filter((item: any) => {
+                    console.log('Employee:', item.employee.firstName, 'isWithinGeofence:', item.location?.isWithinGeofence);
+                    return item.location?.isWithinGeofence === true;
+                  }).length : 0
                 }
               </div>
               <p className="text-xs text-muted-foreground">within boundaries</p>
@@ -351,7 +346,7 @@ export default function LiveTracking() {
               <div className="text-2xl font-bold text-red-600">
                 {Array.isArray(locations) ? 
                   locations.filter((item: any) => 
-                    getStatusColor(item.employee, item.location) === 'bg-red-500'
+                    item.location && !item.location.isWithinGeofence
                   ).length : 0
                 }
               </div>
