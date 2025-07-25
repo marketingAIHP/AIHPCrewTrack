@@ -8,6 +8,7 @@ interface GoogleMapProps {
     position: { lat: number; lng: number };
     title: string;
     color?: string;
+    type?: 'employee' | 'site';
     onClick?: () => void;
   }>;
   geofences?: Array<{
@@ -82,27 +83,49 @@ export default function GoogleMap({
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
-    // Add new markers with custom person icon
+    // Add new markers with custom icons
     markers.forEach(markerData => {
-      // Create custom person icon SVG
-      const personIcon = {
-        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
-                  fill="${markerData.color || '#ff0000'}" stroke="#ffffff" stroke-width="1"/>
-            <circle cx="12" cy="8.5" r="2" fill="#ffffff"/>
-            <path d="M8.5 13.5c0-1.5 1.57-2.5 3.5-2.5s3.5 1 3.5 2.5v1h-7v-1z" fill="#ffffff"/>
-          </svg>
-        `)}`,
-        scaledSize: new google.maps.Size(32, 32),
-        anchor: new google.maps.Point(16, 32),
-      };
+      let customIcon;
+      
+      if (markerData.type === 'site') {
+        // Create custom site icon SVG (building/location marker in green)
+        customIcon = {
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                    fill="${markerData.color || '#22c55e'}" stroke="#ffffff" stroke-width="1"/>
+              <rect x="8" y="6" width="8" height="10" rx="1" fill="#ffffff"/>
+              <rect x="9" y="7" width="2" height="2" fill="${markerData.color || '#22c55e'}"/>
+              <rect x="13" y="7" width="2" height="2" fill="${markerData.color || '#22c55e'}"/>
+              <rect x="9" y="10" width="2" height="2" fill="${markerData.color || '#22c55e'}"/>
+              <rect x="13" y="10" width="2" height="2" fill="${markerData.color || '#22c55e'}"/>
+              <rect x="11" y="13" width="2" height="3" fill="${markerData.color || '#22c55e'}"/>
+            </svg>
+          `)}`,
+          scaledSize: new google.maps.Size(32, 32),
+          anchor: new google.maps.Point(16, 32),
+        };
+      } else {
+        // Create custom person icon SVG (default for employees)
+        customIcon = {
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                    fill="${markerData.color || '#ff0000'}" stroke="#ffffff" stroke-width="1"/>
+              <circle cx="12" cy="8.5" r="2" fill="#ffffff"/>
+              <path d="M8.5 13.5c0-1.5 1.57-2.5 3.5-2.5s3.5 1 3.5 2.5v1h-7v-1z" fill="#ffffff"/>
+            </svg>
+          `)}`,
+          scaledSize: new google.maps.Size(32, 32),
+          anchor: new google.maps.Point(16, 32),
+        };
+      }
 
       const marker = new google.maps.Marker({
         position: markerData.position,
         map: mapInstanceRef.current,
         title: markerData.title,
-        icon: personIcon,
+        icon: customIcon,
       });
 
       // Add click listener if onClick is provided

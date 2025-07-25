@@ -8,11 +8,13 @@ This is a full-stack labor tracking and workforce management application built w
 
 ### Location Tracking Enhancements and Custom Map Icons
 - **Replaced red dot markers with custom person icons** in red color for better employee identification on maps
+- **Added green building icons for work sites** to clearly distinguish sites from employees on the map
+- **Implemented clickable map markers** that zoom to specific employee or site locations when clicked
 - **Changed location update interval to 1 minute** from 30 seconds to reduce server load and improve battery life
 - **Implemented automatic check-out when employees leave geofence** to ensure accurate attendance tracking
 - **Added 30-day attendance history section** to employee dashboard with detailed check-in/out records
 - **Enhanced attendance filtering** with database-level 30-day filtering for improved performance
-- **Fixed WebSocket connection cycling** by updating refresh intervals across all location tracking components
+- **Updated map legend** to show red for employees, green for work sites, and blue for geofence boundaries
 
 ### Live Tracking and "On Site Now" Functionality Enhancement
 - **Fixed "On Site Now" functionality** to properly display employees who are checked in and within geofence

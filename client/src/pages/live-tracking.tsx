@@ -224,6 +224,7 @@ export default function LiveTracking() {
   const getMapMarkers = () => {
     const markers: any[] = [];
     
+    // Add employee markers (red person icons)
     if (Array.isArray(locations)) {
       locations.forEach((item: any) => {
         if (item.location?.latitude && item.location?.longitude) {
@@ -234,10 +235,29 @@ export default function LiveTracking() {
             markers.push({
               position: { lat, lng },
               title: `${item.employee.firstName} ${item.employee.lastName}`,
-              color: 'red', // Show checked-in employees as red markers
+              color: '#ff0000', // Red color for employees
+              type: 'employee',
               onClick: () => zoomToEmployee(lat, lng),
             });
           }
+        }
+      });
+    }
+    
+    // Add site markers (green building icons)
+    if (Array.isArray(sites)) {
+      sites.forEach((site: any) => {
+        const lat = parseFloat(site.latitude);
+        const lng = parseFloat(site.longitude);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          markers.push({
+            position: { lat, lng },
+            title: `Work Site: ${site.name}`,
+            color: '#22c55e', // Green color for sites
+            type: 'site',
+            onClick: () => zoomToEmployee(lat, lng), // Can also zoom to site
+          });
         }
       });
     }
@@ -395,13 +415,19 @@ export default function LiveTracking() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Real-time Map</h2>
                 <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2 text-sm">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span>On Site</span>
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <span>Outside Boundary</span>
-                    <div className="w-3 h-3 bg-blue-500 rounded-full opacity-30"></div>
-                    <span>Site Boundary</span>
+                  <div className="flex items-center space-x-4 text-sm">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span>Employees</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span>Work Sites</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full opacity-30"></div>
+                      <span>Site Boundary</span>
+                    </div>
                   </div>
                 </div>
               </div>
