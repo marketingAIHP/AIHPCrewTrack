@@ -91,6 +91,7 @@ export function useNotifications() {
           
           if (message.type === 'notification') {
             const notification = message.data as Notification;
+            console.log('Received notification:', notification);
             
             // Add to notifications list (keep last 5)
             setNotifications(prev => {
@@ -106,6 +107,8 @@ export function useNotifications() {
             });
           } else if (message.type === 'connection_established') {
             console.log(message.message);
+          } else {
+            console.log('Received unknown message type:', message.type, message);
           }
         } catch (error) {
           console.error('Error parsing notification:', error);

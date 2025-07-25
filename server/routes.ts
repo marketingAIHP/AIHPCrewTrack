@@ -268,6 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send real-time notification to admin
       console.log(`Sending check-in notification for employee ${employee.firstName} ${employee.lastName} to admin ${employee.adminId}`);
       console.log(`Admin connections available:`, Array.from(adminConnections.keys()));
+      console.log(`Admin ${employee.adminId} connections count:`, adminConnections.get(employee.adminId)?.length || 0);
       notifyAdmin(employee.adminId, {
         type: 'employee_checkin',
         message: `${employee.firstName} ${employee.lastName} checked in at ${site.name}`,
