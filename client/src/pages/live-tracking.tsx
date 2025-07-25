@@ -30,7 +30,7 @@ export default function LiveTracking() {
   const { toast } = useToast();
   const [mapLoaded, setMapLoaded] = useState(false);
   const [employeeLocations, setEmployeeLocations] = useState<EmployeeLocation[]>([]);
-  const [mapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
+  const [mapCenter, setMapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
   const [mapZoom, setMapZoom] = useState(12);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -215,6 +215,12 @@ export default function LiveTracking() {
     setLocation(`/admin/employees/${employeeId}`);
   }, [setLocation]);
 
+  // Function to zoom to specific employee location
+  const zoomToEmployee = useCallback((lat: number, lng: number) => {
+    setMapCenter({ lat, lng });
+    setMapZoom(18); // Close zoom level to see the employee clearly
+  }, []);
+
   const getMapMarkers = () => {
     const markers: any[] = [];
     
@@ -229,6 +235,7 @@ export default function LiveTracking() {
               position: { lat, lng },
               title: `${item.employee.firstName} ${item.employee.lastName}`,
               color: 'red', // Show checked-in employees as red markers
+              onClick: () => zoomToEmployee(lat, lng),
             });
           }
         }

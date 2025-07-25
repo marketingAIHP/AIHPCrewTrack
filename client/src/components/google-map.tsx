@@ -8,6 +8,7 @@ interface GoogleMapProps {
     position: { lat: number; lng: number };
     title: string;
     color?: string;
+    onClick?: () => void;
   }>;
   geofences?: Array<{
     center: { lat: number; lng: number };
@@ -103,6 +104,11 @@ export default function GoogleMap({
         title: markerData.title,
         icon: personIcon,
       });
+
+      // Add click listener if onClick is provided
+      if (markerData.onClick) {
+        marker.addListener('click', markerData.onClick);
+      }
 
       markersRef.current.push(marker);
     });
