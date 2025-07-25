@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken, getUser, logout, getUserType } from '@/lib/auth';
-import MiniMap from '@/components/MiniMap';
+
 import { 
   Users, 
   MapPin, 
@@ -196,9 +196,8 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {/* Recent Activity & Live Map */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Recent Activity */}
+        {/* Recent Activity */}
+        <div className="mb-8">
           <Card>
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
@@ -219,23 +218,6 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Live Map Preview */}
-          <Card>
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Live Locations</h3>
-                <Link href="/admin/tracking">
-                  <Button variant="link" className="text-primary hover:text-blue-700 text-sm font-medium">
-                    View Full Map
-                  </Button>
-                </Link>
-              </div>
-            </div>
-            <CardContent className="p-0">
-              <MiniMap height="256px" showEmployeeCount={true} />
             </CardContent>
           </Card>
         </div>
