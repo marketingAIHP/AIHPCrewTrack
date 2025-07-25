@@ -328,6 +328,58 @@ export default function EmployeeDashboard() {
     });
   };
 
+  // Calculate working hours for a record
+  const calculateWorkingHours = (checkInTime: string, checkOutTime?: string) => {
+    if (!checkOutTime) return 0;
+    const start = new Date(checkInTime);
+    const end = new Date(checkOutTime);
+    const diffMs = end.getTime() - start.getTime();
+    return diffMs / (1000 * 60 * 60); // Convert to hours
+  };
+
+  // Calculate today's total hours
+  const calculateTodayHours = () => {
+    if (!attendanceHistory?.length) return 0;
+    
+    const today = new Date().toDateString();
+    let todayTotal = 0;
+    
+    attendanceHistory.forEach(record => {
+      const recordDate = new Date(record.checkInTime).toDateString();
+      if (recordDate === today) {
+        const hours = calculateWorkingHours(record.checkInTime, record.checkOutTime);
+        todayTotal += hours;
+      }
+    });
+    
+    // If currently checked in, add hours from current session
+    if (currentAttendance && !currentAttendance.checkOutTime) {
+      const currentDate = new Date(currentAttendance.checkInTime).toDateString();
+      if (currentDate === today) {
+        const hoursFromCurrentSession = calculateWorkingHours(
+          currentAttendance.checkInTime, 
+          new Date().toISOString()
+        );
+        todayTotal += hoursFromCurrentSession;
+      }
+    }
+    
+    return todayTotal;
+  };
+
+  // Format hours to display (e.g., "8.5h" or "8h 30m")
+  const formatHours = (hours: number) => {
+    if (hours === 0) return "0h";
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    
+    if (minutes === 0) {
+      return `${wholeHours}h`;
+    } else {
+      return `${wholeHours}h ${minutes}m`;
+    }
+  };
+
   if (employeeLoading || siteLoading || attendanceLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
@@ -522,37 +574,44 @@ export default function EmployeeDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime ? (
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">
-                    {Math.floor(
-                      (new Date().getTime() - new Date((currentAttendance as AttendanceRecord).checkInTime).getTime()) 
-                      / (1000 * 60 * 60)
-                    )} hours {Math.floor(
-                      ((new Date().getTime() - new Date((currentAttendance as AttendanceRecord).checkInTime).getTime()) 
-                      % (1000 * 60 * 60)) / (1000 * 60)
-                    )} minutes
+              <div className="text-center">
+                <p className="text-3xl font-bold text-blue-600 mb-2">
+                  {formatHours(calculateTodayHours())}
+                </p>
+                {currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime ? (
+                  <div>
+                    <Badge variant="default" className="mb-2">Currently Working</Badge>
+                    <p className="text-sm text-gray-600">
+                      Started at {new Date((currentAttendance as AttendanceRecord).checkInTime).toLocaleTimeString()}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    {calculateTodayHours() > 0 ? 'Total hours worked today' : 'Not currently checked in'}
                   </p>
-                  <p className="text-sm text-gray-600">Currently working</p>
-                </div>
-              ) : (
-                <div className="text-center text-gray-500">
-                  <p>Not currently checked in</p>
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
 
           {/* 30-Day Attendance History */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <History className="h-5 w-5" />
-                <span>Attendance History (Last 30 Days)</span>
-              </CardTitle>
-              <CardDescription>
-                Your check-in and check-out records
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center space-x-2">
+                    <History className="h-5 w-5" />
+                    <span>Attendance History (Last 30 Days)</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Your check-in and check-out records
+                  </CardDescription>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Today's Total</p>
+                  <p className="text-xl font-bold text-blue-600">{formatHours(calculateTodayHours())}</p>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {historyLoading ? (
@@ -590,7 +649,7 @@ export default function EmployeeDashboard() {
                         </div>
                       </div>
                       
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         {record.checkOutTime ? (
                           <Badge variant="outline" className="text-green-600 border-green-600">
                             Completed
@@ -601,14 +660,16 @@ export default function EmployeeDashboard() {
                           </Badge>
                         )}
                         
-                        {record.checkOutTime && (
-                          <span className="text-xs text-gray-500">
-                            {Math.round(
-                              (new Date(record.checkOutTime).getTime() - 
-                               new Date(record.checkInTime).getTime()) / (1000 * 60 * 60 * 10)
-                            ) / 10}h
+                        <div className="text-right">
+                          <span className="text-sm font-medium text-gray-900">
+                            {record.checkOutTime ? formatHours(calculateWorkingHours(record.checkInTime, record.checkOutTime)) : 'In Progress'}
                           </span>
-                        )}
+                          {!record.checkOutTime && (
+                            <p className="text-xs text-gray-500">
+                              {formatHours(calculateWorkingHours(record.checkInTime, new Date().toISOString()))} so far
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
