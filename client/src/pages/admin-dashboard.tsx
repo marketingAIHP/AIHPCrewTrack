@@ -191,6 +191,37 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
+        {/* Quick Actions */}
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Link href="/admin/employees">
+                <Button variant="outline" className="w-full flex items-center p-4 h-auto">
+                  <UserPlus className="text-primary text-xl mr-3" />
+                  <span className="font-medium text-gray-900">Add Employee</span>
+                </Button>
+              </Link>
+              <Link href="/admin/sites">
+                <Button variant="outline" className="w-full flex items-center p-4 h-auto">
+                  <Plus className="text-primary text-xl mr-3" />
+                  <span className="font-medium text-gray-900">Add Work Site</span>
+                </Button>
+              </Link>
+              <ExportReportDialog>
+                <Button variant="outline" className="w-full flex items-center p-4 h-auto">
+                  <Download className="text-primary text-xl mr-3" />
+                  <span className="font-medium text-gray-900">Export Report</span>
+                </Button>
+              </ExportReportDialog>
+              <Button variant="outline" className="w-full flex items-center p-4 h-auto">
+                <Settings className="text-primary text-xl mr-3" />
+                <span className="font-medium text-gray-900">Settings</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Recent Activity */}
@@ -258,37 +289,6 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Quick Actions */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Link href="/admin/employees">
-                <Button variant="outline" className="w-full flex items-center p-4 h-auto">
-                  <UserPlus className="text-primary text-xl mr-3" />
-                  <span className="font-medium text-gray-900">Add Employee</span>
-                </Button>
-              </Link>
-              <Link href="/admin/sites">
-                <Button variant="outline" className="w-full flex items-center p-4 h-auto">
-                  <Plus className="text-primary text-xl mr-3" />
-                  <span className="font-medium text-gray-900">Add Work Site</span>
-                </Button>
-              </Link>
-              <ExportReportDialog>
-                <Button variant="outline" className="w-full flex items-center p-4 h-auto">
-                  <Download className="text-primary text-xl mr-3" />
-                  <span className="font-medium text-gray-900">Export Report</span>
-                </Button>
-              </ExportReportDialog>
-              <Button variant="outline" className="w-full flex items-center p-4 h-auto">
-                <Settings className="text-primary text-xl mr-3" />
-                <span className="font-medium text-gray-900">Settings</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </main>
     </div>
   );
