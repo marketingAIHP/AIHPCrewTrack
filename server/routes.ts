@@ -43,28 +43,27 @@ function notifyAdmin(adminId: number, notification: any) {
   const connections = adminConnections.get(adminId) || [];
   console.log(`Attempting to notify admin ${adminId}, found ${connections.length} connections`);
   
+  // Clean up closed connections first
+  const activeConnections = connections.filter(ws => ws.readyState === WebSocket.OPEN);
+  adminConnections.set(adminId, activeConnections);
+  
+  if (activeConnections.length === 0) {
+    console.log(`No active connections for admin ${adminId}`);
+    return;
+  }
+  
   const message = JSON.stringify({
     type: 'notification',
     data: notification
   });
   
-  let sentCount = 0;
-  connections.forEach(ws => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(message);
-      sentCount++;
-      console.log(`Notification sent to admin ${adminId}`);
-    } else {
-      console.log(`WebSocket for admin ${adminId} is not open, state:`, ws.readyState);
-    }
-  });
-  
-  console.log(`Sent notification to ${sentCount} out of ${connections.length} connections for admin ${adminId}`);
-  
-  // Clean up closed connections
-  const activeConnections = connections.filter(ws => ws.readyState === WebSocket.OPEN);
-  if (activeConnections.length !== connections.length) {
-    adminConnections.set(adminId, activeConnections);
+  // Send to only the first active connection to avoid duplicates
+  const ws = activeConnections[0];
+  try {
+    ws.send(message);
+    console.log(`Notification sent to admin ${adminId} (using 1 connection out of ${activeConnections.length})`);
+  } catch (error) {
+    console.error(`Failed to send notification to admin ${adminId}:`, error);
   }
 }
 
@@ -381,15 +380,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: 'Connected to notification system'
         }));
 
-        // Send last 5 notifications if any
-        const recentNotifications = notificationStacks.get(decoded.id) || [];
-        if (recentNotifications.length > 0) {
-          recentNotifications.forEach(notification => {
-            ws.send(JSON.stringify({
-              type: 'notification',
-              data: notification
-            }));
-          });
+        // Send last 5 notifications if any (only for the first connection to avoid duplicates)
+        const existingConnections = adminConnections.get(decoded.id) || [];
+        if (existingConnections.length === 1) { // Only send history for first connection
+          const recentNotifications = notificationStacks.get(decoded.id) || [];
+          if (recentNotifications.length > 0) {
+            recentNotifications.forEach(notification => {
+              ws.send(JSON.stringify({
+                type: 'notification',
+                data: notification
+              }));
+            });
+          }
         }
       } else if (decoded.type === 'employee') {
         employeeConnections.set(decoded.id, ws);

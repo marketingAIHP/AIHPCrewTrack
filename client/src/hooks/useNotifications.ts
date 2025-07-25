@@ -93,8 +93,20 @@ export function useNotifications() {
             const notification = message.data as Notification;
             console.log('Received notification:', notification);
             
-            // Add to notifications list (keep last 5)
+            // Add to notifications list (keep last 5, avoid duplicates)
             setNotifications(prev => {
+              // Check if this notification already exists (by timestamp and type)
+              const isDuplicate = prev.some(n => 
+                n.timestamp === notification.timestamp && 
+                n.type === notification.type && 
+                n.employee.id === notification.employee.id
+              );
+              
+              if (isDuplicate) {
+                console.log('Duplicate notification detected, skipping');
+                return prev;
+              }
+              
               const newNotifications = [notification, ...prev];
               return newNotifications.slice(0, 5); // Keep only last 5
             });
