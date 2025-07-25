@@ -21,7 +21,8 @@ import {
   MapPin, 
   Edit, 
   Building2,
-  Users
+  Users,
+  Trash2
 } from 'lucide-react';
 
 const siteSchema = z.object({
@@ -39,6 +40,7 @@ export default function SiteManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSite, setEditingSite] = useState<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({ lat: 40.7128, lng: -74.0060 });
 
@@ -95,23 +97,32 @@ export default function SiteManagement() {
         longitude: data.longitude,
         geofenceRadius: parseInt(data.geofenceRadius),
       };
-      const response = await apiRequest('POST', '/api/admin/sites', payload);
-      return response.json();
+      
+      if (editingSite) {
+        // Update existing site
+        const response = await apiRequest('PUT', `/api/admin/sites/${editingSite.id}`, payload);
+        return response.json();
+      } else {
+        // Create new site
+        const response = await apiRequest('POST', '/api/admin/sites', payload);
+        return response.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/sites'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
       setIsDialogOpen(false);
+      setEditingSite(null);
       form.reset();
       toast({
         title: 'Success',
-        description: 'Work site created successfully',
+        description: editingSite ? 'Work site updated successfully' : 'Work site created successfully',
       });
     },
     onError: (error) => {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create work site',
+        description: error.message || `Failed to ${editingSite ? 'update' : 'create'} work site`,
         variant: 'destructive',
       });
     },
@@ -137,6 +148,74 @@ export default function SiteManagement() {
     return Math.floor(Math.random() * getEmployeeCount(siteId));
   };
 
+  const handleViewSiteMap = (site: any) => {
+    // Navigate to live tracking focused on this site
+    setLocation(`/admin/tracking?siteId=${site.id}`);
+  };
+
+  const handleEditSite = (site: any) => {
+    // Set editing mode and populate form with site data
+    setEditingSite(site);
+    form.setValue('name', site.name);
+    form.setValue('address', site.address);
+    form.setValue('latitude', site.latitude.toString());
+    form.setValue('longitude', site.longitude.toString());
+    form.setValue('geofenceRadius', site.geofenceRadius.toString());
+    setSelectedLocation({ lat: parseFloat(site.latitude), lng: parseFloat(site.longitude) });
+    setIsDialogOpen(true);
+    
+    toast({
+      title: 'Edit Mode',
+      description: `Editing ${site.name}`,
+    });
+  };
+
+  const handleAddSite = () => {
+    setEditingSite(null);
+    form.reset();
+    setSelectedLocation({ lat: 40.7128, lng: -74.0060 });
+    setIsDialogOpen(true);
+  };
+
+  const deleteSiteMutation = useMutation({
+    mutationFn: async (siteId: number) => {
+      const response = await apiRequest('DELETE', `/api/admin/sites/${siteId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/sites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
+      toast({
+        title: 'Success',
+        description: 'Work site deleted successfully',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete work site',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleDeleteSite = (site: any) => {
+    const employeeCount = getEmployeeCount(site.id);
+    
+    if (employeeCount > 0) {
+      toast({
+        title: 'Cannot Delete Site',
+        description: `This site has ${employeeCount} assigned employees. Please reassign them first.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete "${site.name}"? This action cannot be undone.`)) {
+      deleteSiteMutation.mutate(site.id);
+    }
+  };
+
   if (!getAuthToken() || getUserType() !== 'admin') {
     return null;
   }
@@ -155,16 +234,23 @@ export default function SiteManagement() {
               </Link>
               <h1 className="text-xl font-semibold text-gray-900">Work Site Management</h1>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                setEditingSite(null);
+                form.reset();
+                setSelectedLocation({ lat: 40.7128, lng: -74.0060 });
+              }
+            }}>
               <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-blue-700 text-white">
+                <Button className="bg-primary hover:bg-blue-700 text-white" onClick={handleAddSite}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Site
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Add New Work Site</DialogTitle>
+                  <DialogTitle>{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <div>
@@ -273,7 +359,10 @@ export default function SiteManagement() {
                   
                   <div className="flex space-x-2">
                     <Button type="submit" className="flex-1" disabled={createSiteMutation.isPending}>
-                      {createSiteMutation.isPending ? 'Creating...' : 'Create Site'}
+                      {createSiteMutation.isPending 
+                        ? (editingSite ? 'Updating...' : 'Creating...') 
+                        : (editingSite ? 'Update Site' : 'Create Site')
+                      }
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                       Cancel
@@ -336,12 +425,27 @@ export default function SiteManagement() {
                   </div>
                   
                   <div className="flex space-x-2">
-                    <Button className="flex-1 bg-primary text-white hover:bg-blue-700">
+                    <Button 
+                      className="flex-1 bg-primary text-white hover:bg-blue-700"
+                      onClick={() => handleViewSiteMap(site)}
+                    >
                       <MapPin className="mr-2 h-4 w-4" />
                       View Map
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleEditSite(site)}
+                    >
                       <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDeleteSite(site)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>

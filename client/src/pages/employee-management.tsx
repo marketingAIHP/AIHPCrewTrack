@@ -87,26 +87,36 @@ export default function EmployeeManagement() {
         lastName: data.lastName,
         email: data.email,
         phone: data.phone,
-        password: data.password,
+        ...(data.password ? { password: data.password } : {}),
         ...(data.siteId && data.siteId !== 'unassigned' && data.siteId !== '' ? { siteId: parseInt(data.siteId) } : {}),
       };
-      const response = await apiRequest('POST', '/api/admin/employees', payload);
-      return response.json();
+      
+      if (editingEmployee) {
+        // Update existing employee
+        const response = await apiRequest('PUT', `/api/admin/employees/${editingEmployee.id}`, payload);
+        return response.json();
+      } else {
+        // Create new employee - password is required for new employees
+        const createPayload = { ...payload, password: data.password };
+        const response = await apiRequest('POST', '/api/admin/employees', createPayload);
+        return response.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
       setIsDialogOpen(false);
+      setEditingEmployee(null);
       form.reset();
       toast({
         title: 'Success',
-        description: 'Employee created successfully',
+        description: editingEmployee ? 'Employee updated successfully' : 'Employee created successfully',
       });
     },
     onError: (error) => {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create employee',
+        description: error.message || `Failed to ${editingEmployee ? 'update' : 'create'} employee`,
         variant: 'destructive',
       });
     },
@@ -150,15 +160,31 @@ export default function EmployeeManagement() {
   };
 
   const handleViewEmployee = (employee: any) => {
-    // Navigate to live tracking with focus on this employee
-    setLocation('/admin/tracking');
+    // Navigate to employee profile page
+    setLocation(`/admin/employees/${employee.id}/profile`);
   };
 
   const handleEditEmployee = (employee: any) => {
+    // Set editing mode and populate form with employee data
+    setEditingEmployee(employee);
+    form.setValue('firstName', employee.firstName);
+    form.setValue('lastName', employee.lastName);
+    form.setValue('email', employee.email);
+    form.setValue('phone', employee.phone);
+    form.setValue('password', ''); // Leave empty for security
+    form.setValue('siteId', employee.siteId?.toString() || '');
+    setIsDialogOpen(true);
+    
     toast({
-      title: 'Edit Employee',
-      description: `Edit functionality for ${employee.firstName} ${employee.lastName} coming soon`,
+      title: 'Edit Mode',
+      description: `Editing ${employee.firstName} ${employee.lastName}`,
     });
+  };
+
+  const handleAddEmployee = () => {
+    setEditingEmployee(null);
+    form.reset();
+    setIsDialogOpen(true);
   };
 
   const filteredEmployees = Array.isArray(employees) ? employees.filter((employee: any) => {
@@ -197,18 +223,27 @@ export default function EmployeeManagement() {
               </Link>
               <h1 className="text-xl font-semibold text-gray-900">Employee Management</h1>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                setEditingEmployee(null);
+                form.reset();
+              }
+            }}>
               <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-blue-700 text-white">
+                <Button className="bg-primary hover:bg-blue-700 text-white" onClick={handleAddEmployee}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Employee
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md" aria-describedby="add-employee-description">
+              <DialogContent className="max-w-md" aria-describedby="employee-dialog-description">
                 <DialogHeader>
-                  <DialogTitle>Add New Employee</DialogTitle>
-                  <p id="add-employee-description" className="text-sm text-gray-600">
-                    Fill out the information below to add a new employee to your workforce.
+                  <DialogTitle>{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
+                  <p id="employee-dialog-description" className="text-sm text-gray-600">
+                    {editingEmployee 
+                      ? 'Update the employee information below.' 
+                      : 'Fill out the information below to add a new employee to your workforce.'
+                    }
                   </p>
                 </DialogHeader>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -271,16 +306,20 @@ export default function EmployeeManagement() {
                   </div>
                   
                   <div>
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">
+                      Password {editingEmployee && <span className="text-xs text-gray-500">(leave empty to keep current)</span>}
+                    </Label>
                     <Input
                       id="password"
                       type="password"
                       {...form.register('password')}
-                      placeholder="••••••••"
+                      placeholder={editingEmployee ? "Leave empty to keep current" : "••••••••"}
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Must be 8+ characters with letters, numbers, and special characters (@$!%*?&)
-                    </p>
+                    {!editingEmployee && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Must be 8+ characters with letters, numbers, and special characters (@$!%*?&)
+                      </p>
+                    )}
                     {form.formState.errors.password && (
                       <p className="text-error text-sm mt-1">
                         {form.formState.errors.password.message}
@@ -290,7 +329,10 @@ export default function EmployeeManagement() {
                   
                   <div>
                     <Label htmlFor="siteId">Assigned Site (Optional)</Label>
-                    <Select onValueChange={(value) => form.setValue('siteId', value)}>
+                    <Select 
+                      value={form.watch('siteId')} 
+                      onValueChange={(value) => form.setValue('siteId', value)}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a site" />
                       </SelectTrigger>
@@ -307,7 +349,10 @@ export default function EmployeeManagement() {
                   
                   <div className="flex space-x-2">
                     <Button type="submit" className="flex-1" disabled={createEmployeeMutation.isPending}>
-                      {createEmployeeMutation.isPending ? 'Creating...' : 'Create Employee'}
+                      {createEmployeeMutation.isPending 
+                        ? (editingEmployee ? 'Updating...' : 'Creating...') 
+                        : (editingEmployee ? 'Update Employee' : 'Create Employee')
+                      }
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                       Cancel
