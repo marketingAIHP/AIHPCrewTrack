@@ -20,6 +20,7 @@ import {
   Download
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
+import NotificationPanel from '@/components/NotificationPanel';
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -198,8 +199,8 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Recent Activity and Notifications */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Recent Activity */}
           <Card>
             <div className="p-6 border-b border-gray-200">
@@ -264,6 +265,11 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Real-time Notifications */}
+          <div className="lg:col-span-1">
+            <NotificationPanel />
+          </div>
         </div>
 
         {/* Quick Actions */}

@@ -18,6 +18,30 @@ import { sendEmail } from './sendgrid';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
+// WebSocket connections for real-time notifications
+const adminConnections = new Map<number, WebSocket[]>(); // adminId -> WebSocket[]
+
+// Helper function to send notification to admin
+function notifyAdmin(adminId: number, notification: any) {
+  const connections = adminConnections.get(adminId) || [];
+  const message = JSON.stringify({
+    type: 'notification',
+    data: notification
+  });
+  
+  connections.forEach(ws => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+    }
+  });
+  
+  // Clean up closed connections
+  const activeConnections = connections.filter(ws => ws.readyState === WebSocket.OPEN);
+  if (activeConnections.length !== connections.length) {
+    adminConnections.set(adminId, activeConnections);
+  }
+}
+
 interface AuthenticatedRequest extends Request {
   user?: {
     id: number;
@@ -215,6 +239,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isOnSite: true,
       });
 
+      // Send real-time notification to admin
+      notifyAdmin(employee.adminId, {
+        type: 'employee_checkin',
+        message: `${employee.firstName} ${employee.lastName} checked in at ${site.name}`,
+        employee: {
+          id: employee.id,
+          name: `${employee.firstName} ${employee.lastName}`,
+          email: employee.email
+        },
+        site: {
+          id: site.id,
+          name: site.name,
+          address: site.address
+        },
+        timestamp: new Date().toISOString(),
+        location: { latitude, longitude }
+      });
+
       res.json(attendance);
     } catch (error) {
       console.error('Error checking in:', error);
@@ -248,6 +290,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isOnSite: false,
       });
 
+      // Send real-time notification to admin
+      const employee = await storage.getEmployee(employeeId);
+      if (employee) {
+        const site = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
+        notifyAdmin(employee.adminId, {
+          type: 'employee_checkout',
+          message: `${employee.firstName} ${employee.lastName} checked out from ${site?.name || 'work site'}`,
+          employee: {
+            id: employee.id,
+            name: `${employee.firstName} ${employee.lastName}`,
+            email: employee.email
+          },
+          site: site ? {
+            id: site.id,
+            name: site.name,
+            address: site.address
+          } : null,
+          timestamp: new Date().toISOString(),
+          location: { latitude, longitude }
+        });
+      }
+
       res.json(updatedAttendance);
     } catch (error) {
       console.error('Error checking out:', error);
@@ -260,8 +324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WebSocket server for real-time location updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
-  // Store active WebSocket connections
-  const adminConnections = new Map<number, WebSocket>();
+  // Store active WebSocket connections for employees
   const employeeConnections = new Map<number, WebSocket>();
 
   wss.on('connection', (ws, req) => {
@@ -277,14 +340,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       
       if (decoded.type === 'admin') {
-        adminConnections.set(decoded.id, ws);
+        // Add admin connection to notifications map
+        const connections = adminConnections.get(decoded.id) || [];
+        connections.push(ws);
+        adminConnections.set(decoded.id, connections);
+        
+        // Send initial connection confirmation
+        ws.send(JSON.stringify({
+          type: 'connection_established',
+          message: 'Connected to notification system'
+        }));
       } else if (decoded.type === 'employee') {
         employeeConnections.set(decoded.id, ws);
       }
 
       ws.on('close', () => {
         if (decoded.type === 'admin') {
-          adminConnections.delete(decoded.id);
+          const connections = adminConnections.get(decoded.id) || [];
+          const updatedConnections = connections.filter(conn => conn !== ws);
+          if (updatedConnections.length > 0) {
+            adminConnections.set(decoded.id, updatedConnections);
+          } else {
+            adminConnections.delete(decoded.id);
+          }
         } else if (decoded.type === 'employee') {
           employeeConnections.delete(decoded.id);
         }
@@ -320,16 +398,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
 
                 // Broadcast to admin
-                const adminWs = adminConnections.get(employee.adminId);
-                if (adminWs && adminWs.readyState === WebSocket.OPEN) {
-                  adminWs.send(JSON.stringify({
+                const adminWsList = adminConnections.get(employee.adminId);
+                if (adminWsList) {
+                  adminWsList.forEach(adminWs => {
+                    if (adminWs.readyState === WebSocket.OPEN) {
+                      adminWs.send(JSON.stringify({
                     type: 'employee_location',
                     employeeId: decoded.id,
                     latitude,
                     longitude,
                     isOnSite,
-                    timestamp: new Date().toISOString(),
-                  }));
+                        timestamp: new Date().toISOString(),
+                      }));
+                    }
+                  });
                 }
               }
             }

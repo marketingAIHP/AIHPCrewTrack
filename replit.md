@@ -6,6 +6,14 @@ This is a full-stack labor tracking and workforce management application built w
 
 ## Recent Changes (July 25, 2025)
 
+### Real-time Notification System Implementation
+- **Added WebSocket-based real-time notifications** for admin when employees check in/out
+- **Created NotificationPanel component** with live connection status and notification history
+- **Implemented useNotifications hook** for WebSocket connection management and toast notifications
+- **Enhanced check-in/out endpoints** to send real-time notifications to administrators
+- **Added notification system to admin dashboard** with employee details, site information, and timestamps
+- **Integrated toast notifications** for immediate visual feedback when employees change status
+
 ### Email Export Report Implementation
 - **Added comprehensive email export functionality** for 30-day attendance reports
 - **Integrated SendGrid email service** for reliable report delivery to admin-specified email addresses
