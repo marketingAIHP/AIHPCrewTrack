@@ -11,8 +11,8 @@ This is a full-stack labor tracking and workforce management application built w
 - **Created NotificationPanel component** with live connection status and notification history
 - **Implemented useNotifications hook** for WebSocket connection management and toast notifications
 - **Enhanced check-in/out endpoints** to send real-time notifications to administrators
-- **Added notification system to admin dashboard** with employee details, site information, and timestamps
 - **Integrated toast notifications** for immediate visual feedback when employees change status
+- **Removed notification panel from dashboard** as per user request (notifications still work via toast alerts)
 
 ### Email Export Report Implementation
 - **Added comprehensive email export functionality** for 30-day attendance reports
