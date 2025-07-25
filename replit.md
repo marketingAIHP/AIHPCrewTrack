@@ -4,7 +4,19 @@
 
 This is a full-stack labor tracking and workforce management application built with React (frontend), Express.js (backend), and PostgreSQL database. The application enables administrators to manage employees and work sites while providing real-time location tracking and geofencing capabilities for field workers.
 
-## Recent Changes (July 24, 2025)
+## Recent Changes (July 25, 2025)
+
+### Employee Portal Data Refresh and Action Button Enhancement
+- **Fixed employee portal data refresh issue** where updated employee details from admin panel weren't reflected in employee dashboard
+- **Disabled query caching** for employee data using `staleTime: 0` and `gcTime: 0` to ensure fresh data retrieval
+- **Added refresh button** to employee dashboard header for manual data updates
+- **Enhanced action button functionality** with edit modes for both employee and site management
+- **Implemented form pre-population** for edit operations with proper data binding
+- **Added comprehensive validation** to prevent site deletion when employees are assigned
+- **Fixed TypeScript errors** with proper type assertions for employee and site data
+- **Updated TanStack Query** configuration to use v5 syntax (`gcTime` instead of `cacheTime`)
+
+### Previous Changes (July 24, 2025)
 
 ### Google Maps Integration and Error Handling Implementation
 - **Enhanced Live Locations card** with interactive Google Maps replacing gray placeholder

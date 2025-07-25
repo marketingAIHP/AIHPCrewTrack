@@ -18,7 +18,8 @@ import {
   Navigation,
   Building2,
   User,
-  CalendarDays
+  CalendarDays,
+  RefreshCw
 } from 'lucide-react';
 
 interface EmployeeData {
@@ -69,19 +70,25 @@ export default function EmployeeDashboard() {
   const { data: employee, isLoading: employeeLoading } = useQuery({
     queryKey: ['/api/employee/profile'],
     retry: false,
+    staleTime: 0, // Always refetch to get latest data
+    gcTime: 0, // Don't cache the response
   });
 
   // Get assigned work site
   const { data: workSite, isLoading: siteLoading } = useQuery({
     queryKey: ['/api/employee/site'],
     retry: false,
-    enabled: !!employee?.siteId,
+    enabled: !!(employee as EmployeeData)?.siteId,
+    staleTime: 0, // Always refetch to get latest data
+    gcTime: 0, // Don't cache the response
   });
 
   // Get current attendance
   const { data: currentAttendance, isLoading: attendanceLoading } = useQuery({
     queryKey: ['/api/employee/attendance/current'],
     retry: false,
+    staleTime: 0, // Always refetch to get latest data
+    gcTime: 0, // Don't cache the response
   });
 
   // Get location on component mount
@@ -135,14 +142,15 @@ export default function EmployeeDashboard() {
   const isWithinGeofence = () => {
     if (!currentLocation || !workSite) return false;
     
+    const site = workSite as WorkSite;
     const distance = calculateDistance(
       currentLocation.lat,
       currentLocation.lng,
-      parseFloat(workSite.latitude),
-      parseFloat(workSite.longitude)
+      parseFloat(site.latitude.toString()),
+      parseFloat(site.longitude.toString())
     );
     
-    return distance <= workSite.geofenceRadius;
+    return distance <= site.geofenceRadius;
   };
 
   // Calculate distance between two points
@@ -166,12 +174,9 @@ export default function EmployeeDashboard() {
     mutationFn: async () => {
       if (!currentLocation) throw new Error('Location not available');
       
-      const response = await apiRequest('/api/employee/attendance/checkin', {
-        method: 'POST',
-        body: JSON.stringify({
-          latitude: currentLocation.lat,
-          longitude: currentLocation.lng,
-        }),
+      const response = await apiRequest('POST', '/api/employee/attendance/checkin', {
+        latitude: currentLocation.lat,
+        longitude: currentLocation.lng,
       });
       return response;
     },
@@ -196,12 +201,9 @@ export default function EmployeeDashboard() {
     mutationFn: async () => {
       if (!currentLocation) throw new Error('Location not available');
       
-      const response = await apiRequest('/api/employee/attendance/checkout', {
-        method: 'POST',
-        body: JSON.stringify({
-          latitude: currentLocation.lat,
-          longitude: currentLocation.lng,
-        }),
+      const response = await apiRequest('POST', '/api/employee/attendance/checkout', {
+        latitude: currentLocation.lat,
+        longitude: currentLocation.lng,
       });
       return response;
     },
@@ -243,6 +245,16 @@ export default function EmployeeDashboard() {
     checkOutMutation.mutate();
   };
 
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/employee/profile'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/employee/site'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/employee/attendance/current'] });
+    toast({
+      title: 'Refreshed',
+      description: 'Data updated successfully',
+    });
+  };
+
   if (employeeLoading || siteLoading || attendanceLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
@@ -275,11 +287,14 @@ export default function EmployeeDashboard() {
               {employee && (
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900">
-                    {employee.firstName} {employee.lastName}
+                    {(employee as EmployeeData).firstName} {(employee as EmployeeData).lastName}
                   </p>
-                  <p className="text-xs text-gray-500">{employee.email}</p>
+                  <p className="text-xs text-gray-500">{(employee as EmployeeData).email}</p>
                 </div>
               )}
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -306,13 +321,13 @@ export default function EmployeeDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {currentAttendance && !currentAttendance.checkOutTime ? (
+                {currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime ? (
                   <div className="space-y-4">
                     <div className="flex items-center space-x-2">
                       <CheckCircle className="h-5 w-5 text-green-600" />
                       <span className="text-green-600 font-medium">Checked In</span>
                       <Badge variant="secondary">
-                        {new Date(currentAttendance.checkInTime).toLocaleTimeString()}
+                        {new Date((currentAttendance as AttendanceRecord).checkInTime).toLocaleTimeString()}
                       </Badge>
                     </div>
                     <Button 
@@ -386,13 +401,13 @@ export default function EmployeeDashboard() {
                 {workSite ? (
                   <div className="space-y-3">
                     <div>
-                      <h3 className="font-medium text-gray-900">{workSite.name}</h3>
-                      <p className="text-sm text-gray-600">{workSite.address}</p>
+                      <h3 className="font-medium text-gray-900">{(workSite as WorkSite).name}</h3>
+                      <p className="text-sm text-gray-600">{(workSite as WorkSite).address}</p>
                     </div>
                     
                     <div className="flex items-center justify-between text-sm">
                       <span>Geofence Radius:</span>
-                      <Badge variant="outline">{workSite.geofenceRadius}m</Badge>
+                      <Badge variant="outline">{(workSite as WorkSite).geofenceRadius}m</Badge>
                     </div>
                     
                     {currentLocation && (
@@ -402,8 +417,8 @@ export default function EmployeeDashboard() {
                           {Math.round(calculateDistance(
                             currentLocation.lat,
                             currentLocation.lng,
-                            parseFloat(workSite.latitude),
-                            parseFloat(workSite.longitude)
+                            parseFloat((workSite as WorkSite).latitude.toString()),
+                            parseFloat((workSite as WorkSite).longitude.toString())
                           ))}m away
                         </Badge>
                       </div>
@@ -432,15 +447,15 @@ export default function EmployeeDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-blue-600">
-                      {new Date(currentAttendance.checkInTime).toLocaleTimeString()}
+                      {new Date((currentAttendance as AttendanceRecord).checkInTime).toLocaleTimeString()}
                     </p>
                     <p className="text-sm text-gray-600">Check In Time</p>
                   </div>
                   
                   <div className="text-center">
                     <p className="text-2xl font-bold text-red-600">
-                      {currentAttendance.checkOutTime 
-                        ? new Date(currentAttendance.checkOutTime).toLocaleTimeString()
+                      {(currentAttendance as AttendanceRecord).checkOutTime 
+                        ? new Date((currentAttendance as AttendanceRecord).checkOutTime!).toLocaleTimeString()
                         : '--:--'
                       }
                     </p>
@@ -449,8 +464,8 @@ export default function EmployeeDashboard() {
                   
                   <div className="text-center">
                     <p className="text-2xl font-bold text-green-600">
-                      {currentAttendance.checkOutTime 
-                        ? `${Math.round((new Date(currentAttendance.checkOutTime).getTime() - new Date(currentAttendance.checkInTime).getTime()) / (1000 * 60 * 60 * 100)) / 10}h`
+                      {(currentAttendance as AttendanceRecord).checkOutTime 
+                        ? `${Math.round((new Date((currentAttendance as AttendanceRecord).checkOutTime!).getTime() - new Date((currentAttendance as AttendanceRecord).checkInTime).getTime()) / (1000 * 60 * 60 * 100)) / 10}h`
                         : 'Active'
                       }
                     </p>
