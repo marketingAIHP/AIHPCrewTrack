@@ -31,26 +31,18 @@ const authenticateToken = (userType?: 'admin' | 'employee') => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    console.log('Auth header:', authHeader);
-    console.log('Extracted token:', token);
-
     if (!token) {
       return res.status(401).json({ message: 'Access token required' });
     }
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      console.log('Decoded token:', decoded);
-      console.log('Required user type:', userType);
-      console.log('Token user type:', decoded.type);
-      
       if (userType && decoded.type !== userType) {
         return res.status(403).json({ message: 'Insufficient permissions' });
       }
       req.user = decoded;
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
       return res.status(403).json({ message: 'Invalid token' });
     }
   };
