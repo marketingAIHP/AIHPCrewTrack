@@ -6,6 +6,15 @@ This is a full-stack labor tracking and workforce management application built w
 
 ## Recent Changes (July 25, 2025)
 
+### Live Tracking and "On Site Now" Functionality Enhancement
+- **Fixed "On Site Now" functionality** to properly display employees who are checked in and within geofence
+- **Enhanced server-side geofence calculation** for accurate "on site" status determination in dashboard stats
+- **Added real-time data refresh** to "On Site Now" page with 30-second intervals and disabled caching
+- **Fixed employee distance display** to show "0m (On Site)" when within geofence radius instead of actual distance
+- **Improved Google Maps coordinate validation** with proper number parsing to prevent map errors
+- **Enhanced location tracking** to show only checked-in employees with red markers on live tracking map
+- **Added automatic location updates** every 30 seconds for checked-in employees
+
 ### Employee Portal Data Refresh and Action Button Enhancement
 - **Fixed employee portal data refresh issue** where updated employee details from admin panel weren't reflected in employee dashboard
 - **Disabled query caching** for employee data using `staleTime: 0` and `gcTime: 0` to ensure fresh data retrieval

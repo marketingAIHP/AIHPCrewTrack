@@ -158,9 +158,9 @@ export default function EmployeeDashboard() {
     );
   };
 
-  // Check if employee is within geofence
-  const isWithinGeofence = () => {
-    if (!currentLocation || !workSite) return false;
+  // Check if employee is within geofence and calculate distance
+  const getDistanceInfo = () => {
+    if (!currentLocation || !workSite) return { isWithin: false, distance: 0 };
     
     const site = workSite as WorkSite;
     const distance = calculateDistance(
@@ -170,7 +170,15 @@ export default function EmployeeDashboard() {
       parseFloat(site.longitude.toString())
     );
     
-    return distance <= site.geofenceRadius;
+    return {
+      isWithin: distance <= site.geofenceRadius,
+      distance: Math.round(distance)
+    };
+  };
+
+  // Check if employee is within geofence
+  const isWithinGeofence = () => {
+    return getDistanceInfo().isWithin;
   };
 
   // Calculate distance between two points
@@ -442,68 +450,57 @@ export default function EmployeeDashboard() {
                       <div className="flex items-center justify-between text-sm">
                         <span>Distance:</span>
                         <Badge variant="outline">
-                          {Math.round(calculateDistance(
-                            currentLocation.lat,
-                            currentLocation.lng,
-                            parseFloat((workSite as WorkSite).latitude.toString()),
-                            parseFloat((workSite as WorkSite).longitude.toString())
-                          ))}m away
+                          {(() => {
+                            const { isWithin, distance } = getDistanceInfo();
+                            return isWithin ? '0m (On Site)' : `${distance}m`;
+                          })()}
+                        </Badge>
+                      </div>
+                    )}
+                    
+                    {currentLocation && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Status:</span>
+                        <Badge variant={isWithinGeofence() ? "default" : "secondary"}>
+                          {isWithinGeofence() ? 'On Site' : 'Away from Site'}
                         </Badge>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-4">
-                    <p className="text-gray-500">No work site assigned</p>
-                    <p className="text-sm text-gray-400">Contact your administrator</p>
+                  <div className="text-center text-gray-500 py-4">
+                    <p>No work site assigned</p>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Today's Summary */}
+          {/* Today's Hours */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <CalendarDays className="h-5 w-5" />
-                <span>Today's Summary</span>
+                <Clock className="h-5 w-5" />
+                <span>Today's Hours</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {currentAttendance ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">
-                      {new Date((currentAttendance as AttendanceRecord).checkInTime).toLocaleTimeString()}
-                    </p>
-                    <p className="text-sm text-gray-600">Check In Time</p>
-                  </div>
-                  
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-red-600">
-                      {(currentAttendance as AttendanceRecord).checkOutTime 
-                        ? new Date((currentAttendance as AttendanceRecord).checkOutTime!).toLocaleTimeString()
-                        : '--:--'
-                      }
-                    </p>
-                    <p className="text-sm text-gray-600">Check Out Time</p>
-                  </div>
-                  
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">
-                      {(currentAttendance as AttendanceRecord).checkOutTime 
-                        ? `${Math.round((new Date((currentAttendance as AttendanceRecord).checkOutTime!).getTime() - new Date((currentAttendance as AttendanceRecord).checkInTime).getTime()) / (1000 * 60 * 60 * 100)) / 10}h`
-                        : 'Active'
-                      }
-                    </p>
-                    <p className="text-sm text-gray-600">Hours Worked</p>
-                  </div>
+              {currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime ? (
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-600">
+                    {Math.floor(
+                      (new Date().getTime() - new Date((currentAttendance as AttendanceRecord).checkInTime).getTime()) 
+                      / (1000 * 60 * 60)
+                    )} hours {Math.floor(
+                      ((new Date().getTime() - new Date((currentAttendance as AttendanceRecord).checkInTime).getTime()) 
+                      % (1000 * 60 * 60)) / (1000 * 60)
+                    )} minutes
+                  </p>
+                  <p className="text-sm text-gray-600">Currently working</p>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No attendance recorded today</p>
-                  <p className="text-sm text-gray-400">Check in to start tracking your work hours</p>
+                <div className="text-center text-gray-500">
+                  <p>Not currently checked in</p>
                 </div>
               )}
             </CardContent>
