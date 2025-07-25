@@ -23,7 +23,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Download, Mail, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { getAuthToken } from '@/lib/auth';
 
 const exportFormSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -52,11 +52,16 @@ export default function ExportReportDialog({ children }: ExportReportDialogProps
 
   const exportMutation = useMutation({
     mutationFn: async (data: ExportFormData) => {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
       const response = await fetch('/api/admin/export-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(data),
       });
