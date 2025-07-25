@@ -52,7 +52,21 @@ export default function ExportReportDialog({ children }: ExportReportDialogProps
 
   const exportMutation = useMutation({
     mutationFn: async (data: ExportFormData) => {
-      return apiRequest('/api/admin/export-report', 'POST', data);
+      const response = await fetch('/api/admin/export-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send report');
+      }
+
+      return response.json();
     },
     onSuccess: () => {
       toast({
