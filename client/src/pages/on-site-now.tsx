@@ -43,6 +43,9 @@ export default function OnSiteNow() {
       if (!response.ok) throw new Error('Failed to fetch locations');
       return response.json();
     },
+    staleTime: 0, // Always refetch for real-time data
+    gcTime: 0, // Don't cache the response
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   const { data: sites } = useQuery({
@@ -64,8 +67,8 @@ export default function OnSiteNow() {
   };
 
   // Filter for employees currently on site (within geofence)
-  const onSiteEmployees = locations?.filter((location: LocationRecord) => 
-    location.isWithinGeofence && location.employee.isActive
+  const onSiteEmployees = locations?.filter((item: any) => 
+    item.location?.isWithinGeofence && item.employee?.isActive
   ) || [];
 
   if (locationsLoading) {
@@ -123,32 +126,34 @@ export default function OnSiteNow() {
             </CardContent>
           </Card>
         ) : (
-          onSiteEmployees.map((location: LocationRecord) => (
-            <Card key={location.id} className="hover:shadow-md transition-shadow">
+          onSiteEmployees.map((item: any) => (
+            <Card key={item.location?.id || item.employee.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
                       <span className="text-orange-600 font-semibold text-lg">
-                        {location.employee.firstName[0]}{location.employee.lastName[0]}
+                        {item.employee.firstName[0]}{item.employee.lastName[0]}
                       </span>
                     </div>
                     <div>
-                      <Link href={`/admin/employees/${location.employee.id}/profile`}>
+                      <Link href={`/admin/employees/${item.employee.id}/profile`}>
                         <h3 className="font-semibold text-lg hover:text-blue-600 cursor-pointer">
-                          {location.employee.firstName} {location.employee.lastName}
+                          {item.employee.firstName} {item.employee.lastName}
                         </h3>
                       </Link>
-                      <p className="text-gray-600">{location.employee.email}</p>
+                      <p className="text-gray-600">{item.employee.email}</p>
                       <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                         <div className="flex items-center">
                           <MapPin className="h-4 w-4 mr-1" />
-                          <span>{getSiteName(location.employee.siteId)}</span>
+                          <span>{getSiteName(item.employee.siteId)}</span>
                         </div>
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-1" />
-                          <span>Last update: {new Date(location.timestamp).toLocaleTimeString()}</span>
-                        </div>
+                        {item.location && (
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-1" />
+                            <span>Last update: {new Date(item.location.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -158,12 +163,14 @@ export default function OnSiteNow() {
                       <User className="h-3 w-3 mr-1" />
                       On Site
                     </Badge>
-                    <div className="text-sm text-gray-500">
-                      <div>Lat: {parseFloat(location.latitude).toFixed(4)}</div>
-                      <div>Lng: {parseFloat(location.longitude).toFixed(4)}</div>
-                    </div>
+                    {item.location && (
+                      <div className="text-sm text-gray-500">
+                        <div>Lat: {parseFloat(item.location.latitude).toFixed(4)}</div>
+                        <div>Lng: {parseFloat(item.location.longitude).toFixed(4)}</div>
+                      </div>
+                    )}
                     <div className="space-x-2">
-                      <Link href={`/admin/live-tracking?employeeId=${location.employee.id}`}>
+                      <Link href={`/admin/live-tracking?employeeId=${item.employee.id}`}>
                         <Button variant="outline" size="sm">
                           Track Live
                         </Button>

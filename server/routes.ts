@@ -461,7 +461,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/dashboard', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const stats = await storage.getDashboardStats(req.user!.id);
-      res.json(stats);
+      
+      // Calculate "on site now" - employees checked in and within geofence
+      const employees = await storage.getEmployeesByAdmin(req.user!.id);
+      let onSiteCount = 0;
+      
+      for (const employee of employees) {
+        const currentAttendance = await storage.getCurrentAttendance(employee.id);
+        if (currentAttendance && employee.siteId) {
+          const location = await storage.getLatestEmployeeLocation(employee.id);
+          if (location) {
+            const assignedSite = await storage.getWorkSite(employee.siteId);
+            if (assignedSite) {
+              const distance = calculateDistance(
+                parseFloat(location.latitude),
+                parseFloat(location.longitude),
+                parseFloat(assignedSite.latitude),
+                parseFloat(assignedSite.longitude)
+              );
+              if (distance <= assignedSite.geofenceRadius) {
+                onSiteCount++;
+              }
+            }
+          }
+        }
+      }
+      
+      res.json({
+        ...stats,
+        onSiteNow: onSiteCount.toString()
+      });
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch dashboard stats' });
     }
@@ -697,12 +726,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentAttendance = await storage.getCurrentAttendance(employee.id);
           if (currentAttendance) {
             const location = await storage.getLatestEmployeeLocation(employee.id);
+            
+            // Calculate if employee is within geofence
+            let isWithinGeofence = false;
+            if (location && employee.siteId) {
+              const assignedSite = await storage.getWorkSite(employee.siteId);
+              if (assignedSite) {
+                const distance = calculateDistance(
+                  parseFloat(location.latitude),
+                  parseFloat(location.longitude),
+                  parseFloat(assignedSite.latitude),
+                  parseFloat(assignedSite.longitude)
+                );
+                isWithinGeofence = distance <= assignedSite.geofenceRadius;
+              }
+            }
+            
             return {
               employee: {
                 ...employee,
-                isCheckedIn: true
+                isCheckedIn: true,
+                isActive: true
               },
-              location,
+              location: location ? {
+                ...location,
+                isWithinGeofence
+              } : null,
             };
           }
           return null;
