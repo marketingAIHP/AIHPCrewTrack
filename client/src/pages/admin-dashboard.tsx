@@ -20,6 +20,7 @@ import {
   Download
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
+import NotificationDropdown from '@/components/NotificationDropdown';
 
 
 export default function AdminDashboard() {
@@ -85,16 +86,7 @@ export default function AdminDashboard() {
               </div>
             </Link>
             <div className="flex items-center space-x-4">
-              <Link href="/admin/notifications">
-                <div className="relative cursor-pointer hover:opacity-80 transition-opacity">
-                  <Bell className="h-6 w-6 text-gray-600" />
-                  {stats.alerts > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {stats.alerts}
-                    </span>
-                  )}
-                </div>
-              </Link>
+              <NotificationDropdown />
               
               <Link href="/admin/profile">
                 <div className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
