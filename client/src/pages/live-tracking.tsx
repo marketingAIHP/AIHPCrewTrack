@@ -124,11 +124,12 @@ export default function LiveTracking() {
   const getStatusColor = (employee: any, location: any) => {
     if (!location) return 'bg-gray-500';
     
-    // Check if employee has a siteId (assigned site)
-    if (!employee.siteId) return 'bg-gray-500';
+    // Check if employee has a siteId (assigned site) - handle both camelCase and snake_case
+    const siteId = employee.siteId || employee.site_id;
+    if (!siteId) return 'bg-gray-500';
     
     // Find the assigned site
-    const assignedSite = Array.isArray(sites) ? sites.find((site: any) => site.id === employee.siteId) : null;
+    const assignedSite = Array.isArray(sites) ? sites.find((site: any) => site.id === siteId) : null;
     
     if (!assignedSite) return 'bg-gray-500';
     
@@ -141,15 +142,25 @@ export default function LiveTracking() {
   };
 
   const getStatusText = (employee: any, location: any) => {
+    console.log('Employee data:', employee);
+    console.log('Location data:', location);
+    
     if (!location) return 'No Location';
     
-    // Check if employee has a siteId (assigned site)
-    if (!employee.siteId) return 'No Assigned Site';
+    // Check if employee has a siteId (assigned site) - handle both camelCase and snake_case
+    const siteId = employee.siteId || employee.site_id;
+    if (!siteId) {
+      console.log('No site ID found for employee:', employee.firstName);
+      return 'No Assigned Site';
+    }
     
     // Find the assigned site
-    const assignedSite = Array.isArray(sites) ? sites.find((site: any) => site.id === employee.siteId) : null;
+    const assignedSite = Array.isArray(sites) ? sites.find((site: any) => site.id === siteId) : null;
     
-    if (!assignedSite) return 'Unknown Site';
+    if (!assignedSite) {
+      console.log('No matching site found for site ID:', siteId);
+      return 'Unknown Site';
+    }
     
     // Use server-calculated isWithinGeofence status
     if (location.isWithinGeofence) {

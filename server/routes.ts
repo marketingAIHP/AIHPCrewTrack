@@ -743,8 +743,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Calculate if employee is within geofence
             let isWithinGeofence = false;
-            if (location && employee.siteId) {
-              const assignedSite = await storage.getWorkSite(employee.siteId);
+            const siteId = employee.siteId || employee.site_id;
+            if (location && siteId) {
+              const assignedSite = await storage.getWorkSite(siteId);
               if (assignedSite) {
                 const distance = calculateDistance(
                   parseFloat(location.latitude),
@@ -753,6 +754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   parseFloat(assignedSite.longitude)
                 );
                 isWithinGeofence = distance <= assignedSite.geofenceRadius;
+                console.log(`Employee ${employee.firstName} distance: ${distance}m, geofence: ${assignedSite.geofenceRadius}m, within: ${isWithinGeofence}`);
               }
             }
             
