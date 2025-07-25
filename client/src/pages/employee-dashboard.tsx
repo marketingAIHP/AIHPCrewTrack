@@ -19,7 +19,9 @@ import {
   Building2,
   User,
   CalendarDays,
-  RefreshCw
+  RefreshCw,
+  Calendar,
+  History
 } from 'lucide-react';
 
 interface EmployeeData {
@@ -91,30 +93,65 @@ export default function EmployeeDashboard() {
     gcTime: 0, // Don't cache the response
   });
 
+  // Get 30-day attendance history
+  const { data: attendanceHistory = [], isLoading: historyLoading } = useQuery({
+    queryKey: ['/api/employee/attendance/history'],
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
   // Get location on component mount
   useEffect(() => {
     getCurrentLocation();
   }, []);
 
-  // Auto-update location for checked-in employees
+  // Auto-update location for checked-in employees - 1 minute intervals
   useEffect(() => {
     const interval = setInterval(() => {
       // Only update location if employee is checked in
       if (currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime) {
-        getCurrentLocation();
-        
-        // Send location to server for tracking
-        if (currentLocation) {
-          apiRequest('POST', '/api/employee/location', {
-            latitude: currentLocation.lat,
-            longitude: currentLocation.lng,
-          }).catch(console.error);
-        }
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            // Update current location state
+            setCurrentLocation({ lat, lng });
+            
+            // Check if still within geofence
+            if (workSite) {
+              const siteLat = parseFloat((workSite as WorkSite).latitude.toString());
+              const siteLng = parseFloat((workSite as WorkSite).longitude.toString());
+              const distance = calculateDistance(lat, lng, siteLat, siteLng);
+              const isWithinFence = distance <= (workSite as WorkSite).geofenceRadius;
+              
+              // If outside geofence, auto check-out
+              if (!isWithinFence) {
+                handleCheckOut();
+                toast({
+                  title: 'Auto Check-Out',
+                  description: 'You left the work site area. Automatically checked out.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+            }
+            
+            // Send location to server for tracking
+            apiRequest('POST', '/api/employee/location', {
+              latitude: lat,
+              longitude: lng,
+            }).catch(console.error);
+          },
+          (error) => console.error('Location tracking error:', error),
+          { enableHighAccuracy: true }
+        );
       }
-    }, 30000); // Update every 30 seconds
+    }, 60000); // Update every 1 minute
 
     return () => clearInterval(interval);
-  }, [currentAttendance, currentLocation]);
+  }, [currentAttendance, workSite]);
 
   const getCurrentLocation = () => {
     setIsGettingLocation(true);
@@ -501,6 +538,80 @@ export default function EmployeeDashboard() {
               ) : (
                 <div className="text-center text-gray-500">
                   <p>Not currently checked in</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 30-Day Attendance History */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <History className="h-5 w-5" />
+                <span>Attendance History (Last 30 Days)</span>
+              </CardTitle>
+              <CardDescription>
+                Your check-in and check-out records
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {historyLoading ? (
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : attendanceHistory.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p>No attendance records in the last 30 days</p>
+                  <p className="text-sm text-gray-400">Your check-ins and check-outs will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {attendanceHistory.map((record: any) => (
+                    <div 
+                      key={record.id} 
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-gray-900">
+                            {new Date(record.checkInTime).toLocaleDateString()}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Check-in: {new Date(record.checkInTime).toLocaleTimeString()}
+                          </span>
+                          {record.checkOutTime && (
+                            <span className="text-xs text-gray-500">
+                              Check-out: {new Date(record.checkOutTime).toLocaleTimeString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        {record.checkOutTime ? (
+                          <Badge variant="outline" className="text-green-600 border-green-600">
+                            Completed
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">
+                            Still Active
+                          </Badge>
+                        )}
+                        
+                        {record.checkOutTime && (
+                          <span className="text-xs text-gray-500">
+                            {Math.round(
+                              (new Date(record.checkOutTime).getTime() - 
+                               new Date(record.checkInTime).getTime()) / (1000 * 60 * 60 * 10)
+                            ) / 10}h
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

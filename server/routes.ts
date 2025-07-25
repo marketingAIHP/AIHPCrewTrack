@@ -716,6 +716,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Employee attendance history route (30-day filter)
+  app.get('/api/employee/attendance/history', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      // Get attendance history from last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const history = await storage.getEmployeeAttendanceHistory(req.user!.id, thirtyDaysAgo);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch attendance history' });
+    }
+  });
+
   // Location Tracking Routes
   app.get('/api/admin/locations', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {

@@ -51,6 +51,7 @@ export interface IStorage {
   updateAttendance(id: number, attendance: Partial<Attendance>): Promise<Attendance>;
   getCurrentAttendance(employeeId: number): Promise<Attendance | undefined>;
   getAttendanceByAdmin(adminId: number, date?: Date): Promise<Attendance[]>;
+  getEmployeeAttendanceHistory(employeeId: number, fromDate: Date): Promise<Attendance[]>;
 
   // Dashboard stats
   getDashboardStats(adminId: number): Promise<{
@@ -281,6 +282,19 @@ export class DatabaseStorage implements IStorage {
       .from(attendance)
       .innerJoin(employees, eq(attendance.employeeId, employees.id))
       .where(eq(employees.adminId, adminId))
+      .orderBy(desc(attendance.checkInTime));
+  }
+
+  async getEmployeeAttendanceHistory(employeeId: number, fromDate: Date): Promise<Attendance[]> {
+    return db
+      .select()
+      .from(attendance)
+      .where(
+        and(
+          eq(attendance.employeeId, employeeId),
+          sql`${attendance.checkInTime} >= ${fromDate}`
+        )
+      )
       .orderBy(desc(attendance.checkInTime));
   }
 

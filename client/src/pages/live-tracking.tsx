@@ -89,7 +89,7 @@ export default function LiveTracking() {
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['/api/admin/locations'],
     enabled: !!getAuthToken() && getUserType() === 'admin',
-    refetchInterval: 30000,
+    refetchInterval: 60000, // Update every 1 minute
   });
 
   const { data: sites = [] } = useQuery({

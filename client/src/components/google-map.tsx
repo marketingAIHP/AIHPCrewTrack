@@ -81,20 +81,27 @@ export default function GoogleMap({
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
-    // Add new markers
+    // Add new markers with custom person icon
     markers.forEach(markerData => {
+      // Create custom person icon SVG
+      const personIcon = {
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                  fill="${markerData.color || '#ff0000'}" stroke="#ffffff" stroke-width="1"/>
+            <circle cx="12" cy="8.5" r="2" fill="#ffffff"/>
+            <path d="M8.5 13.5c0-1.5 1.57-2.5 3.5-2.5s3.5 1 3.5 2.5v1h-7v-1z" fill="#ffffff"/>
+          </svg>
+        `)}`,
+        scaledSize: new google.maps.Size(32, 32),
+        anchor: new google.maps.Point(16, 32),
+      };
+
       const marker = new google.maps.Marker({
         position: markerData.position,
         map: mapInstanceRef.current,
         title: markerData.title,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: markerData.color || 'red',
-          fillOpacity: 1,
-          strokeColor: 'white',
-          strokeWeight: 2,
-        },
+        icon: personIcon,
       });
 
       markersRef.current.push(marker);
