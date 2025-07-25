@@ -102,12 +102,13 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
     // Default center (can be customized based on sites)
     let center = { lat: 37.7749, lng: -122.4194 }; // San Francisco default
     
-    // If we have sites, center on the first one
+    // If we have sites, center on the first one with valid coordinates
     if (sites.length > 0) {
-      center = {
-        lat: parseFloat(sites[0].latitude),
-        lng: parseFloat(sites[0].longitude)
-      };
+      const lat = parseFloat(sites[0].latitude);
+      const lng = parseFloat(sites[0].longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        center = { lat, lng };
+      }
     }
 
     const map = new window.google.maps.Map(mapRef.current, {
@@ -140,11 +141,15 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
     // Note: In a production app, you'd want to manage markers more efficiently
 
     sites.forEach((site: any) => {
-      if (site.latitude && site.longitude) {
+      // Validate coordinates before using them
+      const lat = parseFloat(site.latitude);
+      const lng = parseFloat(site.longitude);
+      
+      if (site.latitude && site.longitude && !isNaN(lat) && !isNaN(lng)) {
         const marker = new window.google.maps.Marker({
           position: {
-            lat: parseFloat(site.latitude),
-            lng: parseFloat(site.longitude)
+            lat: lat,
+            lng: lng
           },
           map: mapInstance,
           title: site.name,
@@ -169,8 +174,8 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
           fillOpacity: 0.1,
           map: mapInstance,
           center: {
-            lat: parseFloat(site.latitude),
-            lng: parseFloat(site.longitude)
+            lat: lat,
+            lng: lng
           },
           radius: site.geofenceRadius || 200
         });

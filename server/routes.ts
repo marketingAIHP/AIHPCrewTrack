@@ -693,15 +693,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employees = await storage.getEmployeesByAdmin(req.user!.id);
       const locations = await Promise.all(
         employees.map(async (employee) => {
-          const location = await storage.getLatestEmployeeLocation(employee.id);
-          return {
-            employee,
-            location,
-          };
+          // Only show locations for employees who are currently checked in
+          const currentAttendance = await storage.getCurrentAttendance(employee.id);
+          if (currentAttendance) {
+            const location = await storage.getLatestEmployeeLocation(employee.id);
+            return {
+              employee: {
+                ...employee,
+                isCheckedIn: true
+              },
+              location,
+            };
+          }
+          return null;
         })
       );
       
-      res.json(locations);
+      // Filter out null values (employees not checked in)
+      const activeLocations = locations.filter(Boolean);
+      res.json(activeLocations);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch employee locations' });
     }

@@ -96,6 +96,26 @@ export default function EmployeeDashboard() {
     getCurrentLocation();
   }, []);
 
+  // Auto-update location for checked-in employees
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Only update location if employee is checked in
+      if (currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime) {
+        getCurrentLocation();
+        
+        // Send location to server for tracking
+        if (currentLocation) {
+          apiRequest('POST', '/api/employee/location', {
+            latitude: currentLocation.lat,
+            longitude: currentLocation.lng,
+          }).catch(console.error);
+        }
+      }
+    }, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [currentAttendance, currentLocation]);
+
   const getCurrentLocation = () => {
     setIsGettingLocation(true);
     setLocationError('');
@@ -186,6 +206,14 @@ export default function EmployeeDashboard() {
         description: 'Successfully marked attendance.',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/employee/attendance/current'] });
+      
+      // Start location tracking
+      if (currentLocation) {
+        apiRequest('POST', '/api/employee/location', {
+          latitude: currentLocation.lat,
+          longitude: currentLocation.lng,
+        }).catch(console.error);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -369,7 +397,7 @@ export default function EmployeeDashboard() {
                         <div className="flex items-center justify-between text-sm">
                           <span>Status:</span>
                           <Badge variant={isWithinGeofence() ? "default" : "secondary"}>
-                            {isWithinGeofence() ? 'At Work Site' : 'Away from Site'}
+                            {isWithinGeofence() ? 'On Site' : 'Away from Site'}
                           </Badge>
                         </div>
                         <Button 

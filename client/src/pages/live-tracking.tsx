@@ -221,12 +221,16 @@ export default function LiveTracking() {
     if (Array.isArray(locations)) {
       locations.forEach((item: any) => {
         if (item.location?.latitude && item.location?.longitude) {
-          markers.push({
-            position: { lat: item.location.latitude, lng: item.location.longitude },
-            title: `${item.employee.firstName} ${item.employee.lastName}`,
-            color: getStatusColor(item.employee, item.location) === 'bg-green-500' ? 'green' : 
-                   getStatusColor(item.employee, item.location) === 'bg-red-500' ? 'red' : 'gray',
-          });
+          const lat = parseFloat(item.location.latitude);
+          const lng = parseFloat(item.location.longitude);
+          
+          if (!isNaN(lat) && !isNaN(lng)) {
+            markers.push({
+              position: { lat, lng },
+              title: `${item.employee.firstName} ${item.employee.lastName}`,
+              color: 'red', // Show checked-in employees as red markers
+            });
+          }
         }
       });
     }
@@ -237,11 +241,19 @@ export default function LiveTracking() {
   const getMapGeofences = () => {
     if (!Array.isArray(sites)) return [];
     
-    return sites.map((site: any) => ({
-      center: { lat: site.latitude, lng: site.longitude },
-      radius: site.geofenceRadius,
-      color: '#1976D2',
-    }));
+    return sites.map((site: any) => {
+      const lat = parseFloat(site.latitude);
+      const lng = parseFloat(site.longitude);
+      
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return {
+          center: { lat, lng },
+          radius: site.geofenceRadius,
+          color: '#1976D2',
+        };
+      }
+      return null;
+    }).filter(Boolean);
   };
 
   return (
