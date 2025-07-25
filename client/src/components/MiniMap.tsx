@@ -21,6 +21,11 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  // Fetch configuration including Google Maps API key
+  const { data: config } = useQuery<{ GOOGLE_MAPS_API_KEY: string }>({
+    queryKey: ['/api/config'],
+  });
+
   // Fetch work sites and employees data
   const { data: sites = [] } = useQuery<any[]>({
     queryKey: ['/api/admin/sites'],
@@ -34,50 +39,65 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
 
   // Load Google Maps API
   useEffect(() => {
+    // Check if Google Maps is already loaded
     if (window.google && window.google.maps) {
       setIsLoaded(true);
       return;
     }
 
+    // Check if API key is available
+    if (!config?.GOOGLE_MAPS_API_KEY) {
+      console.warn('Google Maps API key not configured');
+      setHasError(true);
+      return;
+    }
+
     // Check if script is already being loaded
-    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existingScript) {
       const checkGoogle = setInterval(() => {
         if (window.google && window.google.maps) {
           setIsLoaded(true);
           clearInterval(checkGoogle);
         }
       }, 100);
-      return;
+      return () => clearInterval(checkGoogle);
     }
 
+    // Create unique callback name to avoid conflicts
+    const callbackName = `initMap_${Date.now()}`;
+    
     // Create callback function
-    window.initMap = () => {
+    (window as any)[callbackName] = () => {
       setIsLoaded(true);
+      delete (window as any)[callbackName]; // Cleanup
     };
 
     // Load Google Maps script
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&callback=initMap&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_MAPS_API_KEY}&callback=${callbackName}&loading=async`;
     script.async = true;
     script.defer = true;
     script.onerror = () => {
       console.error('Failed to load Google Maps API - Invalid API key');
       setHasError(true);
       setIsLoaded(false);
+      delete (window as any)[callbackName]; // Cleanup
     };
     document.head.appendChild(script);
 
     return () => {
-      // Cleanup if needed
+      // Cleanup
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
+      delete (window as any)[callbackName];
     };
-  }, []);
+  }, [config]);
 
   // Initialize map when Google Maps is loaded
   useEffect(() => {
-    if (!isLoaded || !mapRef.current || mapInstance || hasError) return;
+    if (!isLoaded || !mapRef.current || mapInstance || hasError || !window.google) return;
 
     // Default center (can be customized based on sites)
     let center = { lat: 37.7749, lng: -122.4194 }; // San Francisco default
@@ -166,16 +186,18 @@ export default function MiniMap({ height = '256px', showEmployeeCount = true }: 
         className="bg-gray-100 rounded-lg flex items-center justify-center"
         style={{ height }}
       >
-        <div className="bg-white bg-opacity-90 rounded-lg p-4 text-center">
-          <MapPin className="text-primary text-2xl mb-2 mx-auto" />
-          <p className="text-sm font-medium text-gray-900">Interactive Map</p>
-          <p className="text-xs text-gray-600 mt-1">
-            Configure Google Maps API key to view locations
+        <div className="bg-white bg-opacity-95 rounded-lg p-6 text-center max-w-sm">
+          <MapPin className="text-blue-500 text-3xl mb-3 mx-auto" />
+          <p className="text-base font-semibold text-gray-900 mb-2">Live Locations Map</p>
+          <p className="text-sm text-gray-600 mb-3">
+            Map requires valid Google Maps API key
           </p>
           {showEmployeeCount && (
-            <p className="text-xs text-gray-600 mt-2">
-              {sites.length} sites • {activeEmployees} employees
-            </p>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-sm font-medium text-gray-700">
+                {sites.length} work sites • {activeEmployees} active employees
+              </p>
+            </div>
           )}
         </div>
       </div>
