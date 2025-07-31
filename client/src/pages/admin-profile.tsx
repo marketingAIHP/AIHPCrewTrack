@@ -1,11 +1,21 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, Mail, Calendar, Settings, Shield } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, User, Mail, Calendar, Settings, Shield, Eye, EyeOff } from 'lucide-react';
 import { getAuthToken, getUser } from '@/lib/auth';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useState } from 'react';
+import { apiRequest } from '@/lib/queryClient';
 
 interface Admin {
   id: number;
@@ -15,8 +25,41 @@ interface Admin {
   createdAt: string;
 }
 
+// Form schemas
+const editProfileSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email address"),
+});
+
+const securitySchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
+      "Password must contain letters, numbers, and special characters"),
+  confirmPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+const notificationSchema = z.object({
+  emailNotifications: z.boolean(),
+  smsNotifications: z.boolean(),
+  pushNotifications: z.boolean(),
+  attendanceAlerts: z.boolean(),
+  securityAlerts: z.boolean(),
+  systemUpdates: z.boolean(),
+});
+
 export default function AdminProfile() {
   const currentUser = getUser();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { data: admin, isLoading: adminLoading } = useQuery({
     queryKey: ['/api/admin/profile'],
@@ -43,6 +86,134 @@ export default function AdminProfile() {
       return response.json();
     },
   });
+
+  // Form configurations
+  const editProfileForm = useForm({
+    resolver: zodResolver(editProfileSchema),
+    defaultValues: {
+      firstName: admin?.firstName || '',
+      lastName: admin?.lastName || '',
+      email: admin?.email || '',
+    },
+  });
+
+  const securityForm = useForm({
+    resolver: zodResolver(securitySchema),
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+  });
+
+  const notificationForm = useForm({
+    resolver: zodResolver(notificationSchema),
+    defaultValues: {
+      emailNotifications: true,
+      smsNotifications: false,
+      pushNotifications: true,
+      attendanceAlerts: true,
+      securityAlerts: true,
+      systemUpdates: false,
+    },
+  });
+
+  // Mutations
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof editProfileSchema>) => {
+      const response = await fetch('/api/admin/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update profile');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been successfully updated.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/profile'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update profile.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePasswordMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof securitySchema>) => {
+      const response = await fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to change password');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password Updated",
+        description: "Your password has been successfully changed.",
+      });
+      securityForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Password Change Failed",
+        description: error.message || "Failed to change password.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateNotificationsMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof notificationSchema>) => {
+      const response = await fetch('/api/admin/notification-preferences', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update notification preferences');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Preferences Updated",
+        description: "Your notification preferences have been saved.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update notification preferences.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update form defaults when admin data loads
+  if (admin && !editProfileForm.formState.isDirty) {
+    editProfileForm.setValue('firstName', admin.firstName);
+    editProfileForm.setValue('lastName', admin.lastName);
+    editProfileForm.setValue('email', admin.email);
+  }
 
   if (adminLoading || !admin) {
     return (
@@ -193,9 +364,72 @@ export default function AdminProfile() {
                           <h4 className="font-medium">Account Information</h4>
                           <p className="text-sm text-gray-600">Update your profile details</p>
                         </div>
-                        <Button variant="outline" size="sm">
-                          Edit Profile
-                        </Button>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              Edit Profile
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                              <DialogTitle>Edit Profile</DialogTitle>
+                              <DialogDescription>
+                                Update your account information here.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Form {...editProfileForm}>
+                              <form onSubmit={editProfileForm.handleSubmit((data) => updateProfileMutation.mutate(data))} className="space-y-4">
+                                <FormField
+                                  control={editProfileForm.control}
+                                  name="firstName"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>First Name</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Enter first name" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={editProfileForm.control}
+                                  name="lastName"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Last Name</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Enter last name" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={editProfileForm.control}
+                                  name="email"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Email</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Enter email address" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <DialogFooter>
+                                  <Button 
+                                    type="submit" 
+                                    disabled={updateProfileMutation.isPending}
+                                  >
+                                    {updateProfileMutation.isPending ? "Updating..." : "Update Profile"}
+                                  </Button>
+                                </DialogFooter>
+                              </form>
+                            </Form>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </Card>
                     
@@ -205,9 +439,117 @@ export default function AdminProfile() {
                           <h4 className="font-medium">Security Settings</h4>
                           <p className="text-sm text-gray-600">Change password and security preferences</p>
                         </div>
-                        <Button variant="outline" size="sm">
-                          Security
-                        </Button>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              Security
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                              <DialogTitle>Security Settings</DialogTitle>
+                              <DialogDescription>
+                                Change your password and security preferences.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Form {...securityForm}>
+                              <form onSubmit={securityForm.handleSubmit((data) => updatePasswordMutation.mutate(data))} className="space-y-4">
+                                <FormField
+                                  control={securityForm.control}
+                                  name="currentPassword"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Current Password</FormLabel>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <Input 
+                                            type={showCurrentPassword ? "text" : "password"}
+                                            placeholder="Enter current password" 
+                                            {...field} 
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                          >
+                                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                          </Button>
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={securityForm.control}
+                                  name="newPassword"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>New Password</FormLabel>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <Input 
+                                            type={showNewPassword ? "text" : "password"}
+                                            placeholder="Enter new password" 
+                                            {...field} 
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                            onClick={() => setShowNewPassword(!showNewPassword)}
+                                          >
+                                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                          </Button>
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={securityForm.control}
+                                  name="confirmPassword"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Confirm New Password</FormLabel>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <Input 
+                                            type={showConfirmPassword ? "text" : "password"}
+                                            placeholder="Confirm new password" 
+                                            {...field} 
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                          >
+                                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                          </Button>
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <DialogFooter>
+                                  <Button 
+                                    type="submit" 
+                                    disabled={updatePasswordMutation.isPending}
+                                  >
+                                    {updatePasswordMutation.isPending ? "Updating..." : "Change Password"}
+                                  </Button>
+                                </DialogFooter>
+                              </form>
+                            </Form>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </Card>
 
@@ -217,9 +559,131 @@ export default function AdminProfile() {
                           <h4 className="font-medium">Notification Preferences</h4>
                           <p className="text-sm text-gray-600">Manage alerts and notifications</p>
                         </div>
-                        <Button variant="outline" size="sm">
-                          Configure
-                        </Button>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              Configure
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                              <DialogTitle>Notification Preferences</DialogTitle>
+                              <DialogDescription>
+                                Configure your notification settings and alert preferences.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Form {...notificationForm}>
+                              <form onSubmit={notificationForm.handleSubmit((data) => updateNotificationsMutation.mutate(data))} className="space-y-4">
+                                <div className="space-y-4">
+                                  <div>
+                                    <h4 className="text-sm font-medium mb-3">Communication Channels</h4>
+                                    <div className="space-y-3">
+                                      <FormField
+                                        control={notificationForm.control}
+                                        name="emailNotifications"
+                                        render={({ field }) => (
+                                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                            <div className="space-y-0.5">
+                                              <FormLabel className="text-base">Email Notifications</FormLabel>
+                                              <div className="text-sm text-muted-foreground">
+                                                Receive notifications via email
+                                              </div>
+                                            </div>
+                                            <FormControl>
+                                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                          </FormItem>
+                                        )}
+                                      />
+                                      <FormField
+                                        control={notificationForm.control}
+                                        name="pushNotifications"
+                                        render={({ field }) => (
+                                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                            <div className="space-y-0.5">
+                                              <FormLabel className="text-base">Push Notifications</FormLabel>
+                                              <div className="text-sm text-muted-foreground">
+                                                Receive browser push notifications
+                                              </div>
+                                            </div>
+                                            <FormControl>
+                                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                          </FormItem>
+                                        )}
+                                      />
+                                    </div>
+                                  </div>
+                                  
+                                  <div>
+                                    <h4 className="text-sm font-medium mb-3">Alert Types</h4>
+                                    <div className="space-y-3">
+                                      <FormField
+                                        control={notificationForm.control}
+                                        name="attendanceAlerts"
+                                        render={({ field }) => (
+                                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                            <div className="space-y-0.5">
+                                              <FormLabel className="text-base">Attendance Alerts</FormLabel>
+                                              <div className="text-sm text-muted-foreground">
+                                                Employee check-in/out notifications
+                                              </div>
+                                            </div>
+                                            <FormControl>
+                                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                          </FormItem>
+                                        )}
+                                      />
+                                      <FormField
+                                        control={notificationForm.control}
+                                        name="securityAlerts"
+                                        render={({ field }) => (
+                                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                            <div className="space-y-0.5">
+                                              <FormLabel className="text-base">Security Alerts</FormLabel>
+                                              <div className="text-sm text-muted-foreground">
+                                                Important security notifications
+                                              </div>
+                                            </div>
+                                            <FormControl>
+                                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                          </FormItem>
+                                        )}
+                                      />
+                                      <FormField
+                                        control={notificationForm.control}
+                                        name="systemUpdates"
+                                        render={({ field }) => (
+                                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                            <div className="space-y-0.5">
+                                              <FormLabel className="text-base">System Updates</FormLabel>
+                                              <div className="text-sm text-muted-foreground">
+                                                Platform updates and maintenance
+                                              </div>
+                                            </div>
+                                            <FormControl>
+                                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                            </FormControl>
+                                          </FormItem>
+                                        )}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  <Button 
+                                    type="submit" 
+                                    disabled={updateNotificationsMutation.isPending}
+                                  >
+                                    {updateNotificationsMutation.isPending ? "Saving..." : "Save Preferences"}
+                                  </Button>
+                                </DialogFooter>
+                              </form>
+                            </Form>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </Card>
                   </div>

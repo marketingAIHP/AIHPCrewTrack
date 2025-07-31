@@ -643,10 +643,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!admin) {
         return res.status(404).json({ message: 'Admin not found' });
       }
-      res.json(admin);
+      res.json({
+        id: admin.id,
+        firstName: admin.firstName,
+        lastName: admin.lastName,
+        email: admin.email,
+        createdAt: admin.createdAt
+      });
     } catch (error) {
       console.error('Error fetching admin profile:', error);
       res.status(500).json({ message: 'Failed to fetch admin profile' });
+    }
+  });
+
+  // Update admin profile
+  app.put('/api/admin/profile', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { firstName, lastName, email } = req.body;
+
+      if (!firstName || !lastName || !email) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      // Check if email is already taken by another admin
+      const existingAdmin = await storage.getAdminByEmail(email);
+      if (existingAdmin && existingAdmin.id !== req.user!.id) {
+        return res.status(400).json({ message: 'Email already in use' });
+      }
+
+      const updatedAdmin = await storage.updateAdmin(req.user!.id, {
+        firstName,
+        lastName,
+        email
+      });
+
+      res.json({
+        id: updatedAdmin.id,
+        firstName: updatedAdmin.firstName,
+        lastName: updatedAdmin.lastName,
+        email: updatedAdmin.email,
+        createdAt: updatedAdmin.createdAt
+      });
+    } catch (error) {
+      console.error('Error updating admin profile:', error);
+      res.status(500).json({ message: 'Failed to update admin profile' });
+    }
+  });
+
+  // Change admin password
+  app.post('/api/admin/change-password', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Current and new passwords are required' });
+      }
+
+      const admin = await storage.getAdmin(req.user!.id);
+      if (!admin) {
+        return res.status(404).json({ message: 'Admin not found' });
+      }
+
+      // Verify current password
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, admin.password);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+      
+      await storage.updateAdminPassword(req.user!.id, hashedNewPassword);
+
+      res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+      console.error('Error changing admin password:', error);
+      res.status(500).json({ message: 'Failed to change password' });
+    }
+  });
+
+  // Update notification preferences (placeholder for now)
+  app.put('/api/admin/notification-preferences', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const preferences = req.body;
+      
+      // For now, we'll just return success. In a real app, you'd save these to the database
+      console.log('Notification preferences updated for admin:', req.user!.id, preferences);
+      
+      res.json({ message: 'Notification preferences updated successfully' });
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      res.status(500).json({ message: 'Failed to update notification preferences' });
     }
   });
 

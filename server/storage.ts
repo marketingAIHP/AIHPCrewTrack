@@ -25,6 +25,8 @@ export interface IStorage {
   getAdminByCompanyName(companyName: string): Promise<Admin | undefined>;
   checkEmailExists(email: string): Promise<boolean>;
   createAdmin(admin: InsertAdmin): Promise<Admin>;
+  updateAdmin(id: number, data: Partial<InsertAdmin>): Promise<Admin>;
+  updateAdminPassword(id: number, hashedPassword: string): Promise<void>;
 
   // Employee operations
   getEmployee(id: number): Promise<Employee | undefined>;
@@ -67,6 +69,22 @@ export class DatabaseStorage implements IStorage {
   async getAdmin(id: number): Promise<Admin | undefined> {
     const [admin] = await db.select().from(admins).where(eq(admins.id, id));
     return admin || undefined;
+  }
+
+  async updateAdmin(id: number, data: Partial<InsertAdmin>): Promise<Admin> {
+    const [admin] = await db
+      .update(admins)
+      .set(data)
+      .where(eq(admins.id, id))
+      .returning();
+    return admin;
+  }
+
+  async updateAdminPassword(id: number, hashedPassword: string): Promise<void> {
+    await db
+      .update(admins)
+      .set({ password: hashedPassword })
+      .where(eq(admins.id, id));
   }
 
   async getAdminByEmail(email: string): Promise<Admin | undefined> {
