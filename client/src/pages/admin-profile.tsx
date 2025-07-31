@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, User, Mail, Calendar, Settings, Shield, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, User, Mail, Calendar, Settings, Shield, Eye, EyeOff, Camera, Upload, X } from 'lucide-react';
 import { getAuthToken, getUser } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,6 +22,7 @@ interface Admin {
   firstName: string;
   lastName: string;
   email: string;
+  profileImage?: string;
   createdAt: string;
 }
 
@@ -60,6 +61,7 @@ export default function AdminProfile() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
 
   const { data: admin, isLoading: adminLoading } = useQuery({
     queryKey: ['/api/admin/profile'],
@@ -208,6 +210,77 @@ export default function AdminProfile() {
     },
   });
 
+  // Profile image mutations
+  const uploadImageMutation = useMutation({
+    mutationFn: async (imageData: string) => {
+      const response = await fetch('/api/admin/profile-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageData }),
+      });
+      if (!response.ok) throw new Error('Failed to upload image');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Image Uploaded",
+        description: "Your profile image has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/profile'] });
+      setIsImageDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload profile image.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeImageMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/admin/profile-image', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to remove image');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Image Removed",
+        description: "Your profile image has been removed successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/profile'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Removal Failed",
+        description: error.message || "Failed to remove profile image.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Helper functions for image handling
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageData = e.target?.result as string;
+        uploadImageMutation.mutate(imageData);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Update form defaults when admin data loads
   if (admin && !editProfileForm.formState.isDirty) {
     editProfileForm.setValue('firstName', admin.firstName);
@@ -249,10 +322,70 @@ export default function AdminProfile() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center">
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-blue-600 font-bold text-2xl">
-                  {admin.firstName[0]}{admin.lastName[0]}
-                </span>
+              <div className="relative w-20 h-20 mx-auto mb-4">
+                {admin.profileImage ? (
+                  <img 
+                    src={admin.profileImage} 
+                    alt="Profile" 
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-600 font-bold text-2xl">
+                      {admin.firstName[0]}{admin.lastName[0]}
+                    </span>
+                  </div>
+                )}
+                <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      className="absolute -bottom-1 -right-1 rounded-full w-6 h-6 p-0"
+                    >
+                      <Camera className="h-3 w-3" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Profile Image</DialogTitle>
+                      <DialogDescription>
+                        Upload a new profile image or remove the current one.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          id="image-upload"
+                        />
+                        <label htmlFor="image-upload">
+                          <Button 
+                            variant="outline" 
+                            className="w-full cursor-pointer"
+                            disabled={uploadImageMutation.isPending}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadImageMutation.isPending ? 'Uploading...' : 'Upload New Image'}
+                          </Button>
+                        </label>
+                      </div>
+                      {admin.profileImage && (
+                        <Button
+                          variant="destructive"
+                          onClick={() => removeImageMutation.mutate()}
+                          disabled={removeImageMutation.isPending}
+                          className="w-full"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          {removeImageMutation.isPending ? 'Removing...' : 'Remove Image'}
+                        </Button>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
               <h3 className="text-xl font-semibold">{admin.firstName} {admin.lastName}</h3>
               <Badge className="bg-blue-100 text-blue-800 mt-2">

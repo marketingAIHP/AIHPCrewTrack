@@ -11,6 +11,7 @@ export const admins = pgTable("admins", {
   companyName: text("company_name").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  profileImage: text("profile_image"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -24,6 +25,7 @@ export const employees = pgTable("employees", {
   password: text("password").notNull(),
   adminId: integer("admin_id").notNull().references(() => admins.id),
   siteId: integer("site_id").references(() => workSites.id),
+  profileImage: text("profile_image"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

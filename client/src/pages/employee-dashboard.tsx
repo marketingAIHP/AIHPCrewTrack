@@ -31,6 +31,7 @@ interface EmployeeData {
   email: string;
   phone: string;
   siteId: number | null;
+  profileImage?: string;
 }
 
 interface WorkSite {

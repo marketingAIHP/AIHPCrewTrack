@@ -151,6 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: employee.email,
           phone: employee.phone,
           siteId: employee.siteId,
+          profileImage: employee.profileImage,
         }
       });
     } catch (error) {
@@ -174,6 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: employee.email,
         phone: employee.phone,
         siteId: employee.siteId,
+        profileImage: employee.profileImage,
       });
     } catch (error) {
       console.error('Error fetching employee profile:', error);
@@ -648,6 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: admin.firstName,
         lastName: admin.lastName,
         email: admin.email,
+        profileImage: admin.profileImage,
         createdAt: admin.createdAt
       });
     } catch (error) {
@@ -682,6 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: updatedAdmin.firstName,
         lastName: updatedAdmin.lastName,
         email: updatedAdmin.email,
+        profileImage: updatedAdmin.profileImage,
         createdAt: updatedAdmin.createdAt
       });
     } catch (error) {
@@ -734,6 +738,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating notification preferences:', error);
       res.status(500).json({ message: 'Failed to update notification preferences' });
+    }
+  });
+
+  // Upload admin profile image
+  app.post('/api/admin/profile-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { imageData } = req.body;
+
+      if (!imageData) {
+        return res.status(400).json({ message: 'Image data is required' });
+      }
+
+      // Update admin profile with image data
+      const updatedAdmin = await storage.updateAdmin(req.user!.id, {
+        profileImage: imageData
+      });
+
+      res.json({
+        profileImage: updatedAdmin.profileImage,
+        message: 'Profile image updated successfully'
+      });
+    } catch (error) {
+      console.error('Error uploading admin profile image:', error);
+      res.status(500).json({ message: 'Failed to upload profile image' });
+    }
+  });
+
+  // Remove admin profile image
+  app.delete('/api/admin/profile-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.updateAdmin(req.user!.id, {
+        profileImage: null
+      });
+
+      res.json({ message: 'Profile image removed successfully' });
+    } catch (error) {
+      console.error('Error removing admin profile image:', error);
+      res.status(500).json({ message: 'Failed to remove profile image' });
+    }
+  });
+
+  // Upload employee profile image
+  app.post('/api/employee/profile-image', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { imageData } = req.body;
+
+      if (!imageData) {
+        return res.status(400).json({ message: 'Image data is required' });
+      }
+
+      // Update employee profile with image data
+      const updatedEmployee = await storage.updateEmployee(req.user!.id, {
+        profileImage: imageData
+      });
+
+      res.json({
+        profileImage: updatedEmployee.profileImage,
+        message: 'Profile image updated successfully'
+      });
+    } catch (error) {
+      console.error('Error uploading employee profile image:', error);
+      res.status(500).json({ message: 'Failed to upload profile image' });
+    }
+  });
+
+  // Remove employee profile image
+  app.delete('/api/employee/profile-image', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      await storage.updateEmployee(req.user!.id, {
+        profileImage: null
+      });
+
+      res.json({ message: 'Profile image removed successfully' });
+    } catch (error) {
+      console.error('Error removing employee profile image:', error);
+      res.status(500).json({ message: 'Failed to remove profile image' });
+    }
+  });
+
+  // Admin endpoints for managing employee profile images
+  app.post('/api/admin/employees/:id/profile-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+      const { imageData } = req.body;
+
+      if (!imageData) {
+        return res.status(400).json({ message: 'Image data is required' });
+      }
+
+      // Check if this employee belongs to the admin
+      const adminEmployees = await storage.getEmployeesByAdmin(req.user!.id);
+      if (!adminEmployees.find(emp => emp.id === employeeId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Update employee profile with image data
+      const updatedEmployee = await storage.updateEmployee(employeeId, {
+        profileImage: imageData
+      });
+
+      res.json({
+        profileImage: updatedEmployee.profileImage,
+        message: 'Employee profile image updated successfully'
+      });
+    } catch (error) {
+      console.error('Error uploading employee profile image:', error);
+      res.status(500).json({ message: 'Failed to upload profile image' });
+    }
+  });
+
+  app.delete('/api/admin/employees/:id/profile-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+
+      // Check if this employee belongs to the admin
+      const adminEmployees = await storage.getEmployeesByAdmin(req.user!.id);
+      if (!adminEmployees.find(emp => emp.id === employeeId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.updateEmployee(employeeId, {
+        profileImage: null
+      });
+
+      res.json({ message: 'Employee profile image removed successfully' });
+    } catch (error) {
+      console.error('Error removing employee profile image:', error);
+      res.status(500).json({ message: 'Failed to remove profile image' });
     }
   });
 

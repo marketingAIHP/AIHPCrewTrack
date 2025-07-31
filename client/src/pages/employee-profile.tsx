@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken, getUserType } from '@/lib/auth';
 import { 
@@ -19,7 +20,10 @@ import {
   Phone,
   Mail,
   CheckCircle,
-  XCircle
+  XCircle,
+  Camera,
+  Upload,
+  X
 } from 'lucide-react';
 
 interface Employee {
@@ -29,6 +33,7 @@ interface Employee {
   email: string;
   phone: string;
   siteId: number | null;
+  profileImage?: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -63,7 +68,9 @@ export default function EmployeeProfile() {
   const params = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const employeeId = parseInt(params.id || '0');
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!getAuthToken() || getUserType() !== 'admin') {
@@ -95,6 +102,77 @@ export default function EmployeeProfile() {
     queryKey: [`/api/admin/employees/${employeeId}/locations`],
     enabled: !!getAuthToken() && getUserType() === 'admin' && !!employeeId,
   });
+
+  // Profile image mutations (for admin to update employee profile)
+  const uploadImageMutation = useMutation({
+    mutationFn: async (imageData: string) => {
+      const response = await fetch(`/api/admin/employees/${employeeId}/profile-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageData }),
+      });
+      if (!response.ok) throw new Error('Failed to upload image');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Image Uploaded",
+        description: "Employee profile image has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/employees/${employeeId}`] });
+      setIsImageDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload profile image.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeImageMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/admin/employees/${employeeId}/profile-image`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to remove image');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Image Removed",
+        description: "Employee profile image has been removed successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/employees/${employeeId}`] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Removal Failed",
+        description: error.message || "Failed to remove profile image.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Helper functions for image handling
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageData = e.target?.result as string;
+        uploadImageMutation.mutate(imageData);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const assignedSite = employee?.siteId ? sites.find(site => site.id === employee.siteId) : null;
   const recentAttendance = attendance.slice(0, 5);
@@ -171,10 +249,70 @@ export default function EmployeeProfile() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-center mb-4">
-                <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center">
-                  <span className="text-2xl font-medium text-gray-700">
-                    {employee.firstName[0]}{employee.lastName[0]}
-                  </span>
+                <div className="relative">
+                  {employee.profileImage ? (
+                    <img 
+                      src={employee.profileImage} 
+                      alt="Employee Profile" 
+                      className="w-20 h-20 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center">
+                      <span className="text-2xl font-medium text-gray-700">
+                        {employee.firstName[0]}{employee.lastName[0]}
+                      </span>
+                    </div>
+                  )}
+                  <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        className="absolute -bottom-1 -right-1 rounded-full w-6 h-6 p-0"
+                      >
+                        <Camera className="h-3 w-3" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Employee Profile Image</DialogTitle>
+                        <DialogDescription>
+                          Upload a new profile image for {employee.firstName} {employee.lastName} or remove the current one.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            id="employee-image-upload"
+                          />
+                          <label htmlFor="employee-image-upload">
+                            <Button 
+                              variant="outline" 
+                              className="w-full cursor-pointer"
+                              disabled={uploadImageMutation.isPending}
+                            >
+                              <Upload className="h-4 w-4 mr-2" />
+                              {uploadImageMutation.isPending ? 'Uploading...' : 'Upload New Image'}
+                            </Button>
+                          </label>
+                        </div>
+                        {employee.profileImage && (
+                          <Button
+                            variant="destructive"
+                            onClick={() => removeImageMutation.mutate()}
+                            disabled={removeImageMutation.isPending}
+                            className="w-full"
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            {removeImageMutation.isPending ? 'Removing...' : 'Remove Image'}
+                          </Button>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
               
