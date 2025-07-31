@@ -122,8 +122,8 @@ export default function AdminDashboard() {
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-6">
                 <div className="flex items-center">
-                  <div className="bg-red-100 rounded-lg p-3">
-                    <UserCheck className="text-red-600 text-xl" />
+                  <div className="bg-green-100 rounded-lg p-3">
+                    <UserCheck className="text-green-600 text-xl" />
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Active Employees</p>
@@ -140,8 +140,8 @@ export default function AdminDashboard() {
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-6">
                 <div className="flex items-center">
-                  <div className="bg-gray-100 rounded-lg p-3">
-                    <MapPin className="text-gray-900 text-xl" />
+                  <div className="bg-blue-100 rounded-lg p-3">
+                    <MapPin className="text-blue-600 text-xl" />
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Work Sites</p>

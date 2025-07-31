@@ -401,7 +401,7 @@ export default function EmployeeDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <Building2 className="h-8 w-8 text-red-600" />
+              <Building2 className="h-8 w-8 text-blue-600" />
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">WorkTracker</h1>
                 <p className="text-sm text-gray-500">Employee Dashboard</p>
@@ -575,7 +575,7 @@ export default function EmployeeDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <p className="text-3xl font-bold text-red-600 mb-2">
+                <p className="text-3xl font-bold text-blue-600 mb-2">
                   {formatHours(calculateTodayHours())}
                 </p>
                 {currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime ? (
@@ -609,7 +609,7 @@ export default function EmployeeDashboard() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Today's Total</p>
-                  <p className="text-xl font-bold text-red-600">{formatHours(calculateTodayHours())}</p>
+                  <p className="text-xl font-bold text-blue-600">{formatHours(calculateTodayHours())}</p>
                 </div>
               </div>
             </CardHeader>
