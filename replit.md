@@ -4,7 +4,21 @@
 
 This is a full-stack labor tracking and workforce management application built with React (frontend), Express.js (backend), and PostgreSQL database. The application enables administrators to manage employees and work sites while providing real-time location tracking and geofencing capabilities for field workers.
 
-## Recent Changes (July 25, 2025)
+## Recent Changes (July 31, 2025)
+
+### Profile Image Management System Implementation
+- **Added profile image functionality** for both admin and employee profiles with comprehensive image management
+- **Enhanced database schema** with profileImage fields for admins and employees tables
+- **Created image upload/removal API endpoints** with proper authentication and permission validation
+- **Implemented interactive image dialogs** with upload, preview, and removal capabilities
+- **Added profile image display** throughout the application with fallback to initials
+- **Integrated base64 image storage** with proper validation and error handling
+- **Enhanced admin profile page** with camera icon and professional image management interface
+- **Updated employee profile pages** (both admin view and employee dashboard) with image functionality
+- **Fixed database schema synchronization** to resolve login authentication issues
+- **Resolved profile image column missing errors** by adding proper database migrations
+
+### Previous Changes (July 25, 2025)
 
 ### Real-time Notification System Implementation
 - **Added WebSocket-based real-time notifications** for admin when employees check in/out
