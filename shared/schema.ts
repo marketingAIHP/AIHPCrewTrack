@@ -25,7 +25,18 @@ export const employees = pgTable("employees", {
   password: text("password").notNull(),
   adminId: integer("admin_id").notNull().references(() => admins.id),
   siteId: integer("site_id").references(() => workSites.id),
+  departmentId: integer("department_id").references(() => departments.id),
   profileImage: text("profile_image"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Departments table
+export const departments = pgTable("departments", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  adminId: integer("admin_id").notNull().references(() => admins.id),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -70,6 +81,7 @@ export const attendance = pgTable("attendance", {
 export const adminsRelations = relations(admins, ({ many }) => ({
   employees: many(employees),
   workSites: many(workSites),
+  departments: many(departments),
 }));
 
 export const employeesRelations = relations(employees, ({ one, many }) => ({
@@ -80,6 +92,10 @@ export const employeesRelations = relations(employees, ({ one, many }) => ({
   assignedSite: one(workSites, {
     fields: [employees.siteId],
     references: [workSites.id],
+  }),
+  department: one(departments, {
+    fields: [employees.departmentId],
+    references: [departments.id],
   }),
   locationHistory: many(locationTracking),
   attendanceHistory: many(attendance),
@@ -99,6 +115,14 @@ export const locationTrackingRelations = relations(locationTracking, ({ one }) =
     fields: [locationTracking.employeeId],
     references: [employees.id],
   }),
+}));
+
+export const departmentsRelations = relations(departments, ({ one, many }) => ({
+  admin: one(admins, {
+    fields: [departments.adminId],
+    references: [admins.id],
+  }),
+  employees: many(employees),
 }));
 
 export const attendanceRelations = relations(attendance, ({ one }) => ({
@@ -128,6 +152,7 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: tru
 });
 
 export const insertWorkSiteSchema = createInsertSchema(workSites).omit({ id: true, createdAt: true, isActive: true });
+export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true, isActive: true });
 export const insertLocationTrackingSchema = createInsertSchema(locationTracking).omit({ id: true, timestamp: true });
 export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true, checkInTime: true });
 
@@ -135,12 +160,14 @@ export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: 
 export type Admin = typeof admins.$inferSelect;
 export type Employee = typeof employees.$inferSelect;
 export type WorkSite = typeof workSites.$inferSelect;
+export type Department = typeof departments.$inferSelect;
 export type LocationTracking = typeof locationTracking.$inferSelect;
 export type Attendance = typeof attendance.$inferSelect;
 
 export type InsertAdmin = z.infer<typeof insertAdminSchema>;
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type InsertWorkSite = z.infer<typeof insertWorkSiteSchema>;
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type InsertLocationTracking = z.infer<typeof insertLocationTrackingSchema>;
 export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
 

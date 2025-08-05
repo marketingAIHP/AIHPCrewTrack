@@ -2,16 +2,19 @@ import {
   admins,
   employees,
   workSites,
+  departments,
   locationTracking,
   attendance,
   type Admin,
   type Employee,
   type WorkSite,
+  type Department,
   type LocationTracking,
   type Attendance,
   type InsertAdmin,
   type InsertEmployee,
   type InsertWorkSite,
+  type InsertDepartment,
   type InsertLocationTracking,
   type InsertAttendance,
 } from "@shared/schema";
@@ -42,6 +45,14 @@ export interface IStorage {
   createWorkSite(site: InsertWorkSite): Promise<WorkSite>;
   updateWorkSite(id: number, site: Partial<InsertWorkSite>): Promise<WorkSite>;
   deleteWorkSite(id: number): Promise<void>;
+
+  // Department operations
+  getDepartment(id: number): Promise<Department | undefined>;
+  getDepartmentsByAdmin(adminId: number): Promise<Department[]>;
+  createDepartment(department: InsertDepartment): Promise<Department>;
+  updateDepartment(id: number, department: Partial<InsertDepartment>): Promise<Department>;
+  deleteDepartment(id: number): Promise<void>;
+  getEmployeesByDepartment(departmentId: number): Promise<Employee[]>;
 
   // Location tracking operations
   createLocationTracking(location: InsertLocationTracking): Promise<LocationTracking>;
@@ -129,8 +140,28 @@ export class DatabaseStorage implements IStorage {
     return employee || undefined;
   }
 
-  async getEmployeesByAdmin(adminId: number): Promise<Employee[]> {
-    return db.select().from(employees).where(eq(employees.adminId, adminId));
+  async getEmployeesByAdmin(adminId: number): Promise<any[]> {
+    return db
+      .select({
+        id: employees.id,
+        firstName: employees.firstName,
+        lastName: employees.lastName,
+        email: employees.email,
+        phone: employees.phone,
+        adminId: employees.adminId,
+        siteId: employees.siteId,
+        departmentId: employees.departmentId,
+        profileImage: employees.profileImage,
+        isActive: employees.isActive,
+        createdAt: employees.createdAt,
+        siteName: workSites.name,
+        departmentName: departments.name,
+      })
+      .from(employees)
+      .leftJoin(workSites, eq(employees.siteId, workSites.id))
+      .leftJoin(departments, eq(employees.departmentId, departments.id))
+      .where(eq(employees.adminId, adminId))
+      .orderBy(employees.firstName, employees.lastName);
   }
 
   async createEmployee(employee: InsertEmployee): Promise<Employee> {
@@ -177,6 +208,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWorkSite(id: number): Promise<void> {
     await db.delete(workSites).where(eq(workSites.id, id));
+  }
+
+  // Department operations
+  async getDepartment(id: number): Promise<Department | undefined> {
+    const [department] = await db.select().from(departments).where(eq(departments.id, id));
+    return department || undefined;
+  }
+
+  async getDepartmentsByAdmin(adminId: number): Promise<Department[]> {
+    return db
+      .select()
+      .from(departments)
+      .where(and(eq(departments.adminId, adminId), eq(departments.isActive, true)))
+      .orderBy(departments.name);
+  }
+
+  async createDepartment(department: InsertDepartment): Promise<Department> {
+    const [newDepartment] = await db.insert(departments).values(department).returning();
+    return newDepartment;
+  }
+
+  async updateDepartment(id: number, department: Partial<InsertDepartment>): Promise<Department> {
+    const [updatedDepartment] = await db
+      .update(departments)
+      .set(department)
+      .where(eq(departments.id, id))
+      .returning();
+    return updatedDepartment;
+  }
+
+  async deleteDepartment(id: number): Promise<void> {
+    await db.delete(departments).where(eq(departments.id, id));
+  }
+
+  async getEmployeesByDepartment(departmentId: number): Promise<Employee[]> {
+    return db
+      .select()
+      .from(employees)
+      .where(eq(employees.departmentId, departmentId));
   }
 
   // Location tracking operations

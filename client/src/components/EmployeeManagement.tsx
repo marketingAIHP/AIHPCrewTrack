@@ -42,6 +42,7 @@ const addEmployeeSchema = z.object({
   phone: z.string().min(10, 'Phone number must be at least 10 digits'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   siteId: z.string().optional(),
+  departmentId: z.string().optional(),
 });
 
 type AddEmployeeData = z.infer<typeof addEmployeeSchema>;
@@ -53,15 +54,23 @@ interface Employee {
   email: string;
   phone: string;
   siteId?: number;
+  departmentId?: number;
   profileImage?: string;
   isActive: boolean;
   siteName?: string;
+  departmentName?: string;
 }
 
 interface WorkSite {
   id: number;
   name: string;
   address: string;
+}
+
+interface Department {
+  id: number;
+  name: string;
+  description?: string;
 }
 
 export default function EmployeeManagement() {
@@ -80,6 +89,11 @@ export default function EmployeeManagement() {
     enabled: !!getAuthToken(),
   });
 
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ['/api/admin/departments'],
+    enabled: !!getAuthToken(),
+  });
+
   const form = useForm<AddEmployeeData>({
     resolver: zodResolver(addEmployeeSchema),
     defaultValues: {
@@ -89,6 +103,7 @@ export default function EmployeeManagement() {
       phone: '',
       password: '',
       siteId: '',
+      departmentId: '',
     },
   });
 
@@ -97,6 +112,7 @@ export default function EmployeeManagement() {
       const payload = {
         ...data,
         siteId: data.siteId ? parseInt(data.siteId) : undefined,
+        departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
       };
       const token = getAuthToken();
       const response = await fetch('/api/admin/employees', {
@@ -238,6 +254,31 @@ export default function EmployeeManagement() {
                   />
                   <FormField
                     control={form.control}
+                    name="departmentId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Department (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a department" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">No department</SelectItem>
+                            {departments.map((dept) => (
+                              <SelectItem key={dept.id} value={dept.id.toString()}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="siteId"
                     render={({ field }) => (
                       <FormItem>
@@ -326,12 +367,12 @@ export default function EmployeeManagement() {
           <div className="bg-orange-50 rounded-lg p-4">
             <div className="flex items-center">
               <div className="bg-orange-100 rounded-lg p-2">
-                <MapPin className="h-5 w-5 text-orange-600" />
+                <User className="h-5 w-5 text-orange-600" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-orange-600">Assigned to Sites</p>
+                <p className="text-sm font-medium text-orange-600">With Departments</p>
                 <p className="text-2xl font-bold text-orange-900">
-                  {employees.filter(emp => emp.siteId).length}
+                  {employees.filter(emp => emp.departmentId).length}
                 </p>
               </div>
             </div>
@@ -394,22 +435,36 @@ export default function EmployeeManagement() {
                         {employee.phone}
                       </div>
                     </div>
-                    {employee.siteId && (
-                      <div className="flex items-center text-sm text-gray-600 mt-1">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        {employee.siteName || 'Assigned to site'}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {employee.departmentId && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <User className="h-4 w-4 mr-1" />
+                          {employee.departmentName || 'Department assigned'}
+                        </div>
+                      )}
+                      {employee.siteId && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {employee.siteName || 'Site assigned'}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge variant={employee.isActive ? "default" : "secondary"}>
                     {employee.isActive ? 'Active' : 'Inactive'}
                   </Badge>
+                  {employee.departmentId && (
+                    <Badge variant="outline">
+                      <User className="h-3 w-3 mr-1" />
+                      Department
+                    </Badge>
+                  )}
                   {employee.siteId && (
                     <Badge variant="outline">
                       <MapPin className="h-3 w-3 mr-1" />
-                      Assigned
+                      Site
                     </Badge>
                   )}
                 </div>

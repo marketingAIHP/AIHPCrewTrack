@@ -12,6 +12,7 @@ import {
   insertAdminSchema,
   insertEmployeeSchema,
   insertWorkSiteSchema,
+  insertDepartmentSchema,
   insertLocationTrackingSchema,
   insertAttendanceSchema,
 } from "@shared/schema";
@@ -869,6 +870,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error removing employee profile image:', error);
       res.status(500).json({ message: 'Failed to remove profile image' });
+    }
+  });
+
+  // Department Management Routes
+  app.get('/api/admin/departments', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const departments = await storage.getDepartmentsByAdmin(req.user!.id);
+      res.json(departments);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      res.status(500).json({ message: 'Failed to fetch departments' });
+    }
+  });
+
+  app.post('/api/admin/departments', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertDepartmentSchema.parse({
+        ...req.body,
+        adminId: req.user!.id,
+      });
+
+      const department = await storage.createDepartment(validatedData);
+      res.json(department);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+        return res.status(400).json({ message: errorMessages.join(', ') });
+      }
+      console.error('Error creating department:', error);
+      res.status(500).json({ message: 'Failed to create department' });
+    }
+  });
+
+  app.put('/api/admin/departments/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const departmentId = parseInt(req.params.id);
+      const { name, description } = req.body;
+
+      // Check if this department belongs to the admin
+      const department = await storage.getDepartment(departmentId);
+      if (!department || department.adminId !== req.user!.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const updatedDepartment = await storage.updateDepartment(departmentId, {
+        name,
+        description,
+      });
+
+      res.json(updatedDepartment);
+    } catch (error) {
+      console.error('Error updating department:', error);
+      res.status(500).json({ message: 'Failed to update department' });
+    }
+  });
+
+  app.delete('/api/admin/departments/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const departmentId = parseInt(req.params.id);
+
+      // Check if this department belongs to the admin
+      const department = await storage.getDepartment(departmentId);
+      if (!department || department.adminId !== req.user!.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Check if department has employees assigned
+      const employees = await storage.getEmployeesByDepartment(departmentId);
+      if (employees.length > 0) {
+        return res.status(400).json({ 
+          message: 'Cannot delete department with assigned employees. Please reassign employees first.' 
+        });
+      }
+
+      await storage.deleteDepartment(departmentId);
+      res.json({ message: 'Department deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting department:', error);
+      res.status(500).json({ message: 'Failed to delete department' });
     }
   });
 
