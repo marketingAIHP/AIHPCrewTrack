@@ -20,6 +20,7 @@ import { sendEmail } from './sendgrid';
 import * as XLSX from 'xlsx';
 import { createObjectCsvWriter } from 'csv-writer';
 import PDFDocument from 'pdfkit';
+import { ObjectStorageService, ObjectNotFoundError } from './objectStorage';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -79,7 +80,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 // Authentication middleware
-const authenticateToken = (userType?: 'admin' | 'employee') => {
+const authenticateToken = (userType?: 'admin' | 'employee' | ('admin' | 'employee')[]) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -90,8 +91,11 @@ const authenticateToken = (userType?: 'admin' | 'employee') => {
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      if (userType && decoded.type !== userType) {
-        return res.status(403).json({ message: 'Insufficient permissions' });
+      if (userType) {
+        const allowedTypes = Array.isArray(userType) ? userType : [userType];
+        if (!allowedTypes.includes(decoded.type)) {
+          return res.status(403).json({ message: 'Insufficient permissions' });
+        }
       }
       req.user = decoded;
       next();
@@ -745,18 +749,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Object storage endpoints for profile images
+  app.post('/api/objects/upload', authenticateToken(['admin', 'employee']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error('Error getting upload URL:', error);
+      res.status(500).json({ message: 'Failed to get upload URL' });
+    }
+  });
+
+  // Serve private objects with authentication
+  app.get('/objects/:objectPath(*)', authenticateToken(['admin', 'employee']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error('Error serving object:', error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // Upload admin profile image
   app.post('/api/admin/profile-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
-      const { imageData } = req.body;
+      const { imageURL } = req.body;
 
-      if (!imageData) {
-        return res.status(400).json({ message: 'Image data is required' });
+      if (!imageURL) {
+        return res.status(400).json({ message: 'Image URL is required' });
       }
 
-      // Update admin profile with image data
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityPath(imageURL);
+
+      // Update admin profile with object path
       const updatedAdmin = await storage.updateAdmin(req.user!.id, {
-        profileImage: imageData
+        profileImage: objectPath
       });
 
       res.json({

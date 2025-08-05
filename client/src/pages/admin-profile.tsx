@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, User, Mail, Calendar, Settings, Shield, Eye, EyeOff, Camera, Upload, X } from 'lucide-react';
+import { ObjectUploader } from '@/components/ObjectUploader';
+import type { UploadResult } from '@uppy/core';
 import { getAuthToken, getUser } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -212,14 +214,14 @@ export default function AdminProfile() {
 
   // Profile image mutations
   const uploadImageMutation = useMutation({
-    mutationFn: async (imageData: string) => {
+    mutationFn: async (imageURL: string) => {
       const response = await fetch('/api/admin/profile-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ imageData }),
+        body: JSON.stringify({ imageURL }),
       });
       if (!response.ok) throw new Error('Failed to upload image');
       return response.json();
@@ -269,15 +271,27 @@ export default function AdminProfile() {
   });
 
   // Helper functions for image handling
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageData = e.target?.result as string;
-        uploadImageMutation.mutate(imageData);
-      };
-      reader.readAsDataURL(file);
+  const handleGetUploadParameters = async () => {
+    const response = await fetch('/api/objects/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    });
+    if (!response.ok) throw new Error('Failed to get upload parameters');
+    const { uploadURL } = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: uploadURL,
+    };
+  };
+
+  const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadedFile = result.successful[0];
+      if (uploadedFile.uploadURL) {
+        uploadImageMutation.mutate(uploadedFile.uploadURL);
+      }
     }
   };
 
@@ -353,25 +367,17 @@ export default function AdminProfile() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                          id="image-upload"
-                        />
-                        <label htmlFor="image-upload">
-                          <Button 
-                            variant="outline" 
-                            className="w-full cursor-pointer"
-                            disabled={uploadImageMutation.isPending}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            {uploadImageMutation.isPending ? 'Uploading...' : 'Upload New Image'}
-                          </Button>
-                        </label>
-                      </div>
+                      <ObjectUploader
+                        maxNumberOfFiles={1}
+                        maxFileSize={5242880} // 5MB
+                        allowedFileTypes={["image/*"]}
+                        onGetUploadParameters={handleGetUploadParameters}
+                        onComplete={handleUploadComplete}
+                        buttonClassName="w-full"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploadImageMutation.isPending ? 'Processing...' : 'Upload New Image'}
+                      </ObjectUploader>
                       {admin.profileImage && (
                         <Button
                           variant="destructive"
