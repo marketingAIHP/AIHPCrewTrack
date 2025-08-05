@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
 import NotificationDropdown from '@/components/NotificationDropdown';
+import EmployeeManagement from '@/components/EmployeeManagement';
 
 
 export default function AdminDashboard() {
@@ -116,26 +117,13 @@ export default function AdminDashboard() {
 
       {/* Dashboard Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Employee Management Section */}
+        <div className="mb-8">
+          <EmployeeManagement />
+        </div>
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Link href="/admin/active-employees">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <div className="bg-green-100 rounded-lg p-3">
-                    <UserCheck className="text-green-600 text-xl" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Active Employees</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {isLoading ? '...' : stats?.activeEmployees || 0}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Link href="/admin/work-sites">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardContent className="p-6">
