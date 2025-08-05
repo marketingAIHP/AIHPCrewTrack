@@ -18,7 +18,7 @@ import {
 import { sendEmail } from './sendgrid';
 import * as XLSX from 'xlsx';
 import { createObjectCsvWriter } from 'csv-writer';
-import * as htmlPdf from 'html-pdf-node';
+import PDFDocument from 'pdfkit';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -1423,30 +1423,123 @@ function generateAttendanceReportHtml(attendanceData: any[], fromDate: Date): st
   `;
 }
 
-// Generate PDF report using html-pdf-node
+// Generate PDF report using PDFKit
 async function generatePdfReport(attendanceData: any[], fromDate: Date): Promise<Buffer> {
-  const html = generateAttendanceReportHtml(attendanceData, fromDate);
-  
-  try {
-    const options = {
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '1cm',
-        bottom: '1cm',
-        left: '1cm',
-        right: '1cm'
-      }
-    };
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50
+      });
 
-    const file = { content: html };
-    const pdfBuffer = await htmlPdf.generatePdf(file, options);
-    
-    return pdfBuffer;
-  } catch (error) {
-    console.error('PDF generation error:', error);
-    throw new Error(`PDF generation failed: ${error.message}`);
-  }
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Helper functions
+      const formatDate = (date: Date | string) => {
+        return new Date(date).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      };
+
+      const formatTime = (date: Date | string) => {
+        return new Date(date).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      };
+
+      const calculateHours = (checkIn: Date | string, checkOut: Date | string | null) => {
+        if (!checkOut) return 'In Progress';
+        const start = new Date(checkIn);
+        const end = new Date(checkOut);
+        const diffMs = end.getTime() - start.getTime();
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        return `${hours}h ${minutes}m`;
+      };
+
+      // Header
+      doc.fontSize(24).text('Employee Attendance Report', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(12)
+        .text(`Report Period: ${formatDate(fromDate)} - ${formatDate(new Date())}`)
+        .text(`Generated on: ${formatDate(new Date())} at ${formatTime(new Date())}`)
+        .moveDown(2);
+
+      // Employee data
+      attendanceData.forEach(({ employee, site, attendance }, index) => {
+        if (index > 0) {
+          doc.addPage();
+        }
+
+        // Employee header
+        doc.fontSize(18).text(`${employee.firstName} ${employee.lastName}`, { underline: true });
+        doc.moveDown(0.5);
+        doc.fontSize(12)
+          .text(`Email: ${employee.email}`)
+          .text(`Assigned Site: ${site ? site.name : 'No assigned site'}`)
+          .text(`Site Address: ${site ? site.address : 'N/A'}`)
+          .text(`Total Records: ${attendance.length} attendance records in the last 30 days`)
+          .moveDown();
+
+        if (attendance.length > 0) {
+          // Table header
+          const tableTop = doc.y;
+          const colWidths = [80, 80, 80, 80, 120];
+          const headers = ['Date', 'Check In', 'Check Out', 'Hours', 'Site'];
+          
+          let x = 50;
+          headers.forEach((header, i) => {
+            doc.rect(x, tableTop, colWidths[i], 25).stroke();
+            doc.fontSize(10).text(header, x + 5, tableTop + 8, { width: colWidths[i] - 10 });
+            x += colWidths[i];
+          });
+
+          // Table rows
+          let y = tableTop + 25;
+          attendance.forEach((record: any) => {
+            if (y > 700) { // New page if needed
+              doc.addPage();
+              y = 50;
+            }
+
+            x = 50;
+            const rowData = [
+              formatDate(record.checkInTime),
+              formatTime(record.checkInTime),
+              record.checkOutTime ? formatTime(record.checkOutTime) : 'Still in',
+              calculateHours(record.checkInTime, record.checkOutTime),
+              site ? site.name : 'Unknown'
+            ];
+
+            rowData.forEach((data, i) => {
+              doc.rect(x, y, colWidths[i], 20).stroke();
+              doc.fontSize(9).text(data, x + 3, y + 5, { width: colWidths[i] - 6, height: 15 });
+              x += colWidths[i];
+            });
+            y += 20;
+          });
+        } else {
+          doc.text('No attendance records found for this employee in the last 30 days.');
+        }
+      });
+
+      // Footer
+      doc.fontSize(10).text('This report was automatically generated by the Labor Tracking System.', 50, 750, {
+        align: 'center'
+      });
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 // Generate Excel report using XLSX
