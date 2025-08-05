@@ -15,7 +15,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
-import { ObjectUploader } from '@/components/ObjectUploader';
+// Temporarily comment out ObjectUploader to test the page
+// import { ObjectUploader } from '@/components/ObjectUploader';
 import type { UploadResult } from '@uppy/core';
 
 interface Employee {
