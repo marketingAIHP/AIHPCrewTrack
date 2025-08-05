@@ -7,7 +7,7 @@ import NotFound from "@/pages/not-found";
 import AdminLogin from "@/pages/admin-login";
 import AdminSignup from "@/pages/admin-signup";
 import AdminDashboard from "@/pages/admin-dashboard";
-import EmployeeTest from "@/pages/employee-test";
+import EmployeeManagementSimple from "@/pages/employee-management-simple";
 import EmployeeProfile from "@/pages/employee-profile";
 import SiteManagement from "@/pages/site-management";
 import LiveTracking from "@/pages/live-tracking";
@@ -27,7 +27,7 @@ function Router() {
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/signup" component={AdminSignup} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
-      <Route path="/admin/employee-management" component={EmployeeTest} />
+      <Route path="/admin/employee-management" component={EmployeeManagementSimple} />
       <Route path="/admin/employees/:id" component={EmployeeProfile} />
       <Route path="/admin/employees/:id/profile" component={EmployeeProfile} />
       <Route path="/admin/active-employees" component={ActiveEmployees} />
