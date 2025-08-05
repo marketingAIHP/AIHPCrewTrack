@@ -19,6 +19,7 @@ import {
   Minus,
   Maximize 
 } from 'lucide-react';
+import ExportReportDialog from '@/components/ExportReportDialog';
 
 interface EmployeeLocation {
   employee: any;
@@ -309,10 +310,12 @@ export default function LiveTracking() {
                 {isConnected ? 'Live Updates' : 'Connecting...'}
               </span>
             </div>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export Data
-            </Button>
+            <ExportReportDialog>
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export Data
+              </Button>
+            </ExportReportDialog>
           </div>
         </div>
 
