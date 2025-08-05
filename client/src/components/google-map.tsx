@@ -41,7 +41,7 @@ export default function GoogleMap({
     mapInstanceRef.current = new google.maps.Map(mapRef.current, {
       center,
       zoom,
-      mapTypeId: mapType === 'satellite' ? google.maps.MapTypeId.SATELLITE : google.maps.MapTypeId.ROADMAP,
+      mapTypeId: mapType === 'satellite' ? 'satellite' : 'roadmap',
       zoomControl: false,
       mapTypeControl: false,
       scaleControl: false,
@@ -49,6 +49,8 @@ export default function GoogleMap({
       rotateControl: false,
       fullscreenControl: false,
       disableDefaultUI: true,
+      scrollwheel: true, // Enable mouse wheel zoom
+      gestureHandling: 'auto', // Enable all gestures including zoom
       styles: [
         {
           featureType: 'poi',
@@ -102,8 +104,8 @@ export default function GoogleMap({
               <rect x="11" y="13" width="2" height="3" fill="${markerData.color || '#22c55e'}"/>
             </svg>
           `)}`,
-          scaledSize: new google.maps.Size(32, 32),
-          anchor: new google.maps.Point(16, 32),
+          scaledSize: new (window as any).google.maps.Size(32, 32),
+          anchor: new (window as any).google.maps.Point(16, 32),
         };
       } else {
         // Create custom person icon SVG (default for employees)
@@ -116,8 +118,8 @@ export default function GoogleMap({
               <path d="M8.5 13.5c0-1.5 1.57-2.5 3.5-2.5s3.5 1 3.5 2.5v1h-7v-1z" fill="#ffffff"/>
             </svg>
           `)}`,
-          scaledSize: new google.maps.Size(32, 32),
-          anchor: new google.maps.Point(16, 32),
+          scaledSize: new (window as any).google.maps.Size(32, 32),
+          anchor: new (window as any).google.maps.Point(16, 32),
         };
       }
 
@@ -130,7 +132,7 @@ export default function GoogleMap({
 
       // Add click listener if onClick is provided
       if (markerData.onClick) {
-        marker.addListener('click', markerData.onClick);
+        (marker as any).addListener('click', markerData.onClick);
       }
 
       markersRef.current.push(marker);
@@ -166,15 +168,15 @@ export default function GoogleMap({
   // Update zoom when prop changes
   useEffect(() => {
     if (mapInstanceRef.current && typeof zoom === 'number') {
-      mapInstanceRef.current.setZoom(zoom);
+      (mapInstanceRef.current as any).setZoom(zoom);
     }
   }, [zoom]);
 
   // Update map type when prop changes
   useEffect(() => {
     if (mapInstanceRef.current) {
-      const mapTypeId = mapType === 'satellite' ? google.maps.MapTypeId.SATELLITE : google.maps.MapTypeId.ROADMAP;
-      mapInstanceRef.current.setMapTypeId(mapTypeId);
+      const mapTypeId = mapType === 'satellite' ? 'satellite' : 'roadmap';
+      (mapInstanceRef.current as any).setMapTypeId(mapTypeId);
     }
   }, [mapType]);
 

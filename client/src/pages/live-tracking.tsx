@@ -276,16 +276,17 @@ export default function LiveTracking() {
     return sites.map((site: any) => {
       const lat = parseFloat(site.latitude);
       const lng = parseFloat(site.longitude);
+      const radius = parseFloat(site.geofenceRadius);
       
-      if (!isNaN(lat) && !isNaN(lng)) {
+      if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
         return {
           center: { lat, lng },
-          radius: site.geofenceRadius,
+          radius: radius,
           color: '#1976D2',
         };
       }
       return null;
-    }).filter(Boolean);
+    }).filter((item): item is { center: { lat: number; lng: number }; radius: number; color: string } => item !== null);
   };
 
   return (
