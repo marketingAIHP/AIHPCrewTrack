@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +29,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const user = getUser();
   const userType = getUserType();
+  const [isEmployeeManagementExpanded, setIsEmployeeManagementExpanded] = useState(false);
 
   useEffect(() => {
     if (!getAuthToken() || userType !== 'admin') {
@@ -119,7 +120,10 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Employee Management Section */}
         <div className="mb-8">
-          <EmployeeManagement />
+          <EmployeeManagement 
+            isExpanded={isEmployeeManagementExpanded}
+            onToggle={() => setIsEmployeeManagementExpanded(!isEmployeeManagementExpanded)}
+          />
         </div>
 
         {/* Stats Cards */}

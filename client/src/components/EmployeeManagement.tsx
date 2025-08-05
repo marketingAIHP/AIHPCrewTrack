@@ -30,7 +30,7 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Search, UserPlus, MapPin, Phone, Mail, User } from 'lucide-react';
+import { Search, UserPlus, MapPin, Phone, Mail, User, ChevronDown, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth';
 import { apiRequest } from '@/lib/queryClient';
@@ -73,7 +73,12 @@ interface Department {
   description?: string;
 }
 
-export default function EmployeeManagement() {
+interface EmployeeManagementProps {
+  isExpanded?: boolean;
+  onToggle?: () => void;
+}
+
+export default function EmployeeManagement({ isExpanded = false, onToggle }: EmployeeManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -168,11 +173,19 @@ export default function EmployeeManagement() {
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle 
+            className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={onToggle}
+          >
+            {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
             <User className="h-5 w-5" />
             Employee Management
+            <span className="text-sm font-normal text-gray-500 ml-2">
+              ({employees.length} employees)
+            </span>
           </CardTitle>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          {isExpanded && (
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <UserPlus className="h-4 w-4 mr-2" />
@@ -322,9 +335,11 @@ export default function EmployeeManagement() {
               </Form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </CardHeader>
-      <CardContent>
+      {isExpanded && (
+        <CardContent>
         {/* Search Bar */}
         <div className="mb-6">
           <div className="relative">
@@ -472,7 +487,51 @@ export default function EmployeeManagement() {
             ))}
           </div>
         )}
-      </CardContent>
+        </CardContent>
+      )}
+      {!isExpanded && (
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="bg-blue-100 rounded-lg p-2">
+                  <User className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-blue-600">Total</p>
+                  <p className="text-xl font-bold text-blue-900">{employees.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="bg-green-100 rounded-lg p-2">
+                  <User className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-green-600">Active</p>
+                  <p className="text-xl font-bold text-green-900">
+                    {employees.filter(emp => emp.isActive).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-orange-50 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="bg-orange-100 rounded-lg p-2">
+                  <User className="h-5 w-5 text-orange-600" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-orange-600">Departments</p>
+                  <p className="text-xl font-bold text-orange-900">
+                    {employees.filter(emp => emp.departmentId).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }
