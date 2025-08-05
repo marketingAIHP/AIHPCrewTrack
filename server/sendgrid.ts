@@ -13,6 +13,12 @@ interface EmailParams {
   subject: string;
   text?: string;
   html?: string;
+  attachments?: Array<{
+    content: string;
+    filename: string;
+    type: string;
+    disposition: string;
+  }>;
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
@@ -25,13 +31,19 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       hasText: !!params.text
     });
 
-    const result = await mailService.send({
+    const emailData: any = {
       to: params.to,
       from: params.from,
       subject: params.subject,
       text: params.text || 'Please view this email in HTML format to see the attendance report.',
       html: params.html || '',
-    });
+    };
+
+    if (params.attachments && params.attachments.length > 0) {
+      emailData.attachments = params.attachments;
+    }
+
+    const result = await mailService.send(emailData);
 
     console.log('SendGrid response:', result);
     return true;

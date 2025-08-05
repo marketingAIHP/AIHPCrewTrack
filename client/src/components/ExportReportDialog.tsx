@@ -18,10 +18,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Download, Mail, Loader2 } from 'lucide-react';
+import { Download, Mail, Loader2, FileText, File, Table } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth';
 
@@ -29,9 +30,17 @@ const exportFormSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   fromEmail: z.string().email('Please enter a valid sender email address'),
   subject: z.string().min(1, 'Subject is required').default('Employee Attendance Report - Last 30 Days'),
+  format: z.enum(['html', 'pdf', 'excel', 'csv']).default('html'),
 });
 
 type ExportFormData = z.infer<typeof exportFormSchema>;
+
+const formatOptions = [
+  { value: 'html', label: 'HTML Report', icon: FileText, description: 'Rich formatted report with charts' },
+  { value: 'pdf', label: 'PDF Document', icon: File, description: 'Professional PDF format' },
+  { value: 'excel', label: 'Excel Spreadsheet', icon: Table, description: 'Editable Excel file (.xlsx)' },
+  { value: 'csv', label: 'CSV Data', icon: Table, description: 'Comma-separated values' },
+];
 
 interface ExportReportDialogProps {
   children: React.ReactNode;
@@ -47,6 +56,7 @@ export default function ExportReportDialog({ children }: ExportReportDialogProps
       email: '',
       fromEmail: '',
       subject: 'Employee Attendance Report - Last 30 Days',
+      format: 'html' as const,
     },
   });
 
@@ -161,6 +171,40 @@ export default function ExportReportDialog({ children }: ExportReportDialogProps
                       {...field} 
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="format"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>File Format</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select export format" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {formatOptions.map((option) => {
+                        const IconComponent = option.icon;
+                        return (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div className="flex items-center space-x-2">
+                              <IconComponent className="h-4 w-4" />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{option.label}</span>
+                                <span className="text-xs text-muted-foreground">{option.description}</span>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

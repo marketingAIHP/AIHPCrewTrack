@@ -16,6 +16,11 @@ import {
   insertAttendanceSchema,
 } from "@shared/schema";
 import { sendEmail } from './sendgrid';
+import * as XLSX from 'xlsx';
+import { createObjectCsvWriter } from 'csv-writer';
+import puppeteer from 'puppeteer';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -1195,10 +1200,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Export Report endpoint
   app.post('/api/admin/export-report', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
-      const { email, fromEmail, subject } = req.body;
+      const { email, fromEmail, subject, format = 'html' } = req.body;
       
       if (!email || !fromEmail || !subject) {
         return res.status(400).json({ message: 'Email, fromEmail, and subject are required' });
+      }
+
+      // Validate format
+      const validFormats = ['html', 'pdf', 'excel', 'csv'];
+      if (!validFormats.includes(format)) {
+        return res.status(400).json({ message: 'Invalid format. Must be one of: html, pdf, excel, csv' });
       }
 
       // Get all employees for this admin
@@ -1221,8 +1232,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // Generate HTML report
-      const reportHtml = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
+      // Generate report based on format
+      let reportContent: string | Buffer;
+      let attachments: any[] = [];
+      let emailHtml = '';
+
+      if (format === 'html') {
+        reportContent = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
+        emailHtml = reportContent;
+      } else if (format === 'pdf') {
+        reportContent = await generatePdfReport(attendanceData, thirtyDaysAgo);
+        emailHtml = 'Please find the attendance report attached as a PDF file.';
+        attachments = [{
+          content: reportContent.toString('base64'),
+          filename: `attendance-report-${new Date().toISOString().split('T')[0]}.pdf`,
+          type: 'application/pdf',
+          disposition: 'attachment'
+        }];
+      } else if (format === 'excel') {
+        reportContent = await generateExcelReport(attendanceData, thirtyDaysAgo);
+        emailHtml = 'Please find the attendance report attached as an Excel file.';
+        attachments = [{
+          content: reportContent.toString('base64'),
+          filename: `attendance-report-${new Date().toISOString().split('T')[0]}.xlsx`,
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          disposition: 'attachment'
+        }];
+      } else if (format === 'csv') {
+        reportContent = await generateCsvReport(attendanceData, thirtyDaysAgo);
+        emailHtml = 'Please find the attendance report attached as a CSV file.';
+        attachments = [{
+          content: Buffer.from(reportContent).toString('base64'),
+          filename: `attendance-report-${new Date().toISOString().split('T')[0]}.csv`,
+          type: 'text/csv',
+          disposition: 'attachment'
+        }];
+      }
       
       // Validate email addresses
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1230,7 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid email address format' });
       }
 
-      console.log(`Sending attendance report from ${fromEmail} to ${email}`);
+      console.log(`Sending attendance report (${format.toUpperCase()}) from ${fromEmail} to ${email}`);
       console.log(`Report contains ${attendanceData.length} employees`);
 
       // For SendGrid to work properly, the 'from' email should be verified
@@ -1247,8 +1292,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         to: email,
         from: actualFromEmail,
         subject: subject,
-        html: reportHtml,
-        text: 'Please view this email in HTML format to see the attendance report.'
+        html: emailHtml,
+        text: 'Please view this email in HTML format to see the attendance report.',
+        attachments: attachments
       });
 
       if (emailSent) {
@@ -1369,4 +1415,126 @@ function generateAttendanceReportHtml(attendanceData: any[], fromDate: Date): st
     </body>
     </html>
   `;
+}
+
+// Generate PDF report using Puppeteer
+async function generatePdfReport(attendanceData: any[], fromDate: Date): Promise<Buffer> {
+  const html = generateAttendanceReportHtml(attendanceData, fromDate);
+  
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '1cm',
+        bottom: '1cm',
+        left: '1cm',
+        right: '1cm'
+      }
+    });
+    
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close();
+  }
+}
+
+// Generate Excel report using XLSX
+async function generateExcelReport(attendanceData: any[], fromDate: Date): Promise<Buffer> {
+  const workbook = XLSX.utils.book_new();
+  
+  // Summary sheet
+  const summaryData = attendanceData.map(({ employee, site, attendance }) => ({
+    'Employee Name': `${employee.firstName} ${employee.lastName}`,
+    'Email': employee.email,
+    'Assigned Site': site ? site.name : 'No assigned site',
+    'Site Address': site ? site.address : '',
+    'Total Records': attendance.length,
+    'Active Days': attendance.length
+  }));
+  
+  const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+  
+  // Detailed attendance sheet
+  const detailedData: any[] = [];
+  attendanceData.forEach(({ employee, site, attendance }) => {
+    attendance.forEach((record: any) => {
+      const checkIn = new Date(record.checkInTime);
+      const checkOut = record.checkOutTime ? new Date(record.checkOutTime) : null;
+      const hours = checkOut ? 
+        Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60) * 100) / 100 : 0;
+      
+      detailedData.push({
+        'Employee Name': `${employee.firstName} ${employee.lastName}`,
+        'Email': employee.email,
+        'Date': checkIn.toLocaleDateString(),
+        'Check In Time': checkIn.toLocaleTimeString(),
+        'Check Out Time': checkOut ? checkOut.toLocaleTimeString() : 'Still checked in',
+        'Hours Worked': checkOut ? hours : 'In Progress',
+        'Site Name': site ? site.name : 'Unknown',
+        'Site Address': site ? site.address : ''
+      });
+    });
+  });
+  
+  const detailedSheet = XLSX.utils.json_to_sheet(detailedData);
+  XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Attendance');
+  
+  return Buffer.from(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+}
+
+// Generate CSV report
+async function generateCsvReport(attendanceData: any[], fromDate: Date): Promise<string> {
+  const csvData: any[] = [];
+  
+  attendanceData.forEach(({ employee, site, attendance }) => {
+    attendance.forEach((record: any) => {
+      const checkIn = new Date(record.checkInTime);
+      const checkOut = record.checkOutTime ? new Date(record.checkOutTime) : null;
+      const hours = checkOut ? 
+        Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60) * 100) / 100 : 0;
+      
+      csvData.push({
+        employee_name: `${employee.firstName} ${employee.lastName}`,
+        email: employee.email,
+        date: checkIn.toLocaleDateString(),
+        check_in_time: checkIn.toLocaleTimeString(),
+        check_out_time: checkOut ? checkOut.toLocaleTimeString() : 'Still checked in',
+        hours_worked: checkOut ? hours : 'In Progress',
+        site_name: site ? site.name : 'Unknown',
+        site_address: site ? site.address : ''
+      });
+    });
+  });
+  
+  // Convert to CSV format manually
+  if (csvData.length === 0) {
+    return 'employee_name,email,date,check_in_time,check_out_time,hours_worked,site_name,site_address\n';
+  }
+  
+  const headers = Object.keys(csvData[0]);
+  const csvContent = [
+    headers.join(','),
+    ...csvData.map(row => 
+      headers.map(header => {
+        const value = row[header];
+        // Escape commas and quotes in CSV
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      }).join(',')
+    )
+  ].join('\n');
+  
+  return csvContent;
 }
