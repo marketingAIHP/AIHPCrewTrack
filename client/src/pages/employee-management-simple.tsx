@@ -13,7 +13,7 @@ import { getAuthToken } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { apiRequest } from '@/lib/queryClient';
 
 interface Employee {
@@ -65,32 +65,17 @@ export default function EmployeeManagementSimple() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Fetch employees
+  // Fetch employees and departments
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ['/api/admin/employees'],
-    queryFn: async () => {
-      const response = await fetch(`/api/admin/employees`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch employees');
-      return response.json();
-    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Fetch departments
   const { data: departments = [], isLoading: departmentsLoading } = useQuery({
     queryKey: ['/api/admin/departments'],
-    queryFn: async () => {
-      const response = await fetch(`/api/admin/departments`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch departments');
-      return response.json();
-    },
+    staleTime: 5 * 60 * 1000, // 5 minutes  
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   // Create employee form
@@ -136,7 +121,7 @@ export default function EmployeeManagementSimple() {
         },
         body: JSON.stringify({
           ...data,
-          departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
+          departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
         }),
       });
       if (!response.ok) throw new Error('Failed to create employee');
@@ -164,7 +149,7 @@ export default function EmployeeManagementSimple() {
         },
         body: JSON.stringify({
           ...data,
-          departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
+          departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
         }),
       });
       if (!response.ok) throw new Error('Failed to update employee');
@@ -245,17 +230,26 @@ export default function EmployeeManagementSimple() {
     setEditingEmployee(employee);
     editEmployeeForm.reset({
       firstName: employee.firstName,
-      lastName: employee.lastName,
+      lastName: employee.lastName, 
       email: employee.email,
-      departmentId: employee.departmentId?.toString() || '',
+      departmentId: employee.departmentId?.toString() || 'none',
     });
   };
 
-  const getDepartmentName = (departmentId?: number) => {
-    if (!departmentId) return 'No Department';
-    const department = departments.find((d: Department) => d.id === departmentId);
-    return department?.name || 'Unknown Department';
-  };
+  const getDepartmentName = useMemo(() => {
+    const departmentMap = new Map(departments.map((d: Department) => [d.id, d.name]));
+    return (departmentId?: number) => {
+      if (!departmentId) return 'No Department';
+      return departmentMap.get(departmentId) || 'Unknown Department';
+    };
+  }, [departments]);
+
+  const departmentStats = useMemo(() => {
+    return departments.map((dept: Department) => ({
+      ...dept,
+      employeeCount: employees.filter((emp: Employee) => emp.departmentId === dept.id).length
+    }));
+  }, [departments, employees]);
 
   if (employeesLoading || departmentsLoading) {
     return (
@@ -442,7 +436,7 @@ export default function EmployeeManagementSimple() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">No Department</SelectItem>
+                            <SelectItem value="none">No Department</SelectItem>
                             {departments.map((dept: Department) => (
                               <SelectItem key={dept.id} value={dept.id.toString()}>
                                 {dept.name}
@@ -467,7 +461,7 @@ export default function EmployeeManagementSimple() {
       </div>
 
       {/* Department Overview */}
-      {departments.length > 0 && (
+      {departmentStats.length > 0 && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -477,18 +471,15 @@ export default function EmployeeManagementSimple() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {departments.map((dept: Department) => {
-                const employeeCount = employees.filter((emp: Employee) => emp.departmentId === dept.id).length;
-                return (
-                  <div key={dept.id} className="bg-gray-50 p-3 rounded-lg">
-                    <h4 className="font-medium">{dept.name}</h4>
-                    <p className="text-sm text-gray-600">{employeeCount} employees</p>
-                    {dept.description && (
-                      <p className="text-xs text-gray-500 mt-1">{dept.description}</p>
-                    )}
-                  </div>
-                );
-              })}
+              {departmentStats.map((dept) => (
+                <div key={dept.id} className="bg-gray-50 p-3 rounded-lg">
+                  <h4 className="font-medium">{dept.name}</h4>
+                  <p className="text-sm text-gray-600">{dept.employeeCount} employees</p>
+                  {dept.description && (
+                    <p className="text-xs text-gray-500 mt-1">{dept.description}</p>
+                  )}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -640,7 +631,7 @@ export default function EmployeeManagementSimple() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No Department</SelectItem>
+                        <SelectItem value="none">No Department</SelectItem>
                         {departments.map((dept: Department) => (
                           <SelectItem key={dept.id} value={dept.id.toString()}>
                             {dept.name}
