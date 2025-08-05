@@ -27,7 +27,7 @@ function Router() {
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/signup" component={AdminSignup} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
-      <Route path="/admin/employees" component={EmployeeTest} />
+      <Route path="/admin/employee-management" component={EmployeeTest} />
       <Route path="/admin/employees/:id" component={EmployeeProfile} />
       <Route path="/admin/employees/:id/profile" component={EmployeeProfile} />
       <Route path="/admin/active-employees" component={ActiveEmployees} />

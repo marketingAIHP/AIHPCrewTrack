@@ -173,7 +173,7 @@ export default function AdminDashboard() {
             </Card>
           </Link>
           
-          <Link href="/admin/employees">
+          <Link href="/admin/employee-management">
             <Card className="hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer bg-gradient-to-br from-white to-green-50 border-0 shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
               <div className="w-12 h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Link href="/admin/employees">
+              <Link href="/admin/employee-management">
                 <Button variant="outline" className="w-full flex items-center p-6 h-auto bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all duration-300 hover:scale-105 shadow-md">
                   <Users className="text-blue-600 w-6 h-6 mr-3" />
                   <div className="text-left">
