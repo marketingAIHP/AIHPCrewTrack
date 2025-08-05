@@ -18,9 +18,7 @@ import {
 import { sendEmail } from './sendgrid';
 import * as XLSX from 'xlsx';
 import { createObjectCsvWriter } from 'csv-writer';
-import puppeteer from 'puppeteer';
-import { promises as fs } from 'fs';
-import path from 'path';
+import * as htmlPdf from 'html-pdf-node';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -1241,14 +1239,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reportContent = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
         emailHtml = reportContent;
       } else if (format === 'pdf') {
-        reportContent = await generatePdfReport(attendanceData, thirtyDaysAgo);
-        emailHtml = 'Please find the attendance report attached as a PDF file.';
-        attachments = [{
-          content: reportContent.toString('base64'),
-          filename: `attendance-report-${new Date().toISOString().split('T')[0]}.pdf`,
-          type: 'application/pdf',
-          disposition: 'attachment'
-        }];
+        try {
+          reportContent = await generatePdfReport(attendanceData, thirtyDaysAgo);
+          emailHtml = 'Please find the attendance report attached as a PDF file.';
+          attachments = [{
+            content: reportContent.toString('base64'),
+            filename: `attendance-report-${new Date().toISOString().split('T')[0]}.pdf`,
+            type: 'application/pdf',
+            disposition: 'attachment'
+          }];
+        } catch (pdfError) {
+          console.error('PDF generation failed, falling back to HTML:', pdfError);
+          // Fallback to HTML format if PDF generation fails
+          reportContent = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
+          emailHtml = reportContent;
+          attachments = [];
+        }
       } else if (format === 'excel') {
         reportContent = await generateExcelReport(attendanceData, thirtyDaysAgo);
         emailHtml = 'Please find the attendance report attached as an Excel file.';
@@ -1417,20 +1423,12 @@ function generateAttendanceReportHtml(attendanceData: any[], fromDate: Date): st
   `;
 }
 
-// Generate PDF report using Puppeteer
+// Generate PDF report using html-pdf-node
 async function generatePdfReport(attendanceData: any[], fromDate: Date): Promise<Buffer> {
   const html = generateAttendanceReportHtml(attendanceData, fromDate);
   
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-  
   try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    
-    const pdf = await page.pdf({
+    const options = {
       format: 'A4',
       printBackground: true,
       margin: {
@@ -1439,11 +1437,15 @@ async function generatePdfReport(attendanceData: any[], fromDate: Date): Promise
         left: '1cm',
         right: '1cm'
       }
-    });
+    };
+
+    const file = { content: html };
+    const pdfBuffer = await htmlPdf.generatePdf(file, options);
     
-    return Buffer.from(pdf);
-  } finally {
-    await browser.close();
+    return pdfBuffer;
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    throw new Error(`PDF generation failed: ${error.message}`);
   }
 }
 
