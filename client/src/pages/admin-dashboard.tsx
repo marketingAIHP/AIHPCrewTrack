@@ -218,7 +218,7 @@ export default function AdminDashboard() {
               <div className="w-12 h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Link href="/admin/employee-management">
+              <a href="/admin/employee-management" onClick={(e) => { e.preventDefault(); window.location.href = '/admin/employee-management'; }}>
                 <Button variant="outline" className="w-full flex items-center p-6 h-auto bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all duration-300 hover:scale-105 shadow-md">
                   <Users className="text-blue-600 w-6 h-6 mr-3" />
                   <div className="text-left">
@@ -226,7 +226,7 @@ export default function AdminDashboard() {
                     <div className="text-xs text-gray-600">Manage workforce</div>
                   </div>
                 </Button>
-              </Link>
+              </a>
               <Link href="/admin/sites">
                 <Button variant="outline" className="w-full flex items-center p-6 h-auto bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 hover:border-green-300 transition-all duration-300 hover:scale-105 shadow-md">
                   <Plus className="text-green-600 w-6 h-6 mr-3" />
