@@ -17,7 +17,8 @@ import {
   FileText,
   Settings,
   Bell,
-  Download
+  Download,
+  LogOut
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
 import NotificationDropdown from '@/components/NotificationDropdown';
