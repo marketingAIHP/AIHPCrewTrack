@@ -1,515 +1,760 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'wouter';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Users, Plus, MapPin, Clock, Edit, Trash2, Camera, Upload, X, Eye, EyeOff } from 'lucide-react';
+import { getAuthToken } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
-import { getAuthToken, getUserType } from '@/lib/auth';
-import { 
-  ArrowLeft, 
-  Plus, 
-  Search, 
-  Edit, 
-  MapPin, 
-  Trash2, 
-  Users 
-} from 'lucide-react';
+import { ObjectUploader } from '@/components/ObjectUploader';
+import type { UploadResult } from '@uppy/core';
 
-const employeeSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address'),
-  phone: z.string().min(1, 'Phone number is required'),
+interface Employee {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  departmentId?: number;
+  profileImage?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface Department {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+// Form schemas
+const createEmployeeSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email address"),
   password: z.string()
-    .min(8, 'Password must be at least 8 characters long')
+    .min(8, "Password must be at least 8 characters")
     .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
-      'Password must contain at least one letter, one number, and one special character'),
-  siteId: z.string().optional(),
+      "Password must contain letters, numbers, and special characters"),
+  departmentId: z.string().optional(),
 });
 
-type EmployeeForm = z.infer<typeof employeeSchema>;
+const editEmployeeSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email address"),
+  departmentId: z.string().optional(),
+});
+
+const createDepartmentSchema = z.object({
+  name: z.string().min(1, "Department name is required"),
+  description: z.string().optional(),
+});
 
 export default function EmployeeManagement() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSite, setSelectedSite] = useState('all');
+  const [isCreateEmployeeOpen, setIsCreateEmployeeOpen] = useState(false);
+  const [isCreateDepartmentOpen, setIsCreateDepartmentOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [imageDialogEmployee, setImageDialogEmployee] = useState<Employee | null>(null);
 
-  useEffect(() => {
-    if (!getAuthToken() || getUserType() !== 'admin') {
-      toast({
-        title: 'Unauthorized',
-        description: 'Please log in as an admin to access this page.',
-        variant: 'destructive',
-      });
-      setLocation('/admin/login');
-    }
-  }, []);
-
-  const { data: employees = [], isLoading: loadingEmployees } = useQuery({
+  // Fetch employees
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
     queryKey: ['/api/admin/employees'],
-    enabled: !!getAuthToken() && getUserType() === 'admin',
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/employees`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch employees');
+      return response.json();
+    },
   });
 
-  const { data: sites = [] } = useQuery({
-    queryKey: ['/api/admin/sites'],
-    enabled: !!getAuthToken() && getUserType() === 'admin',
+  // Fetch departments
+  const { data: departments = [], isLoading: departmentsLoading } = useQuery({
+    queryKey: ['/api/admin/departments'],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/departments`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch departments');
+      return response.json();
+    },
   });
 
-  const form = useForm<EmployeeForm>({
-    resolver: zodResolver(employeeSchema),
+  // Forms
+  const createEmployeeForm = useForm<z.infer<typeof createEmployeeSchema>>({
+    resolver: zodResolver(createEmployeeSchema),
     defaultValues: {
       firstName: '',
       lastName: '',
       email: '',
-      phone: '',
       password: '',
-      siteId: '',
+      departmentId: '',
     },
   });
 
-  const createEmployeeMutation = useMutation({
-    mutationFn: async (data: EmployeeForm) => {
-      const payload = {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: data.phone,
-        ...(data.password ? { password: data.password } : {}),
-        ...(data.siteId && data.siteId !== 'unassigned' && data.siteId !== '' ? { siteId: parseInt(data.siteId) } : {}),
-      };
-      
-      if (editingEmployee) {
-        // Update existing employee
-        const response = await apiRequest('PUT', `/api/admin/employees/${editingEmployee.id}`, payload);
-        return response.json();
-      } else {
-        // Create new employee - password is required for new employees
-        const createPayload = { ...payload, password: data.password };
-        const response = await apiRequest('POST', '/api/admin/employees', createPayload);
-        return response.json();
-      }
+  const editEmployeeForm = useForm<z.infer<typeof editEmployeeSchema>>({
+    resolver: zodResolver(editEmployeeSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      departmentId: '',
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
-      setIsDialogOpen(false);
-      setEditingEmployee(null);
-      form.reset();
-      toast({
-        title: 'Success',
-        description: editingEmployee ? 'Employee updated successfully' : 'Employee created successfully',
+  });
+
+  const createDepartmentForm = useForm<z.infer<typeof createDepartmentSchema>>({
+    resolver: zodResolver(createDepartmentSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+    },
+  });
+
+  // Mutations
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof createEmployeeSchema>) => {
+      return await apiRequest('/api/admin/employees', 'POST', {
+        ...data,
+        departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
       });
     },
-    onError: (error) => {
+    onSuccess: () => {
       toast({
-        title: 'Error',
-        description: error.message || `Failed to ${editingEmployee ? 'update' : 'create'} employee`,
-        variant: 'destructive',
+        title: "Employee Created",
+        description: "New employee has been added successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      setIsCreateEmployeeOpen(false);
+      createEmployeeForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create employee.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof editEmployeeSchema> }) => {
+      return await apiRequest(`/api/admin/employees/${id}`, 'PUT', {
+        ...data,
+        departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Employee Updated",
+        description: "Employee information has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      setEditingEmployee(null);
+      editEmployeeForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update employee.",
+        variant: "destructive",
       });
     },
   });
 
   const deleteEmployeeMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest('DELETE', `/api/admin/employees/${id}`);
+      return await apiRequest(`/api/admin/employees/${id}`, 'DELETE');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
       toast({
-        title: 'Success',
-        description: 'Employee deleted successfully',
+        title: "Employee Deleted",
+        description: "Employee has been removed successfully.",
       });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to delete employee',
-        variant: 'destructive',
+        title: "Deletion Failed",
+        description: error.message || "Failed to delete employee.",
+        variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: EmployeeForm) => {
-    createEmployeeMutation.mutate(data);
-  };
+  const createDepartmentMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof createDepartmentSchema>) => {
+      return await apiRequest('/api/admin/departments', 'POST', data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Department Created",
+        description: "New department has been added successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/departments'] });
+      setIsCreateDepartmentOpen(false);
+      createDepartmentForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create department.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
-      deleteEmployeeMutation.mutate(id);
-    }
-  };
+  // Profile image mutations
+  const uploadEmployeeImageMutation = useMutation({
+    mutationFn: async ({ employeeId, imageURL }: { employeeId: number; imageURL: string }) => {
+      const response = await fetch(`/api/admin/employees/${employeeId}/profile-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageURL }),
+      });
+      if (!response.ok) throw new Error('Failed to upload image');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Image Uploaded",
+        description: "Employee profile image has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      setImageDialogEmployee(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload profile image.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const handleDeleteEmployee = (employee: any) => {
-    if (window.confirm(`Are you sure you want to delete ${employee.firstName} ${employee.lastName}?`)) {
-      deleteEmployeeMutation.mutate(employee.id);
-    }
-  };
+  const removeEmployeeImageMutation = useMutation({
+    mutationFn: async (employeeId: number) => {
+      const response = await fetch(`/api/admin/employees/${employeeId}/profile-image`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to remove image');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Image Removed",
+        description: "Employee profile image has been removed successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      setImageDialogEmployee(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Removal Failed",
+        description: error.message || "Failed to remove profile image.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const handleViewEmployee = (employee: any) => {
-    // Navigate to employee profile page
-    setLocation(`/admin/employees/${employee.id}/profile`);
-  };
-
-  const handleEditEmployee = (employee: any) => {
-    // Set editing mode and populate form with employee data
-    setEditingEmployee(employee);
-    form.setValue('firstName', employee.firstName);
-    form.setValue('lastName', employee.lastName);
-    form.setValue('email', employee.email);
-    form.setValue('phone', employee.phone);
-    form.setValue('password', ''); // Leave empty for security
-    form.setValue('siteId', employee.siteId?.toString() || '');
-    setIsDialogOpen(true);
-    
-    toast({
-      title: 'Edit Mode',
-      description: `Editing ${employee.firstName} ${employee.lastName}`,
+  // Helper functions
+  const handleGetUploadParameters = async () => {
+    const response = await fetch('/api/objects/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
     });
+    if (!response.ok) throw new Error('Failed to get upload parameters');
+    const { uploadURL } = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: uploadURL,
+    };
   };
 
-  const handleAddEmployee = () => {
-    setEditingEmployee(null);
-    form.reset();
-    setIsDialogOpen(true);
+  const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    if (result.successful && result.successful.length > 0 && imageDialogEmployee) {
+      const uploadedFile = result.successful[0];
+      if (uploadedFile.uploadURL) {
+        uploadEmployeeImageMutation.mutate({
+          employeeId: imageDialogEmployee.id,
+          imageURL: uploadedFile.uploadURL,
+        });
+      }
+    }
   };
 
-  const filteredEmployees = Array.isArray(employees) ? employees.filter((employee: any) => {
-    const matchesSearch = 
-      employee.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesSite = selectedSite === 'all' || 
-      (selectedSite === 'unassigned' && !employee.siteId) ||
-      employee.siteId?.toString() === selectedSite;
-    
-    return matchesSearch && matchesSite;
-  }) : [];
-
-  const getSiteName = (siteId: number) => {
-    const site = Array.isArray(sites) ? sites.find((s: any) => s.id === siteId) : null;
-    return site?.name || 'Unknown Site';
+  const getDepartmentName = (departmentId?: number) => {
+    if (!departmentId) return 'No Department';
+    const department = departments.find((d: Department) => d.id === departmentId);
+    return department?.name || 'Unknown Department';
   };
 
-  if (!getAuthToken() || getUserType() !== 'admin') {
-    return null;
+  const handleEditEmployee = (employee: Employee) => {
+    setEditingEmployee(employee);
+    editEmployeeForm.setValue('firstName', employee.firstName);
+    editEmployeeForm.setValue('lastName', employee.lastName);
+    editEmployeeForm.setValue('email', employee.email);
+    editEmployeeForm.setValue('departmentId', employee.departmentId?.toString() || '');
+  };
+
+  if (employeesLoading || departmentsLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-48 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <Link href="/admin/dashboard">
-                <Button variant="ghost" size="sm" className="mr-4">
-                  <ArrowLeft />
-                </Button>
-              </Link>
-              <h1 className="text-xl font-semibold text-gray-900">Employee Management</h1>
-            </div>
-            <Dialog open={isDialogOpen} onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) {
-                setEditingEmployee(null);
-                form.reset();
-              }
-            }}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-blue-700 text-white" onClick={handleAddEmployee}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Employee
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md" aria-describedby="employee-dialog-description">
-                <DialogHeader>
-                  <DialogTitle>{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
-                  <p id="employee-dialog-description" className="text-sm text-gray-600">
-                    {editingEmployee 
-                      ? 'Update the employee information below.' 
-                      : 'Fill out the information below to add a new employee to your workforce.'
-                    }
-                  </p>
-                </DialogHeader>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Link href="/admin/dashboard">
+            <Button variant="ghost" size="sm" className="mr-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold flex items-center">
+            <Users className="h-6 w-6 mr-2" />
+            Employee Management
+          </h1>
+        </div>
+        <div className="flex gap-2">
+          <Dialog open={isCreateDepartmentOpen} onOpenChange={setIsCreateDepartmentOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Department
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Department</DialogTitle>
+                <DialogDescription>
+                  Add a new department to organize your employees.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...createDepartmentForm}>
+                <form onSubmit={createDepartmentForm.handleSubmit((data) => createDepartmentMutation.mutate(data))} className="space-y-4">
+                  <FormField
+                    control={createDepartmentForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Department Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter department name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createDepartmentForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter department description" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button type="submit" disabled={createDepartmentMutation.isPending}>
+                      {createDepartmentMutation.isPending ? 'Creating...' : 'Create Department'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isCreateEmployeeOpen} onOpenChange={setIsCreateEmployeeOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Employee
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Employee</DialogTitle>
+                <DialogDescription>
+                  Add a new employee to your workforce management system.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...createEmployeeForm}>
+                <form onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                        id="firstName"
-                        {...form.register('firstName')}
-                        placeholder="John"
-                      />
-                      {form.formState.errors.firstName && (
-                        <p className="text-error text-sm mt-1">
-                          {form.formState.errors.firstName.message}
-                        </p>
+                    <FormField
+                      control={createEmployeeForm.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter first name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                    </div>
-                    <div>
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        {...form.register('lastName')}
-                        placeholder="Doe"
-                      />
-                      {form.formState.errors.lastName && (
-                        <p className="text-error text-sm mt-1">
-                          {form.formState.errors.lastName.message}
-                        </p>
+                    />
+                    <FormField
+                      control={createEmployeeForm.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter last name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      {...form.register('email')}
-                      placeholder="john.doe@company.com"
                     />
-                    {form.formState.errors.email && (
-                      <p className="text-error text-sm mt-1">
-                        {form.formState.errors.email.message}
-                      </p>
-                    )}
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      {...form.register('phone')}
-                      placeholder="+1 (555) 123-4567"
-                    />
-                    {form.formState.errors.phone && (
-                      <p className="text-error text-sm mt-1">
-                        {form.formState.errors.phone.message}
-                      </p>
+                  <FormField
+                    control={createEmployeeForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="Enter email address" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )}
+                  />
+                  <FormField
+                    control={createEmployeeForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"} 
+                              placeholder="Enter password" 
+                              {...field} 
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createEmployeeForm.control}
+                    name="departmentId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Department (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a department" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">No Department</SelectItem>
+                            {departments.map((dept: Department) => (
+                              <SelectItem key={dept.id} value={dept.id.toString()}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button type="submit" disabled={createEmployeeMutation.isPending}>
+                      {createEmployeeMutation.isPending ? 'Creating...' : 'Create Employee'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Departments Section */}
+      {departments.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Departments ({departments.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {departments.map((dept: Department) => (
+                <Badge key={dept.id} variant="outline" className="text-sm">
+                  {dept.name}
+                  {dept.description && (
+                    <span className="ml-1 text-gray-500">- {dept.description}</span>
+                  )}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Employees Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {employees.map((employee: Employee) => (
+          <Card key={employee.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    {employee.profileImage ? (
+                      <img 
+                        src={employee.profileImage} 
+                        alt="Profile" 
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-bold">
+                          {employee.firstName[0]}{employee.lastName[0]}
+                        </span>
+                      </div>
+                    )}
+                    <Dialog open={imageDialogEmployee?.id === employee.id} onOpenChange={(open) => !open && setImageDialogEmployee(null)}>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="absolute -bottom-1 -right-1 rounded-full w-6 h-6 p-0"
+                          onClick={() => setImageDialogEmployee(employee)}
+                        >
+                          <Camera className="h-3 w-3" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Employee Profile Image</DialogTitle>
+                          <DialogDescription>
+                            Upload a new profile image for {employee.firstName} {employee.lastName} or remove the current one.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <ObjectUploader
+                            maxNumberOfFiles={1}
+                            maxFileSize={5242880} // 5MB
+                            allowedFileTypes={["image/*"]}
+                            onGetUploadParameters={handleGetUploadParameters}
+                            onComplete={handleUploadComplete}
+                            buttonClassName="w-full"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadEmployeeImageMutation.isPending ? 'Processing...' : 'Upload New Image'}
+                          </ObjectUploader>
+                          {employee.profileImage && (
+                            <Button
+                              variant="destructive"
+                              onClick={() => removeEmployeeImageMutation.mutate(employee.id)}
+                              disabled={removeEmployeeImageMutation.isPending}
+                              className="w-full"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              {removeEmployeeImageMutation.isPending ? 'Removing...' : 'Remove Image'}
+                            </Button>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
-                  
                   <div>
-                    <Label htmlFor="password">
-                      Password {editingEmployee && <span className="text-xs text-gray-500">(leave empty to keep current)</span>}
-                    </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      {...form.register('password')}
-                      placeholder={editingEmployee ? "Leave empty to keep current" : "••••••••"}
-                    />
-                    {!editingEmployee && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Must be 8+ characters with letters, numbers, and special characters (@$!%*?&)
-                      </p>
-                    )}
-                    {form.formState.errors.password && (
-                      <p className="text-error text-sm mt-1">
-                        {form.formState.errors.password.message}
-                      </p>
-                    )}
+                    <CardTitle className="text-lg">{employee.firstName} {employee.lastName}</CardTitle>
+                    <p className="text-sm text-gray-600">{employee.email}</p>
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="siteId">Assigned Site (Optional)</Label>
-                    <Select 
-                      value={form.watch('siteId')} 
-                      onValueChange={(value) => form.setValue('siteId', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a site" />
-                      </SelectTrigger>
+                </div>
+                <Badge variant={employee.isActive ? "default" : "secondary"}>
+                  {employee.isActive ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center text-sm text-gray-600">
+                <MapPin className="h-4 w-4 mr-2" />
+                {getDepartmentName(employee.departmentId)}
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <Clock className="h-4 w-4 mr-2" />
+                Joined {new Date(employee.createdAt).toLocaleDateString()}
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEditEmployee(employee)}
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => deleteEmployeeMutation.mutate(employee.id)}
+                  disabled={deleteEmployeeMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {employees.length === 0 && (
+        <Card className="text-center py-12">
+          <CardContent>
+            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Employees Yet</h3>
+            <p className="text-gray-600 mb-4">Get started by adding your first employee to the system.</p>
+            <Button onClick={() => setIsCreateEmployeeOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Employee
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Edit Employee Dialog */}
+      <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Employee</DialogTitle>
+            <DialogDescription>
+              Update employee information.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editEmployeeForm}>
+            <form onSubmit={editEmployeeForm.handleSubmit((data) => 
+              editingEmployee && updateEmployeeMutation.mutate({ id: editingEmployee.id, data })
+            )} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editEmployeeForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter first name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editEmployeeForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter last name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={editEmployeeForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="Enter email address" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editEmployeeForm.control}
+                name="departmentId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a department" />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
-                        <SelectItem value="unassigned">No assignment</SelectItem>
-                        {Array.isArray(sites) && sites.map((site: any) => (
-                          <SelectItem key={site.id} value={site.id.toString()}>
-                            {site.name}
+                        <SelectItem value="">No Department</SelectItem>
+                        {departments.map((dept: Department) => (
+                          <SelectItem key={dept.id} value={dept.id.toString()}>
+                            {dept.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    <Button type="submit" className="flex-1" disabled={createEmployeeMutation.isPending}>
-                      {createEmployeeMutation.isPending 
-                        ? (editingEmployee ? 'Updating...' : 'Creating...') 
-                        : (editingEmployee ? 'Update Employee' : 'Create Employee')
-                      }
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search and Filters */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search employees..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select value={selectedSite} onValueChange={setSelectedSite}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sites</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {Array.isArray(sites) && sites.map((site: any) => (
-                    <SelectItem key={site.id} value={site.id.toString()}>
-                      {site.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Employee Table */}
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Employee
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Assigned Site
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loadingEmployees ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center">
-                      Loading employees...
-                    </td>
-                  </tr>
-                ) : filteredEmployees.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center">
-                      <div className="flex flex-col items-center justify-center py-8">
-                        <Users className="h-12 w-12 text-gray-400 mb-4" />
-                        <p className="text-gray-500">No employees found</p>
-                        <p className="text-sm text-gray-400">Add employees to start managing your workforce</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredEmployees.map((employee: any) => (
-                    <tr key={employee.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-gray-300 rounded-full mr-4 flex items-center justify-center">
-                            <span className="text-sm font-medium text-gray-700">
-                              {employee.firstName[0]}{employee.lastName[0]}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {employee.firstName} {employee.lastName}
-                            </div>
-                            <div className="text-sm text-gray-500">ID: EMP{employee.id.toString().padStart(3, '0')}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{employee.phone}</div>
-                        <div className="text-sm text-gray-500">{employee.email}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {employee.siteId ? getSiteName(employee.siteId) : 'Not assigned'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge 
-                          variant={employee.isActive ? "default" : "secondary"}
-                          className={employee.isActive ? "bg-success text-white" : ""}
-                        >
-                          {employee.isActive ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleEditEmployee(employee)}
-                            title="Edit Employee"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleViewEmployee(employee)}
-                            title="View Employee Location"
-                          >
-                            <MapPin className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleDeleteEmployee(employee)}
-                            className="text-red-600 hover:text-red-700"
-                            title="Delete Employee"
-                            disabled={deleteEmployeeMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </main>
+              />
+              <DialogFooter>
+                <Button type="submit" disabled={updateEmployeeMutation.isPending}>
+                  {updateEmployeeMutation.isPending ? 'Updating...' : 'Update Employee'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

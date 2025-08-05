@@ -220,9 +220,9 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <Link href="/admin/employees">
                 <Button variant="outline" className="w-full flex items-center p-6 h-auto bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all duration-300 hover:scale-105 shadow-md">
-                  <UserPlus className="text-blue-600 w-6 h-6 mr-3" />
+                  <Users className="text-blue-600 w-6 h-6 mr-3" />
                   <div className="text-left">
-                    <div className="font-semibold text-gray-900">Add Employee</div>
+                    <div className="font-semibold text-gray-900">Employee Management</div>
                     <div className="text-xs text-gray-600">Manage workforce</div>
                   </div>
                 </Button>

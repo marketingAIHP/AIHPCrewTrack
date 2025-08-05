@@ -820,15 +820,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Upload employee profile image
   app.post('/api/employee/profile-image', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
     try {
-      const { imageData } = req.body;
+      const { imageURL } = req.body;
 
-      if (!imageData) {
-        return res.status(400).json({ message: 'Image data is required' });
+      if (!imageURL) {
+        return res.status(400).json({ message: 'Image URL is required' });
       }
 
-      // Update employee profile with image data
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityPath(imageURL);
+
+      // Update employee profile with object path
       const updatedEmployee = await storage.updateEmployee(req.user!.id, {
-        profileImage: imageData
+        profileImage: objectPath
       });
 
       res.json({
@@ -859,10 +862,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/employees/:id/profile-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const employeeId = parseInt(req.params.id);
-      const { imageData } = req.body;
+      const { imageURL } = req.body;
 
-      if (!imageData) {
-        return res.status(400).json({ message: 'Image data is required' });
+      if (!imageURL) {
+        return res.status(400).json({ message: 'Image URL is required' });
       }
 
       // Check if this employee belongs to the admin
@@ -871,9 +874,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      // Update employee profile with image data
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityPath(imageURL);
+
+      // Update employee profile with object path
       const updatedEmployee = await storage.updateEmployee(employeeId, {
-        profileImage: imageData
+        profileImage: objectPath
       });
 
       res.json({
