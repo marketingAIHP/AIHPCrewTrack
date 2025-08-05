@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
 import NotificationDropdown from '@/components/NotificationDropdown';
-import EmployeeManagement from '@/components/EmployeeManagement';
+
 
 
 export default function AdminDashboard() {
@@ -30,7 +30,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const user = getUser();
   const userType = getUserType();
-  const [isEmployeeManagementExpanded, setIsEmployeeManagementExpanded] = useState(false);
+
 
   useEffect(() => {
     if (!getAuthToken() || userType !== 'admin') {
@@ -125,13 +125,7 @@ export default function AdminDashboard() {
 
       {/* Dashboard Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Employee Management Section */}
-        <div className="mb-8">
-          <EmployeeManagement 
-            isExpanded={isEmployeeManagementExpanded}
-            onToggle={() => setIsEmployeeManagementExpanded(!isEmployeeManagementExpanded)}
-          />
-        </div>
+
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

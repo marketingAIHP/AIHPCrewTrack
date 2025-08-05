@@ -128,13 +128,19 @@ export default function EmployeeManagementSimple() {
   // Create employee mutation
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createEmployeeSchema>) => {
-      return apiRequest('/api/admin/employees', {
+      const response = await fetch('/api/admin/employees', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
         body: JSON.stringify({
           ...data,
           departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
         }),
       });
+      if (!response.ok) throw new Error('Failed to create employee');
+      return response.json();
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Employee created successfully" });
@@ -150,13 +156,19 @@ export default function EmployeeManagementSimple() {
   // Update employee mutation
   const updateEmployeeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof editEmployeeSchema> }) => {
-      return apiRequest(`/api/admin/employees/${id}`, {
+      const response = await fetch(`/api/admin/employees/${id}`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
         body: JSON.stringify({
           ...data,
           departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
         }),
       });
+      if (!response.ok) throw new Error('Failed to update employee');
+      return response.json();
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Employee updated successfully" });
@@ -172,9 +184,14 @@ export default function EmployeeManagementSimple() {
   // Delete employee mutation
   const deleteEmployeeMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/admin/employees/${id}`, {
+      const response = await fetch(`/api/admin/employees/${id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
       });
+      if (!response.ok) throw new Error('Failed to delete employee');
+      return response.json();
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Employee deleted successfully" });
@@ -188,10 +205,16 @@ export default function EmployeeManagementSimple() {
   // Create department mutation
   const createDepartmentMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createDepartmentSchema>) => {
-      return apiRequest('/api/admin/departments', {
+      const response = await fetch('/api/admin/departments', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
         body: JSON.stringify(data),
       });
+      if (!response.ok) throw new Error('Failed to create department');
+      return response.json();
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Department created successfully" });
@@ -230,7 +253,7 @@ export default function EmployeeManagementSimple() {
 
   const getDepartmentName = (departmentId?: number) => {
     if (!departmentId) return 'No Department';
-    const department = departments.find(d => d.id === departmentId);
+    const department = departments.find((d: Department) => d.id === departmentId);
     return department?.name || 'Unknown Department';
   };
 
@@ -455,7 +478,7 @@ export default function EmployeeManagementSimple() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {departments.map((dept: Department) => {
-                const employeeCount = employees.filter(emp => emp.departmentId === dept.id).length;
+                const employeeCount = employees.filter((emp: Employee) => emp.departmentId === dept.id).length;
                 return (
                   <div key={dept.id} className="bg-gray-50 p-3 rounded-lg">
                     <h4 className="font-medium">{dept.name}</h4>
