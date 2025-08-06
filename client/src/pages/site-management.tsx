@@ -15,6 +15,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { getAuthToken, getUserType } from '@/lib/auth';
 import GoogleMap from '@/components/google-map';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
+import { ObjectUploader } from '@/components/ObjectUploader';
 import { 
   ArrowLeft, 
   Plus, 
@@ -22,7 +23,9 @@ import {
   Edit, 
   Building2,
   Users,
-  Trash2
+  Trash2,
+  Camera,
+  Image
 } from 'lucide-react';
 
 const siteSchema = z.object({
@@ -31,6 +34,7 @@ const siteSchema = z.object({
   latitude: z.string().min(1, 'Latitude is required'),
   longitude: z.string().min(1, 'Longitude is required'),
   geofenceRadius: z.string().min(1, 'Geofence radius is required'),
+  siteImage: z.string().optional(),
 });
 
 type SiteForm = z.infer<typeof siteSchema>;
@@ -43,6 +47,7 @@ export default function SiteManagement() {
   const [editingSite, setEditingSite] = useState<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({ lat: 40.7128, lng: -74.0060 });
+  const [siteImageURL, setSiteImageURL] = useState<string>('');
 
   useEffect(() => {
     if (!getAuthToken() || getUserType() !== 'admin') {
@@ -96,6 +101,7 @@ export default function SiteManagement() {
         latitude: data.latitude,
         longitude: data.longitude,
         geofenceRadius: parseInt(data.geofenceRadius),
+        siteImage: siteImageURL || undefined,
       };
       
       if (editingSite) {
@@ -114,6 +120,7 @@ export default function SiteManagement() {
       setIsDialogOpen(false);
       setEditingSite(null);
       form.reset();
+      setSiteImageURL('');
       toast({
         title: 'Success',
         description: editingSite ? 'Work site updated successfully' : 'Work site created successfully',
@@ -139,7 +146,7 @@ export default function SiteManagement() {
   };
 
   const getEmployeeCount = (siteId: number) => {
-    return employees?.filter((emp: any) => emp.siteId === siteId).length || 0;
+    return Array.isArray(employees) ? employees.filter((emp: any) => emp.siteId === siteId).length : 0;
   };
 
   const getCurrentlyOnSite = (siteId: number) => {
@@ -158,6 +165,7 @@ export default function SiteManagement() {
     setEditingSite(site);
     form.setValue('name', site.name);
     form.setValue('address', site.address);
+    setSiteImageURL(site.siteImage || '');
     form.setValue('latitude', site.latitude.toString());
     form.setValue('longitude', site.longitude.toString());
     form.setValue('geofenceRadius', site.geofenceRadius.toString());
@@ -174,7 +182,29 @@ export default function SiteManagement() {
     setEditingSite(null);
     form.reset();
     setSelectedLocation({ lat: 40.7128, lng: -74.0060 });
+    setSiteImageURL('');
     setIsDialogOpen(true);
+  };
+
+  // Image upload handlers
+  const handleGetUploadParameters = async () => {
+    const response = await apiRequest('POST', '/api/objects/upload');
+    const data = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: data.uploadURL,
+    };
+  };
+
+  const handleUploadComplete = (result: any) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadedFile = result.successful[0];
+      setSiteImageURL(uploadedFile.uploadURL);
+      toast({
+        title: 'Success',
+        description: 'Site image uploaded successfully',
+      });
+    }
   };
 
   const deleteSiteMutation = useMutation({
@@ -240,6 +270,7 @@ export default function SiteManagement() {
                 setEditingSite(null);
                 form.reset();
                 setSelectedLocation({ lat: 40.7128, lng: -74.0060 });
+                setSiteImageURL('');
               }
             }}>
               <DialogTrigger asChild>
@@ -327,6 +358,37 @@ export default function SiteManagement() {
                     )}
                   </div>
                   
+                  {/* Site Image Upload Section */}
+                  <div>
+                    <Label>Site Image</Label>
+                    {siteImageURL && (
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-600 mb-2">Current Image:</p>
+                        <img 
+                          src={siteImageURL} 
+                          alt="Site preview"
+                          className="w-full h-32 object-cover rounded-lg border"
+                        />
+                      </div>
+                    )}
+                    <ObjectUploader
+                      maxNumberOfFiles={1}
+                      maxFileSize={10485760} // 10MB
+                      allowedFileTypes={['image/*']}
+                      onGetUploadParameters={handleGetUploadParameters}
+                      onComplete={handleUploadComplete}
+                      buttonClassName="w-full"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Camera className="h-4 w-4" />
+                        <span>{siteImageURL ? 'Change Site Image' : 'Upload Site Image'}</span>
+                      </div>
+                    </ObjectUploader>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Upload a clear image of the work site. Supported formats: JPG, PNG. Max size: 10MB.
+                    </p>
+                  </div>
+                  
                   {mapLoaded && (
                     <div>
                       <Label>Click on the map to select location</Label>
@@ -336,7 +398,6 @@ export default function SiteManagement() {
                           zoom={13}
                           markers={[
                             {
-                              id: 'selected',
                               position: selectedLocation,
                               title: 'Selected Location',
                               color: 'red',
@@ -344,7 +405,6 @@ export default function SiteManagement() {
                           ]}
                           geofences={[
                             {
-                              id: 'geofence',
                               center: selectedLocation,
                               radius: parseInt(form.watch('geofenceRadius') || '200'),
                               color: '#1976D2',
@@ -382,14 +442,14 @@ export default function SiteManagement() {
             <div className="col-span-full text-center py-8">
               <p>Loading work sites...</p>
             </div>
-          ) : !sites || sites.length === 0 ? (
+          ) : !sites || !Array.isArray(sites) || sites.length === 0 ? (
             <div className="col-span-full text-center py-8">
               <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <p className="text-gray-500">No work sites found</p>
               <p className="text-sm text-gray-400">Add work sites to start managing locations</p>
             </div>
           ) : (
-            sites.map((site: any) => (
+            Array.isArray(sites) && sites.map((site: any) => (
               <Card key={site.id} className="overflow-hidden">
                 <div className="h-48 bg-gray-200 flex items-center justify-center">
                   <div className="text-center">
