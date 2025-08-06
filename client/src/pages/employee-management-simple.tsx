@@ -256,10 +256,22 @@ export default function EmployeeManagementSimple() {
   const handleUploadComplete = (result: any) => {
     if (result.successful && result.successful.length > 0) {
       const uploadedFile = result.successful[0];
-      const imageURL = uploadedFile.uploadURL;
+      // Try multiple possible image URL properties from the upload result
+      const imageURL = uploadedFile.uploadURL || 
+                       uploadedFile.url || 
+                       uploadedFile.source ||
+                       (uploadedFile.response && uploadedFile.response.uploadURL);
+      
       if (imageURL) {
         setEmployeeImageURL(imageURL);
         toast({ title: "Success", description: "Image uploaded successfully!" });
+      } else {
+        console.error('Upload result:', result);
+        toast({ 
+          title: "Warning", 
+          description: "Image uploaded but URL not found. Please try again.", 
+          variant: "destructive" 
+        });
       }
     }
   };

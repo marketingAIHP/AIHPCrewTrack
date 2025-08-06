@@ -5,15 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, MapPin, Clock, User } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth';
-
-interface Employee {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  siteId: number;
-  isActive: boolean;
-}
+import { Employee } from '@shared/schema';
 
 interface Site {
   id: number;
@@ -132,9 +124,17 @@ export default function OnSiteNow() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                      <span className="text-orange-600 font-semibold text-lg">
-                        {item.employee.firstName[0]}{item.employee.lastName[0]}
-                      </span>
+                      {item.employee.profileImage ? (
+                        <img
+                          src={item.employee.profileImage}
+                          alt={`${item.employee.firstName} ${item.employee.lastName}`}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-orange-600 font-semibold text-lg">
+                          {item.employee.firstName[0]}{item.employee.lastName[0]}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <Link href={`/admin/employees/${item.employee.id}/profile`}>

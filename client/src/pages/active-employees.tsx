@@ -5,17 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, MapPin, Clock } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth';
-
-interface Employee {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  isActive: boolean;
-  siteId: number;
-  createdAt: string;
-}
+import { Employee } from '@shared/schema';
 
 interface Site {
   id: number;
@@ -114,9 +104,17 @@ export default function ActiveEmployees() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 font-semibold text-lg">
-                        {employee.firstName[0]}{employee.lastName[0]}
-                      </span>
+                      {employee.profileImage ? (
+                        <img
+                          src={employee.profileImage}
+                          alt={`${employee.firstName} ${employee.lastName}`}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-blue-600 font-semibold text-lg">
+                          {employee.firstName[0]}{employee.lastName[0]}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <Link href={`/admin/employees/${employee.id}/profile`}>
@@ -132,12 +130,12 @@ export default function ActiveEmployees() {
                   <div className="text-right space-y-2">
                     <div className="flex items-center text-gray-600">
                       <MapPin className="h-4 w-4 mr-1" />
-                      <span className="text-sm">{getSiteName(employee.siteId)}</span>
+                      <span className="text-sm">{getSiteName(employee.siteId || 0)}</span>
                     </div>
                     <div className="flex items-center text-gray-600">
                       <Clock className="h-4 w-4 mr-1" />
                       <span className="text-sm">
-                        Joined {new Date(employee.createdAt).toLocaleDateString()}
+                        Joined {employee.createdAt ? new Date(employee.createdAt).toLocaleDateString() : 'Unknown'}
                       </span>
                     </div>
                     <Badge 
