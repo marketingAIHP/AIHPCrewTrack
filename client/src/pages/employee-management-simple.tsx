@@ -71,13 +71,13 @@ export default function EmployeeManagementSimple() {
   const [employeeImageURL, setEmployeeImageURL] = useState<string>('');
 
   // Fetch employees and departments
-  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+  const { data: employees = [], isLoading: employeesLoading } = useQuery<Employee[]>({
     queryKey: ['/api/admin/employees'],
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  const { data: departments = [], isLoading: departmentsLoading } = useQuery({
+  const { data: departments = [], isLoading: departmentsLoading } = useQuery<Department[]>({
     queryKey: ['/api/admin/departments'],
     staleTime: 5 * 60 * 1000, // 5 minutes  
     gcTime: 10 * 60 * 1000, // 10 minutes
@@ -92,7 +92,7 @@ export default function EmployeeManagementSimple() {
       lastName: '',
       email: '',
       password: '',
-      departmentId: '',
+      departmentId: 'none',
     },
   });
 
@@ -104,7 +104,7 @@ export default function EmployeeManagementSimple() {
       firstName: '',
       lastName: '',
       email: '',
-      departmentId: '',
+      departmentId: 'none',
     },
   });
 
@@ -268,7 +268,7 @@ export default function EmployeeManagementSimple() {
     setEditingEmployee(employee);
     setEmployeeImageURL(employee.profileImage || '');
     editEmployeeForm.reset({
-      employeeId: employee.employeeId,
+      employeeId: employee.employeeId || '',
       firstName: employee.firstName,
       lastName: employee.lastName, 
       email: employee.email,
@@ -277,7 +277,7 @@ export default function EmployeeManagementSimple() {
   };
 
   const getDepartmentName = useMemo(() => {
-    const departmentMap = new Map(departments.map((d: Department) => [d.id, d.name]));
+    const departmentMap = new Map(departments.map((d) => [d.id, d.name]));
     return (departmentId?: number) => {
       if (!departmentId) return 'No Department';
       return departmentMap.get(departmentId) || 'Unknown Department';
@@ -285,9 +285,9 @@ export default function EmployeeManagementSimple() {
   }, [departments]);
 
   const departmentStats = useMemo(() => {
-    return departments.map((dept: Department) => ({
+    return departments.map((dept) => ({
       ...dept,
-      employeeCount: employees.filter((emp: Employee) => emp.departmentId === dept.id).length
+      employeeCount: employees.filter((emp) => emp.departmentId === dept.id).length
     }));
   }, [departments, employees]);
 
@@ -490,7 +490,7 @@ export default function EmployeeManagementSimple() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">No Department</SelectItem>
-                            {departments.map((dept: Department) => (
+                            {departments.map((dept) => (
                               <SelectItem key={dept.id} value={dept.id.toString()}>
                                 {dept.name}
                               </SelectItem>
@@ -518,7 +518,6 @@ export default function EmployeeManagementSimple() {
                     <ObjectUploader
                       maxNumberOfFiles={1}
                       maxFileSize={10485760} // 10MB
-                      allowedFileTypes={['image/*']}
                       onGetUploadParameters={handleGetUploadParameters}
                       onComplete={handleUploadComplete}
                       buttonClassName="w-full"
@@ -571,7 +570,7 @@ export default function EmployeeManagementSimple() {
 
       {/* Employees Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {employees.map((employee: Employee) => (
+        {employees.map((employee) => (
           <Card key={employee.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -729,7 +728,7 @@ export default function EmployeeManagementSimple() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">No Department</SelectItem>
-                        {departments.map((dept: Department) => (
+                        {departments.map((dept) => (
                           <SelectItem key={dept.id} value={dept.id.toString()}>
                             {dept.name}
                           </SelectItem>
@@ -757,7 +756,6 @@ export default function EmployeeManagementSimple() {
                 <ObjectUploader
                   maxNumberOfFiles={1}
                   maxFileSize={10485760} // 10MB
-                  allowedFileTypes={['image/*']}
                   onGetUploadParameters={handleGetUploadParameters}
                   onComplete={handleUploadComplete}
                   buttonClassName="w-full"
