@@ -1169,10 +1169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const objectStorageService = new ObjectStorageService();
-      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(siteImageURL, {
-        owner: req.user!.id.toString(),
-        visibility: 'public'
-      });
+      const objectPath = await objectStorageService.trySetObjectEntityPath(siteImageURL);
 
       // Update work site with object path
       const updatedSite = await storage.updateWorkSite(siteId, {

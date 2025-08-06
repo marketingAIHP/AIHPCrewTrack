@@ -218,7 +218,7 @@ export default function WorkSitesList() {
                       <div>Lat: {parseFloat(site.latitude).toFixed(4)}</div>
                       <div>Lng: {parseFloat(site.longitude).toFixed(4)}</div>
                     </div>
-                    <div className="space-x-2">
+                    <div className="flex flex-wrap gap-2">
                       <Link href={`/admin/live-tracking?siteId=${site.id}`}>
                         <Button variant="outline" size="sm">
                           <MapPin className="h-4 w-4 mr-1" />
@@ -228,7 +228,11 @@ export default function WorkSitesList() {
                       
                       <Dialog open={uploadingSiteId === site.id} onOpenChange={(open) => setUploadingSiteId(open ? site.id : null)}>
                         <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 border-2"
+                          >
                             <Camera className="h-4 w-4 mr-1" />
                             {site.siteImage ? 'Update' : 'Add'} Image
                           </Button>
