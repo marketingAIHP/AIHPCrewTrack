@@ -24,7 +24,7 @@ The application uses React with Tailwind CSS and shadcn/ui for a modern, respons
 *   **Map Integration**: Interactive Google Maps with custom markers and controls, displaying real-time employee positions, work sites, and geofence boundaries. Features clickable markers and employee names for detailed profile navigation.
 *   **Data Validation & Security**: Strong password requirements, unique email validation for both admin and employee accounts, and organization uniqueness constraints. Robust error handling provides detailed validation messages.
 *   **Real-time Notifications**: WebSocket-based notifications alert administrators to employee check-in/out events, with toast notifications and a persistent notification history.
-*   **Profile Image Management**: Comprehensive system for uploading, previewing, and removing profile images for both admin and employee profiles, with base64 storage.
+*   **Profile Image Management**: Comprehensive system for uploading, previewing, and removing profile images for both admin and employee profiles, with cloud object storage. Images display consistently across all application interfaces including employee cards, active employee lists, on-site tracking, live map sidebar, and notifications.
 
 ### System Design Choices
 The application follows a monorepo structure with shared TypeScript types for full-stack type safety. It prioritizes real-time data synchronization, robust error handling, and a clear separation of concerns between frontend, backend, and database layers. Location updates are optimized for server load and battery life (1-minute interval), and automatic check-out occurs when employees leave geofences. Caching is disabled for critical employee data to ensure data freshness.
