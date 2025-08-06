@@ -8,16 +8,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Users, Plus, MapPin, Clock, Edit, Trash2, Camera, Upload, X, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Users, Plus, MapPin, Clock, Edit, Trash2, Camera, Upload, X, Eye, EyeOff, Image } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState, useMemo } from 'react';
 import { apiRequest } from '@/lib/queryClient';
+import { ObjectUploader } from '@/components/ObjectUploader';
 
 interface Employee {
   id: number;
+  employeeId: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -35,6 +37,7 @@ interface Department {
 
 // Form schemas
 const createEmployeeSchema = z.object({
+  employeeId: z.string().min(1, "Employee ID is required"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
@@ -46,6 +49,7 @@ const createEmployeeSchema = z.object({
 });
 
 const editEmployeeSchema = z.object({
+  employeeId: z.string().min(1, "Employee ID is required"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
@@ -64,6 +68,7 @@ export default function EmployeeManagementSimple() {
   const [isCreateDepartmentOpen, setIsCreateDepartmentOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [employeeImageURL, setEmployeeImageURL] = useState<string>('');
 
   // Fetch employees and departments
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
@@ -82,6 +87,7 @@ export default function EmployeeManagementSimple() {
   const createEmployeeForm = useForm({
     resolver: zodResolver(createEmployeeSchema),
     defaultValues: {
+      employeeId: '',
       firstName: '',
       lastName: '',
       email: '',
@@ -94,6 +100,7 @@ export default function EmployeeManagementSimple() {
   const editEmployeeForm = useForm({
     resolver: zodResolver(editEmployeeSchema),
     defaultValues: {
+      employeeId: '',
       firstName: '',
       lastName: '',
       email: '',
@@ -121,6 +128,7 @@ export default function EmployeeManagementSimple() {
         },
         body: JSON.stringify({
           ...data,
+          profileImage: employeeImageURL || undefined,
           departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
         }),
       });
@@ -131,6 +139,7 @@ export default function EmployeeManagementSimple() {
       toast({ title: "Success", description: "Employee created successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
       setIsCreateEmployeeOpen(false);
+      setEmployeeImageURL('');
       createEmployeeForm.reset();
     },
     onError: (error: any) => {
@@ -149,6 +158,7 @@ export default function EmployeeManagementSimple() {
         },
         body: JSON.stringify({
           ...data,
+          profileImage: employeeImageURL || undefined,
           departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
         }),
       });
@@ -159,6 +169,7 @@ export default function EmployeeManagementSimple() {
       toast({ title: "Success", description: "Employee updated successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
       setEditingEmployee(null);
+      setEmployeeImageURL('');
       editEmployeeForm.reset();
     },
     onError: (error: any) => {
@@ -226,9 +237,38 @@ export default function EmployeeManagementSimple() {
     createDepartmentMutation.mutate(data);
   };
 
+  // Image upload functions
+  const handleGetUploadParameters = async () => {
+    const response = await fetch('/api/objects/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    });
+    if (!response.ok) throw new Error('Failed to get upload URL');
+    const data = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: data.uploadURL,
+    };
+  };
+
+  const handleUploadComplete = (result: any) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadedFile = result.successful[0];
+      const imageURL = uploadedFile.uploadURL;
+      if (imageURL) {
+        setEmployeeImageURL(imageURL);
+        toast({ title: "Success", description: "Image uploaded successfully!" });
+      }
+    }
+  };
+
   const handleEditEmployee = (employee: Employee) => {
     setEditingEmployee(employee);
+    setEmployeeImageURL(employee.profileImage || '');
     editEmployeeForm.reset({
+      employeeId: employee.employeeId,
       firstName: employee.firstName,
       lastName: employee.lastName, 
       email: employee.email,
@@ -350,6 +390,19 @@ export default function EmployeeManagementSimple() {
               </DialogHeader>
               <Form {...createEmployeeForm}>
                 <form onSubmit={createEmployeeForm.handleSubmit(onCreateEmployee)} className="space-y-4">
+                  <FormField
+                    control={createEmployeeForm.control}
+                    name="employeeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Employee ID</FormLabel>
+                        <FormControl>
+                          <Input placeholder="EMP001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={createEmployeeForm.control}
@@ -448,6 +501,37 @@ export default function EmployeeManagementSimple() {
                       </FormItem>
                     )}
                   />
+                  
+                  {/* Employee Image Upload Section */}
+                  <div>
+                    <FormLabel>Profile Image</FormLabel>
+                    {employeeImageURL && (
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-600 mb-2">Current Image:</p>
+                        <img 
+                          src={employeeImageURL} 
+                          alt="Employee preview"
+                          className="w-20 h-20 object-cover rounded-full border"
+                        />
+                      </div>
+                    )}
+                    <ObjectUploader
+                      maxNumberOfFiles={1}
+                      maxFileSize={10485760} // 10MB
+                      allowedFileTypes={['image/*']}
+                      onGetUploadParameters={handleGetUploadParameters}
+                      onComplete={handleUploadComplete}
+                      buttonClassName="w-full"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Camera className="h-4 w-4" />
+                        <span>{employeeImageURL ? 'Change Profile Image' : 'Upload Profile Image'}</span>
+                      </div>
+                    </ObjectUploader>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Upload a clear photo of the employee. Supported formats: JPG, PNG. Max size: 10MB.
+                    </p>
+                  </div>
                   <DialogFooter>
                     <Button type="submit" disabled={createEmployeeMutation.isPending}>
                       {createEmployeeMutation.isPending ? 'Creating...' : 'Create Employee'}
@@ -541,7 +625,7 @@ export default function EmployeeManagementSimple() {
                 </Badge>
               </div>
               <div className="text-xs text-gray-500">
-                ID: {employee.id} • Created: {new Date(employee.createdAt).toLocaleDateString()}
+                Employee ID: {employee.employeeId} • System ID: {employee.id} • Created: {new Date(employee.createdAt).toLocaleDateString()}
               </div>
             </CardContent>
           </Card>
@@ -577,6 +661,19 @@ export default function EmployeeManagementSimple() {
           </DialogHeader>
           <Form {...editEmployeeForm}>
             <form onSubmit={editEmployeeForm.handleSubmit(onUpdateEmployee)} className="space-y-4">
+              <FormField
+                control={editEmployeeForm.control}
+                name="employeeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Employee ID</FormLabel>
+                    <FormControl>
+                      <Input placeholder="EMP001" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={editEmployeeForm.control}
@@ -643,6 +740,37 @@ export default function EmployeeManagementSimple() {
                   </FormItem>
                 )}
               />
+              
+              {/* Employee Image Upload Section */}
+              <div>
+                <FormLabel>Profile Image</FormLabel>
+                {employeeImageURL && (
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-600 mb-2">Current Image:</p>
+                    <img 
+                      src={employeeImageURL} 
+                      alt="Employee preview"
+                      className="w-20 h-20 object-cover rounded-full border"
+                    />
+                  </div>
+                )}
+                <ObjectUploader
+                  maxNumberOfFiles={1}
+                  maxFileSize={10485760} // 10MB
+                  allowedFileTypes={['image/*']}
+                  onGetUploadParameters={handleGetUploadParameters}
+                  onComplete={handleUploadComplete}
+                  buttonClassName="w-full"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    <span>{employeeImageURL ? 'Change Profile Image' : 'Upload Profile Image'}</span>
+                  </div>
+                </ObjectUploader>
+                <p className="text-xs text-gray-500 mt-1">
+                  Upload a clear photo of the employee. Supported formats: JPG, PNG. Max size: 10MB.
+                </p>
+              </div>
               <DialogFooter>
                 <Button type="submit" disabled={updateEmployeeMutation.isPending}>
                   {updateEmployeeMutation.isPending ? 'Updating...' : 'Update Employee'}

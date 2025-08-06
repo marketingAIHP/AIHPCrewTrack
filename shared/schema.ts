@@ -18,6 +18,7 @@ export const admins = pgTable("admins", {
 // Labor employees table
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
+  employeeId: text("employee_id").notNull().unique(), // Custom employee ID (like "EMP001")
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull().unique(),
