@@ -77,13 +77,21 @@ export function ObjectUploader({
       })
       .on("complete", (result) => {
         onComplete?.(result);
-        setShowModal(false);
+        // Use setTimeout to prevent immediate closing from affecting parent dialogs
+        setTimeout(() => setShowModal(false), 100);
       })
   );
 
   return (
     <div>
-      <Button onClick={() => setShowModal(true)} className={buttonClassName}>
+      <Button 
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowModal(true);
+        }} 
+        className={buttonClassName}
+        type="button"
+      >
         {children}
       </Button>
 

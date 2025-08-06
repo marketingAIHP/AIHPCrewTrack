@@ -650,7 +650,9 @@ export default function EmployeeManagementSimple() {
       )}
 
       {/* Edit Employee Dialog */}
-      <Dialog open={!!editingEmployee} onOpenChange={() => setEditingEmployee(null)}>
+      <Dialog open={!!editingEmployee} onOpenChange={(open) => {
+        if (!open) setEditingEmployee(null);
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Employee</DialogTitle>
