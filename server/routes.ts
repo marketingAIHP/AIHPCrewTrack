@@ -1152,6 +1152,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload work site image
+  app.put('/api/admin/sites/:id/image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const siteId = parseInt(req.params.id);
+      const { siteImageURL } = req.body;
+
+      if (!siteImageURL) {
+        return res.status(400).json({ message: 'Site image URL is required' });
+      }
+
+      // Check if this site belongs to the admin
+      const adminSites = await storage.getWorkSitesByAdmin(req.user!.id);
+      if (!adminSites.find(site => site.id === siteId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(siteImageURL, {
+        owner: req.user!.id.toString(),
+        visibility: 'public'
+      });
+
+      // Update work site with object path
+      const updatedSite = await storage.updateWorkSite(siteId, {
+        siteImage: objectPath
+      });
+
+      res.json({
+        siteImage: updatedSite.siteImage,
+        message: 'Site image updated successfully'
+      });
+    } catch (error) {
+      console.error('Error uploading site image:', error);
+      res.status(500).json({ message: 'Failed to upload site image' });
+    }
+  });
+
+  // Remove work site image
+  app.delete('/api/admin/sites/:id/image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const siteId = parseInt(req.params.id);
+
+      // Check if this site belongs to the admin
+      const adminSites = await storage.getWorkSitesByAdmin(req.user!.id);
+      if (!adminSites.find(site => site.id === siteId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.updateWorkSite(siteId, {
+        siteImage: null
+      });
+
+      res.json({ message: 'Site image removed successfully' });
+    } catch (error) {
+      console.error('Error removing site image:', error);
+      res.status(500).json({ message: 'Failed to remove site image' });
+    }
+  });
+
   // Employee Check-in/Check-out Routes
   app.post('/api/employee/checkin', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
     try {

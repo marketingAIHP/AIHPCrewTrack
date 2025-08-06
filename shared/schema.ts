@@ -49,6 +49,7 @@ export const workSites = pgTable("work_sites", {
   latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
   longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
   geofenceRadius: integer("geofence_radius").notNull().default(200), // in meters
+  siteImage: text("site_image"), // URL to site image in object storage
   adminId: integer("admin_id").notNull().references(() => admins.id),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
