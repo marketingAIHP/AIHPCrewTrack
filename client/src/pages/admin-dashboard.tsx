@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
 import NotificationDropdown from '@/components/NotificationDropdown';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 
 
 
@@ -42,6 +43,19 @@ export default function AdminDashboard() {
       setLocation('/admin/login');
     }
   }, []);
+
+  const { data: adminProfile } = useQuery({
+    queryKey: ['/api/admin/profile'],
+    queryFn: async () => {
+      const response = await fetch('/api/admin/profile', {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch profile');
+      return response.json();
+    },
+  });
 
   const { data: stats = {
     activeEmployees: 0,
@@ -96,9 +110,16 @@ export default function AdminDashboard() {
               <Link href="/admin/profile">
                 <div className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-all duration-300 bg-gradient-to-r from-white/60 to-white/40 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-md">
-                    <span className="text-sm font-bold text-white">
-                      {user?.firstName?.[0]}{user?.lastName?.[0]}
-                    </span>
+                    <AuthenticatedImage
+                      src={adminProfile?.profileImage}
+                      alt={`${user?.firstName} ${user?.lastName}`}
+                      className="w-10 h-10 rounded-full object-cover"
+                      fallback={
+                        <span className="text-sm font-bold text-white">
+                          {user?.firstName?.[0]}{user?.lastName?.[0]}
+                        </span>
+                      }
+                    />
                   </div>
                   <div>
                     <span className="text-sm font-semibold text-gray-800 block">
