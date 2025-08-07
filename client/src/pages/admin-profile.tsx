@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, User, Mail, Calendar, Settings, Shield, Eye, EyeOff, Camera, Upload, X } from 'lucide-react';
 import { ObjectUploader } from '@/components/ObjectUploader';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 import type { UploadResult } from '@uppy/core';
 import { getAuthToken, getUser } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
@@ -64,6 +65,7 @@ export default function AdminProfile() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+  const [profileImageModalOpen, setProfileImageModalOpen] = useState(false);
 
   const { data: admin, isLoading: adminLoading } = useQuery({
     queryKey: ['/api/admin/profile'],
@@ -337,19 +339,23 @@ export default function AdminProfile() {
           <CardContent className="space-y-4">
             <div className="text-center">
               <div className="relative w-20 h-20 mx-auto mb-4">
-                {admin.profileImage ? (
-                  <img 
-                    src={admin.profileImage} 
-                    alt="Profile" 
-                    className="w-20 h-20 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600 font-bold text-2xl">
-                      {admin.firstName[0]}{admin.lastName[0]}
-                    </span>
-                  </div>
-                )}
+                <AuthenticatedImage
+                  src={admin.profileImage}
+                  alt="Profile"
+                  className="w-20 h-20 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => {
+                    if (admin.profileImage) {
+                      setProfileImageModalOpen(true);
+                    }
+                  }}
+                  fallback={
+                    <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 font-bold text-2xl">
+                        {admin.firstName[0]}{admin.lastName[0]}
+                      </span>
+                    </div>
+                  }
+                />
                 <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
                   <DialogTrigger asChild>
                     <Button
@@ -832,6 +838,32 @@ export default function AdminProfile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Profile Image Modal */}
+      <Dialog open={profileImageModalOpen} onOpenChange={setProfileImageModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Profile Picture</DialogTitle>
+            <DialogDescription>
+              {admin?.firstName} {admin?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          {admin?.profileImage && (
+            <div className="flex justify-center p-4">
+              <AuthenticatedImage
+                src={admin.profileImage}
+                alt={`${admin.firstName} ${admin.lastName}`}
+                className="max-w-full max-h-96 object-contain rounded-lg"
+                fallback={
+                  <div className="w-96 h-96 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-500">Image not available</span>
+                  </div>
+                }
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

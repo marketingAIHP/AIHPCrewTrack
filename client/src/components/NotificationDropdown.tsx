@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNotifications, type Notification } from '@/hooks/useNotifications';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function NotificationDropdown() {
@@ -111,19 +112,18 @@ export default function NotificationDropdown() {
                   
                   <div className="flex items-start gap-3 pr-6">
                     <div className="mt-1 flex items-center space-x-2">
-                      {notification.employee.profileImage ? (
-                        <img
-                          src={notification.employee.profileImage}
-                          alt={`${notification.employee.firstName} ${notification.employee.lastName}`}
-                          className="w-6 h-6 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                          <span className="text-xs font-medium text-gray-600">
-                            {notification.employee.firstName?.[0]}{notification.employee.lastName?.[0]}
-                          </span>
-                        </div>
-                      )}
+                      <AuthenticatedImage
+                        src={notification.employee.profileImage}
+                        alt={`${notification.employee.firstName} ${notification.employee.lastName}`}
+                        className="w-6 h-6 rounded-full object-cover"
+                        fallback={
+                          <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium text-gray-600">
+                              {notification.employee.firstName?.[0]}{notification.employee.lastName?.[0]}
+                            </span>
+                          </div>
+                        }
+                      />
                       {getNotificationIcon(notification.type)}
                     </div>
                     <div className="flex-1 space-y-1">
