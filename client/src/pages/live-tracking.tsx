@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken, getUserType } from '@/lib/auth';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
@@ -35,6 +36,8 @@ export default function LiveTracking() {
   const [mapZoom, setMapZoom] = useState(12);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [profileImageModalOpen, setProfileImageModalOpen] = useState(false);
+  const [selectedProfileImage, setSelectedProfileImage] = useState<{url: string, name: string} | null>(null);
   const initializeCalledRef = useRef(false);
 
   // Initialize component only once
@@ -398,7 +401,15 @@ export default function LiveTracking() {
                                 <img
                                   src={item.employee.profileImage}
                                   alt={`${item.employee.firstName} ${item.employee.lastName}`}
-                                  className="w-10 h-10 rounded-full object-cover"
+                                  className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedProfileImage({
+                                      url: item.employee.profileImage!,
+                                      name: `${item.employee.firstName} ${item.employee.lastName}`
+                                    });
+                                    setProfileImageModalOpen(true);
+                                  }}
                                 />
                               ) : (
                                 <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
@@ -497,6 +508,27 @@ export default function LiveTracking() {
           </div>
         </div>
       </div>
+
+      {/* Profile Image Modal */}
+      <Dialog open={profileImageModalOpen} onOpenChange={setProfileImageModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Profile Picture</DialogTitle>
+            <DialogDescription>
+              {selectedProfileImage?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedProfileImage && (
+            <div className="flex justify-center p-4">
+              <img
+                src={selectedProfileImage.url}
+                alt={selectedProfileImage.name}
+                className="max-w-full max-h-96 object-contain rounded-lg"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

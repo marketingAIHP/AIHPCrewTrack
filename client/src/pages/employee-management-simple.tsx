@@ -69,6 +69,8 @@ export default function EmployeeManagementSimple() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [employeeImageURL, setEmployeeImageURL] = useState<string>('');
+  const [profileImageModalOpen, setProfileImageModalOpen] = useState(false);
+  const [selectedProfileImage, setSelectedProfileImage] = useState<{url: string, name: string} | null>(null);
 
   // Fetch employees and departments
   const { data: employees = [], isLoading: employeesLoading } = useQuery<Employee[]>({
@@ -619,7 +621,14 @@ export default function EmployeeManagementSimple() {
                       <img
                         src={employee.profileImage}
                         alt={`${employee.firstName} ${employee.lastName}`}
-                        className="w-12 h-12 rounded-full object-cover"
+                        className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => {
+                          setSelectedProfileImage({
+                            url: employee.profileImage!,
+                            name: `${employee.firstName} ${employee.lastName}`
+                          });
+                          setProfileImageModalOpen(true);
+                        }}
                       />
                     ) : (
                       <span className="text-blue-600 font-bold">
@@ -817,6 +826,27 @@ export default function EmployeeManagementSimple() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Profile Image Modal */}
+      <Dialog open={profileImageModalOpen} onOpenChange={setProfileImageModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Profile Picture</DialogTitle>
+            <DialogDescription>
+              {selectedProfileImage?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedProfileImage && (
+            <div className="flex justify-center p-4">
+              <img
+                src={selectedProfileImage.url}
+                alt={selectedProfileImage.name}
+                className="max-w-full max-h-96 object-contain rounded-lg"
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

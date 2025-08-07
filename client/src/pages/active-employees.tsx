@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowLeft, MapPin, Clock } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth';
 import { Employee } from '@shared/schema';
@@ -14,6 +16,8 @@ interface Site {
 }
 
 export default function ActiveEmployees() {
+  const [profileImageModalOpen, setProfileImageModalOpen] = useState(false);
+  const [selectedProfileImage, setSelectedProfileImage] = useState<{url: string, name: string} | null>(null);
   const { data: employees, isLoading: employeesLoading } = useQuery({
     queryKey: ['/api/admin/employees'],
     queryFn: async () => {
@@ -108,7 +112,14 @@ export default function ActiveEmployees() {
                         <img
                           src={employee.profileImage}
                           alt={`${employee.firstName} ${employee.lastName}`}
-                          className="w-12 h-12 rounded-full object-cover"
+                          className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => {
+                            setSelectedProfileImage({
+                              url: employee.profileImage!,
+                              name: `${employee.firstName} ${employee.lastName}`
+                            });
+                            setProfileImageModalOpen(true);
+                          }}
                         />
                       ) : (
                         <span className="text-blue-600 font-semibold text-lg">
@@ -151,6 +162,27 @@ export default function ActiveEmployees() {
           ))
         )}
       </div>
+
+      {/* Profile Image Modal */}
+      <Dialog open={profileImageModalOpen} onOpenChange={setProfileImageModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Profile Picture</DialogTitle>
+            <DialogDescription>
+              {selectedProfileImage?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedProfileImage && (
+            <div className="flex justify-center p-4">
+              <img
+                src={selectedProfileImage.url}
+                alt={selectedProfileImage.name}
+                className="max-w-full max-h-96 object-contain rounded-lg"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
