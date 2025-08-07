@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { useState, useMemo } from 'react';
 import { apiRequest } from '@/lib/queryClient';
 import { ObjectUploader } from '@/components/ObjectUploader';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 
 interface Employee {
   id: number;
@@ -169,7 +170,10 @@ export default function EmployeeManagementSimple() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Employee updated successfully" });
+      // Invalidate all related queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/locations'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
       setEditingEmployee(null);
       setEmployeeImageURL('');
       editEmployeeForm.reset();
@@ -628,24 +632,25 @@ export default function EmployeeManagementSimple() {
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center relative">
-                    {employee.profileImage ? (
-                      <img
-                        src={employee.profileImage}
-                        alt={`${employee.firstName} ${employee.lastName}`}
-                        className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => {
+                    <AuthenticatedImage
+                      src={employee.profileImage}
+                      alt={`${employee.firstName} ${employee.lastName}`}
+                      className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        if (employee.profileImage) {
                           setSelectedProfileImage({
-                            url: employee.profileImage!,
+                            url: employee.profileImage,
                             name: `${employee.firstName} ${employee.lastName}`
                           });
                           setProfileImageModalOpen(true);
-                        }}
-                      />
-                    ) : (
-                      <span className="text-blue-600 font-bold">
-                        {employee.firstName[0]}{employee.lastName[0]}
-                      </span>
-                    )}
+                        }
+                      }}
+                      fallback={
+                        <span className="text-blue-600 font-bold">
+                          {employee.firstName[0]}{employee.lastName[0]}
+                        </span>
+                      }
+                    />
                   </div>
                   <div>
                     <CardTitle className="text-lg">{employee.firstName} {employee.lastName}</CardTitle>
@@ -807,10 +812,15 @@ export default function EmployeeManagementSimple() {
                 {employeeImageURL && (
                   <div className="mb-3">
                     <p className="text-sm text-gray-600 mb-2">Current Image:</p>
-                    <img 
-                      src={employeeImageURL} 
+                    <AuthenticatedImage
+                      src={employeeImageURL}
                       alt="Employee preview"
                       className="w-20 h-20 object-cover rounded-full border"
+                      fallback={
+                        <div className="w-20 h-20 bg-gray-200 rounded-full border flex items-center justify-center">
+                          <Camera className="h-8 w-8 text-gray-400" />
+                        </div>
+                      }
                     />
                   </div>
                 )}
@@ -851,10 +861,15 @@ export default function EmployeeManagementSimple() {
           </DialogHeader>
           {selectedProfileImage && (
             <div className="flex justify-center p-4">
-              <img
+              <AuthenticatedImage
                 src={selectedProfileImage.url}
                 alt={selectedProfileImage.name}
                 className="max-w-full max-h-96 object-contain rounded-lg"
+                fallback={
+                  <div className="w-96 h-96 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-500">Image not available</span>
+                  </div>
+                }
               />
             </div>
           )}
