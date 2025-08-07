@@ -267,9 +267,20 @@ export default function EmployeeManagementSimple() {
       if (imageURL) {
         setEmployeeImageURL(imageURL);
         
+        // Convert Google Storage URL to object path for optimistic updates
+        const convertToObjectPath = (url: string) => {
+          if (url.includes('/.private/profile-images/')) {
+            const match = url.match(/\.private\/profile-images\/([^?]+)/);
+            return match ? `/objects/profile-images/${match[1]}` : url;
+          }
+          return url;
+        };
+        
+        const objectPath = convertToObjectPath(imageURL);
+        
         // If we're editing an employee, immediately update their profile image in the cache
         if (editingEmployee) {
-          const updatedEmployee = { ...editingEmployee, profileImage: imageURL };
+          const updatedEmployee = { ...editingEmployee, profileImage: objectPath };
           setEditingEmployee(updatedEmployee);
           
           // Optimistically update the employee list cache
@@ -277,7 +288,7 @@ export default function EmployeeManagementSimple() {
             if (!oldData) return oldData;
             return oldData.map((emp: any) => 
               emp.id === editingEmployee.id 
-                ? { ...emp, profileImage: imageURL }
+                ? { ...emp, profileImage: objectPath }
                 : emp
             );
           });
@@ -287,7 +298,7 @@ export default function EmployeeManagementSimple() {
             if (!oldData) return oldData;
             return oldData.map((item: any) => 
               item.employee?.id === editingEmployee.id 
-                ? { ...item, employee: { ...item.employee, profileImage: imageURL } }
+                ? { ...item, employee: { ...item.employee, profileImage: objectPath } }
                 : item
             );
           });
