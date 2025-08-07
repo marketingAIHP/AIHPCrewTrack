@@ -1059,9 +1059,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const hashedPassword = await bcrypt.hash(validatedData.password, 10);
       
+      // Normalize profile image URL if provided
+      let profileImage = validatedData.profileImage;
+      if (profileImage) {
+        const objectStorageService = new ObjectStorageService();
+        profileImage = await objectStorageService.trySetObjectEntityPath(profileImage);
+      }
+      
       const employee = await storage.createEmployee({
         ...validatedData,
         password: hashedPassword,
+        profileImage,
         adminId: req.user!.id,
       });
 
@@ -1083,6 +1091,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (validatedData.password) {
         validatedData.password = await bcrypt.hash(validatedData.password, 10);
+      }
+      
+      // Normalize profile image URL if provided
+      if (validatedData.profileImage) {
+        const objectStorageService = new ObjectStorageService();
+        validatedData.profileImage = await objectStorageService.trySetObjectEntityPath(validatedData.profileImage);
       }
       
       const employee = await storage.updateEmployee(id, validatedData);
