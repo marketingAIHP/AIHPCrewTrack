@@ -264,6 +264,33 @@ export default function EmployeeManagementSimple() {
       
       if (imageURL) {
         setEmployeeImageURL(imageURL);
+        
+        // If we're editing an employee, immediately update their profile image in the cache
+        if (editingEmployee) {
+          const updatedEmployee = { ...editingEmployee, profileImage: imageURL };
+          setEditingEmployee(updatedEmployee);
+          
+          // Optimistically update the employee list cache
+          queryClient.setQueryData(['/api/admin/employees'], (oldData: any) => {
+            if (!oldData) return oldData;
+            return oldData.map((emp: any) => 
+              emp.id === editingEmployee.id 
+                ? { ...emp, profileImage: imageURL }
+                : emp
+            );
+          });
+          
+          // Also update other cache entries that might display this employee
+          queryClient.setQueryData(['/api/admin/locations'], (oldData: any) => {
+            if (!oldData) return oldData;
+            return oldData.map((item: any) => 
+              item.employee?.id === editingEmployee.id 
+                ? { ...item, employee: { ...item.employee, profileImage: imageURL } }
+                : item
+            );
+          });
+        }
+        
         toast({ title: "Success", description: "Image uploaded successfully!" });
       } else {
         console.error('Upload result:', result);
