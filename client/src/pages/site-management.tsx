@@ -259,7 +259,7 @@ export default function SiteManagement() {
 
   // Image upload handlers
   const handleGetUploadParameters = async () => {
-    const response = await apiRequest('POST', '/api/objects/upload-public');
+    const response = await apiRequest('POST', '/api/objects/upload');
     const data = await response.json();
     return {
       method: 'PUT' as const,
@@ -267,14 +267,27 @@ export default function SiteManagement() {
     };
   };
 
-  const handleUploadComplete = (result: any) => {
+  const handleUploadComplete = async (result: any) => {
     if (result.successful && result.successful.length > 0) {
       const uploadedFile = result.successful[0];
-      setSiteImageURL(uploadedFile.uploadURL);
-      toast({
-        title: 'Success',
-        description: 'Site image uploaded successfully',
-      });
+      try {
+        const response = await apiRequest('POST', '/api/admin/site-image', {
+          imageURL: uploadedFile.uploadURL
+        });
+        const data = await response.json();
+        setSiteImageURL(data.siteImage);
+        toast({
+          title: 'Success',
+          description: 'Site image uploaded successfully',
+        });
+      } catch (error) {
+        console.error('Error processing site image:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to process site image',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -610,20 +623,23 @@ export default function SiteManagement() {
                   <Card key={site.id} className="overflow-hidden">
                     <div className="h-48 bg-gray-200 flex items-center justify-center overflow-hidden">
                       {site.siteImage ? (
-                        <img 
+                        <AuthenticatedImage 
                           src={site.siteImage} 
                           alt={site.name}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
+                          fallback={
+                            <div className="text-center">
+                              <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                              <p className="text-sm text-gray-600">Work Site</p>
+                            </div>
+                          }
                         />
-                      ) : null}
-                      <div className={`text-center ${site.siteImage ? 'hidden' : ''}`}>
-                        <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">Work Site</p>
-                      </div>
+                      ) : (
+                        <div className="text-center">
+                          <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-600">Work Site</p>
+                        </div>
+                      )}
                     </div>
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">

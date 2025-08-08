@@ -774,15 +774,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Upload objects to public directory for site images
-  app.post('/api/objects/upload-public', authenticateToken(['admin', 'employee']), async (req: AuthenticatedRequest, res) => {
+  // Upload and process site image
+  app.post('/api/admin/site-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
+      const { imageURL } = req.body;
+
+      if (!imageURL) {
+        return res.status(400).json({ message: 'Image URL is required' });
+      }
+
       const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getPublicObjectUploadURL();
-      res.json({ uploadURL });
+      const objectPath = await objectStorageService.trySetObjectEntityPath(imageURL);
+
+      res.json({
+        siteImage: objectPath,
+        message: 'Site image processed successfully'
+      });
     } catch (error) {
-      console.error('Error getting public upload URL:', error);
-      res.status(500).json({ message: 'Failed to get public upload URL' });
+      console.error('Error processing site image:', error);
+      res.status(500).json({ message: 'Failed to process site image' });
     }
   });
 
