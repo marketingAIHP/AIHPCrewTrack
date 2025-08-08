@@ -180,19 +180,42 @@ export class ObjectStorageService {
     }
 
     const entityId = parts.slice(1).join("/");
+
+    // Try private directory first
     let entityDir = this.getPrivateObjectDir();
     if (!entityDir.endsWith("/")) {
       entityDir = `${entityDir}/`;
     }
-    const objectEntityPath = `${entityDir}${entityId}`;
-    const { bucketName, objectName } = parseObjectPath(objectEntityPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const objectFile = bucket.file(objectName);
-    const [exists] = await objectFile.exists();
-    if (!exists) {
-      throw new ObjectNotFoundError();
+    let objectEntityPath = `${entityDir}${entityId}`;
+    let { bucketName, objectName } = parseObjectPath(objectEntityPath);
+    let bucket = objectStorageClient.bucket(bucketName);
+    let objectFile = bucket.file(objectName);
+    let [exists] = await objectFile.exists();
+    
+    if (exists) {
+      return objectFile;
     }
-    return objectFile;
+
+    // If not found in private, try public directories (for site images)
+    const publicSearchPaths = this.getPublicObjectSearchPaths();
+    for (const publicPath of publicSearchPaths) {
+      let normalizedPublicPath = publicPath;
+      if (!normalizedPublicPath.endsWith("/")) {
+        normalizedPublicPath = `${normalizedPublicPath}/`;
+      }
+      
+      objectEntityPath = `${normalizedPublicPath}${entityId}`;
+      ({ bucketName, objectName } = parseObjectPath(objectEntityPath));
+      bucket = objectStorageClient.bucket(bucketName);
+      objectFile = bucket.file(objectName);
+      [exists] = await objectFile.exists();
+      
+      if (exists) {
+        return objectFile;
+      }
+    }
+
+    throw new ObjectNotFoundError();
   }
 
   normalizeObjectEntityPath(rawPath: string): string {
@@ -204,18 +227,33 @@ export class ObjectStorageService {
     const url = new URL(rawPath);
     const rawObjectPath = url.pathname;
   
+    // Handle both private and public uploads
     let objectEntityDir = this.getPrivateObjectDir();
     if (!objectEntityDir.endsWith("/")) {
       objectEntityDir = `${objectEntityDir}/`;
     }
   
-    if (!rawObjectPath.startsWith(objectEntityDir)) {
-      return rawObjectPath;
+    // Check if it's from private directory first
+    if (rawObjectPath.startsWith(objectEntityDir)) {
+      const entityId = rawObjectPath.slice(objectEntityDir.length);
+      return `/objects/${entityId}`;
     }
   
-    // Extract the entity ID from the path
-    const entityId = rawObjectPath.slice(objectEntityDir.length);
-    return `/objects/${entityId}`;
+    // Check if it's from public directory (for site images)
+    const publicSearchPaths = this.getPublicObjectSearchPaths();
+    for (const publicPath of publicSearchPaths) {
+      let normalizedPublicPath = publicPath;
+      if (!normalizedPublicPath.endsWith("/")) {
+        normalizedPublicPath = `${normalizedPublicPath}/`;
+      }
+      
+      if (rawObjectPath.startsWith(normalizedPublicPath)) {
+        const entityId = rawObjectPath.slice(normalizedPublicPath.length);
+        return `/objects/${entityId}`;
+      }
+    }
+  
+    return rawObjectPath;
   }
 
   // Normalize object entity path and return it
