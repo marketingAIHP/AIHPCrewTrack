@@ -25,6 +25,7 @@ The application uses React with Tailwind CSS and shadcn/ui for a modern, respons
 *   **Data Validation & Security**: Strong password requirements, unique email validation for both admin and employee accounts, and organization uniqueness constraints. Robust error handling provides detailed validation messages.
 *   **Real-time Notifications**: WebSocket-based notifications alert administrators to employee check-in/out events, with toast notifications and a persistent notification history.
 *   **Profile Image Management**: Comprehensive system for uploading, previewing, and removing profile images for both admin and employee profiles, with cloud object storage. Images display consistently across all application interfaces including employee cards, active employee lists, on-site tracking, live map sidebar, and notifications.
+*   **Site Image Management**: Complete image upload and display system for work sites using the same authenticated storage infrastructure as profile images. Site images are processed through secure backend endpoints and display properly in site cards using the AuthenticatedImage component with automatic fallback to placeholder graphics.
 *   **Hierarchical Area Organization**: Work sites can be organized into logical areas for better management. Areas contain multiple work sites and provide hierarchical structure for large organizations with multiple locations or districts. Full CRUD operations for both areas and sites with validation to prevent deletion of areas with associated sites.
 
 ### System Design Choices
