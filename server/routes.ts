@@ -774,6 +774,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload objects to public directory for site images
+  app.post('/api/objects/upload-public', authenticateToken(['admin', 'employee']), async (req: AuthenticatedRequest, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getPublicObjectUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error('Error getting public upload URL:', error);
+      res.status(500).json({ message: 'Failed to get public upload URL' });
+    }
+  });
+
   // Serve private objects with authentication
   app.get('/objects/:objectPath(*)', authenticateToken(['admin', 'employee']), async (req: AuthenticatedRequest, res) => {
     try {

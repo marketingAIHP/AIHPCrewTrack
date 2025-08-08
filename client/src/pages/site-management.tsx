@@ -259,7 +259,7 @@ export default function SiteManagement() {
 
   // Image upload handlers
   const handleGetUploadParameters = async () => {
-    const response = await apiRequest('POST', '/api/objects/upload');
+    const response = await apiRequest('POST', '/api/objects/upload-public');
     const data = await response.json();
     return {
       method: 'PUT' as const,
@@ -608,25 +608,22 @@ export default function SiteManagement() {
               ) : (
                 sites.filter((site: any) => site.areaId === selectedAreaView.id).map((site: any) => (
                   <Card key={site.id} className="overflow-hidden">
-                    <div className="h-48 bg-gray-200 flex items-center justify-center">
+                    <div className="h-48 bg-gray-200 flex items-center justify-center overflow-hidden">
                       {site.siteImage ? (
-                        <AuthenticatedImage 
+                        <img 
                           src={site.siteImage} 
                           alt={site.name}
                           className="w-full h-full object-cover"
-                          fallback={
-                            <div className="text-center">
-                              <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                              <p className="text-sm text-gray-600">Work Site</p>
-                            </div>
-                          }
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
                         />
-                      ) : (
-                        <div className="text-center">
-                          <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                          <p className="text-sm text-gray-600">Work Site</p>
-                        </div>
-                      )}
+                      ) : null}
+                      <div className={`text-center ${site.siteImage ? 'hidden' : ''}`}>
+                        <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600">Work Site</p>
+                      </div>
                     </div>
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
