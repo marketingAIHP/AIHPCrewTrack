@@ -52,6 +52,22 @@ type AreaForm = z.infer<typeof areaSchema>;
 export default function SiteManagement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  // Check authentication first, before any other hooks
+  const isAuthenticated = getAuthToken() && getUserType() === 'admin';
+  
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast({
+        title: 'Unauthorized',
+        description: 'Please log in as an admin to access this page.',
+        variant: 'destructive',
+      });
+      setLocation('/admin/login');
+      return;
+    }
+  }, [isAuthenticated, setLocation, toast]);
+
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAreaDialogOpen, setIsAreaDialogOpen] = useState(false);
@@ -63,14 +79,7 @@ export default function SiteManagement() {
   const [selectedAreaView, setSelectedAreaView] = useState<any>(null);
 
   useEffect(() => {
-    if (!getAuthToken() || getUserType() !== 'admin') {
-      toast({
-        title: 'Unauthorized',
-        description: 'Please log in as an admin to access this page.',
-        variant: 'destructive',
-      });
-      setLocation('/admin/login');
-    }
+    if (!isAuthenticated) return;
 
     // Load Google Maps API
     loadGoogleMapsAPI()
@@ -83,18 +92,18 @@ export default function SiteManagement() {
           variant: 'destructive',
         });
       });
-  }, []);
+  }, [isAuthenticated, toast]);
 
   const { data: areas = [], isLoading: loadingAreas } = useQuery<any[]>({
     queryKey: ['/api/admin/areas'],
-    enabled: !!getAuthToken(),
+    enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   const { data: sites = [], isLoading: loadingSites } = useQuery<any[]>({
     queryKey: ['/api/admin/sites'],
-    enabled: !!getAuthToken() && getUserType() === 'admin',
+    enabled: isAuthenticated,
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -364,7 +373,7 @@ export default function SiteManagement() {
     }
   };
 
-  if (!getAuthToken() || getUserType() !== 'admin') {
+  if (!isAuthenticated) {
     return null;
   }
 
