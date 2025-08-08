@@ -18,6 +18,7 @@ import { getAuthToken, getUserType } from '@/lib/auth';
 import GoogleMap from '@/components/google-map';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
 import { ObjectUploader } from '@/components/ObjectUploader';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 import { 
   ArrowLeft, 
   Plus, 
@@ -609,10 +610,16 @@ export default function SiteManagement() {
                   <Card key={site.id} className="overflow-hidden">
                     <div className="h-48 bg-gray-200 flex items-center justify-center">
                       {site.siteImage ? (
-                        <img 
+                        <AuthenticatedImage 
                           src={site.siteImage} 
                           alt={site.name}
                           className="w-full h-full object-cover"
+                          fallback={
+                            <div className="text-center">
+                              <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                              <p className="text-sm text-gray-600">Work Site</p>
+                            </div>
+                          }
                         />
                       ) : (
                         <div className="text-center">
