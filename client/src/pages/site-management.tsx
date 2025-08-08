@@ -383,17 +383,7 @@ export default function SiteManagement() {
                 {selectedAreaView ? `${selectedAreaView.name} - Sites` : 'Areas & Sites Management'}
               </h1>
             </div>
-            {!selectedAreaView && (
-              <Button 
-                className="bg-primary hover:bg-blue-700 text-white" 
-                onClick={() => {
-                  // Just show the areas management - no dialog for sites
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Work Site
-              </Button>
-            )}
+
             
             {selectedAreaView && (
               <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -986,88 +976,7 @@ export default function SiteManagement() {
           </div>
         </div>
 
-        {/* Site Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loadingSites ? (
-            <div className="col-span-full text-center py-8">
-              <p>Loading work sites...</p>
-            </div>
-          ) : !sites || !Array.isArray(sites) || sites.length === 0 ? (
-            <div className="col-span-full text-center py-8">
-              <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-500">No work sites found</p>
-              <p className="text-sm text-gray-400">Add work sites to start managing locations</p>
-            </div>
-          ) : (
-            Array.isArray(sites) && sites.map((site: any) => (
-              <Card key={site.id} className="overflow-hidden">
-                <div className="h-48 bg-gray-200 flex items-center justify-center">
-                  <div className="text-center">
-                    <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600">Work Site</p>
-                  </div>
-                </div>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{site.name}</h3>
-                    <Badge 
-                      variant={site.isActive ? "default" : "secondary"}
-                      className={site.isActive ? "bg-success text-white" : ""}
-                    >
-                      {site.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">{site.address}</p>
-                  {site.areaId && (
-                    <p className="text-xs text-blue-600 mb-4">
-                      Area: {areas.find((area: any) => area.id === site.areaId)?.name || 'Unknown'}
-                    </p>
-                  )}
-                  
-                  <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Assigned Workers</span>
-                      <span className="font-medium text-gray-900">{getEmployeeCount(site.id)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Currently On Site</span>
-                      <span className="font-medium text-success">{getCurrentlyOnSite(site.id)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Geofence Radius</span>
-                      <span className="font-medium text-gray-900">{site.geofenceRadius}m</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    <Button 
-                      className="flex-1 bg-primary text-white hover:bg-blue-700"
-                      onClick={() => handleViewSiteMap(site)}
-                    >
-                      <MapPin className="mr-2 h-4 w-4" />
-                      View Map
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEditSite(site)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDeleteSite(site)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-            </div>
+
           </div>
         )}
       </main>
