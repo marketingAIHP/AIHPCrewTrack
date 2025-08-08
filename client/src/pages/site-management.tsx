@@ -8,6 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -34,17 +36,26 @@ const siteSchema = z.object({
   latitude: z.string().min(1, 'Latitude is required'),
   longitude: z.string().min(1, 'Longitude is required'),
   geofenceRadius: z.string().min(1, 'Geofence radius is required'),
+  areaId: z.string().optional(),
   siteImage: z.string().optional(),
 });
 
+const areaSchema = z.object({
+  name: z.string().min(1, 'Area name is required'),
+  description: z.string().optional(),
+});
+
 type SiteForm = z.infer<typeof siteSchema>;
+type AreaForm = z.infer<typeof areaSchema>;
 
 export default function SiteManagement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAreaDialogOpen, setIsAreaDialogOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<any>(null);
+  const [editingArea, setEditingArea] = useState<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({ lat: 40.7128, lng: -74.0060 });
   const [siteImageURL, setSiteImageURL] = useState<string>('');
@@ -72,6 +83,11 @@ export default function SiteManagement() {
       });
   }, []);
 
+  const { data: areas = [], isLoading: loadingAreas } = useQuery({
+    queryKey: ['/api/admin/areas'],
+    enabled: !!getAuthToken(),
+  });
+
   const { data: sites = [], isLoading: loadingSites } = useQuery({
     queryKey: ['/api/admin/sites'],
     enabled: !!getAuthToken() && getUserType() === 'admin',
@@ -90,6 +106,15 @@ export default function SiteManagement() {
       latitude: '',
       longitude: '',
       geofenceRadius: '200',
+      areaId: '',
+    },
+  });
+
+  const areaForm = useForm<AreaForm>({
+    resolver: zodResolver(areaSchema),
+    defaultValues: {
+      name: '',
+      description: '',
     },
   });
 
@@ -98,20 +123,23 @@ export default function SiteManagement() {
       const payload = {
         name: data.name,
         address: data.address,
-        latitude: data.latitude,
-        longitude: data.longitude,
+        latitude: parseFloat(data.latitude),
+        longitude: parseFloat(data.longitude),
         geofenceRadius: parseInt(data.geofenceRadius),
+        areaId: data.areaId ? parseInt(data.areaId) : null,
         siteImage: siteImageURL || undefined,
       };
       
       if (editingSite) {
-        // Update existing site
-        const response = await apiRequest('PUT', `/api/admin/sites/${editingSite.id}`, payload);
-        return response.json();
+        return apiRequest(`/api/admin/sites/${editingSite.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
       } else {
-        // Create new site
-        const response = await apiRequest('POST', '/api/admin/sites', payload);
-        return response.json();
+        return apiRequest('/api/admin/sites', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
       }
     },
     onSuccess: () => {
@@ -135,8 +163,45 @@ export default function SiteManagement() {
     },
   });
 
+  const createAreaMutation = useMutation({
+    mutationFn: async (data: AreaForm) => {
+      if (editingArea) {
+        return apiRequest(`/api/admin/areas/${editingArea.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+      } else {
+        return apiRequest('/api/admin/areas', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/areas'] });
+      setIsAreaDialogOpen(false);
+      setEditingArea(null);
+      areaForm.reset();
+      toast({
+        title: 'Success',
+        description: editingArea ? 'Area updated successfully' : 'Area created successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save area',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const onSubmit = (data: SiteForm) => {
     createSiteMutation.mutate(data);
+  };
+
+  const onAreaSubmit = (data: AreaForm) => {
+    createAreaMutation.mutate(data);
   };
 
   const handleMapClick = (lat: number, lng: number) => {
@@ -169,6 +234,7 @@ export default function SiteManagement() {
     form.setValue('latitude', site.latitude.toString());
     form.setValue('longitude', site.longitude.toString());
     form.setValue('geofenceRadius', site.geofenceRadius.toString());
+    form.setValue('areaId', site.areaId ? site.areaId.toString() : '');
     setSelectedLocation({ lat: parseFloat(site.latitude), lng: parseFloat(site.longitude) });
     setIsDialogOpen(true);
     
@@ -176,6 +242,21 @@ export default function SiteManagement() {
       title: 'Edit Mode',
       description: `Editing ${site.name}`,
     });
+  };
+
+  const handleEditArea = (area: any) => {
+    setEditingArea(area);
+    areaForm.reset({
+      name: area.name,
+      description: area.description || '',
+    });
+    setIsAreaDialogOpen(true);
+  };
+
+  const handleAddArea = () => {
+    setEditingArea(null);
+    areaForm.reset();
+    setIsAreaDialogOpen(true);
   };
 
   const handleAddSite = () => {
@@ -246,6 +327,45 @@ export default function SiteManagement() {
     }
   };
 
+  const deleteAreaMutation = useMutation({
+    mutationFn: async (areaId: number) => {
+      return apiRequest(`/api/admin/areas/${areaId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/areas'] });
+      toast({
+        title: 'Success',
+        description: 'Area deleted successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete area',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleDeleteArea = (area: any) => {
+    const areaSites = sites.filter((site: any) => site.areaId === area.id);
+    
+    if (areaSites.length > 0) {
+      toast({
+        title: 'Cannot Delete Area',
+        description: `This area has ${areaSites.length} work sites. Please reassign them first.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete "${area.name}"? This action cannot be undone.`)) {
+      deleteAreaMutation.mutate(area.id);
+    }
+  };
+
   if (!getAuthToken() || getUserType() !== 'admin') {
     return null;
   }
@@ -262,7 +382,7 @@ export default function SiteManagement() {
                   <ArrowLeft />
                 </Button>
               </Link>
-              <h1 className="text-xl font-semibold text-gray-900">Work Site Management</h1>
+              <h1 className="text-xl font-semibold text-gray-900">Areas & Sites Management</h1>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
@@ -341,6 +461,23 @@ export default function SiteManagement() {
                         </p>
                       )}
                     </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="area">Area (Optional)</Label>
+                    <Select value={form.watch('areaId')} onValueChange={(value) => form.setValue('areaId', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an area (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No Area</SelectItem>
+                        {areas.map((area: any) => (
+                          <SelectItem key={area.id} value={area.id.toString()}>
+                            {area.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div>
@@ -436,6 +573,119 @@ export default function SiteManagement() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Areas Management Section */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Area Management</h2>
+            <Dialog open={isAreaDialogOpen} onOpenChange={(open) => {
+              setIsAreaDialogOpen(open);
+              if (!open) {
+                setEditingArea(null);
+                areaForm.reset();
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button variant="outline" onClick={handleAddArea}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Area
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingArea ? 'Edit Area' : 'Add New Area'}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={areaForm.handleSubmit(onAreaSubmit)} className="space-y-4">
+                  <div>
+                    <Label htmlFor="areaName">Area Name</Label>
+                    <Input
+                      id="areaName"
+                      {...areaForm.register('name')}
+                      placeholder="Downtown District"
+                    />
+                    {areaForm.formState.errors.name && (
+                      <p className="text-error text-sm mt-1">
+                        {areaForm.formState.errors.name.message}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="areaDescription">Description (Optional)</Label>
+                    <Textarea
+                      id="areaDescription"
+                      {...areaForm.register('description')}
+                      placeholder="Description of the area..."
+                      rows={3}
+                    />
+                    {areaForm.formState.errors.description && (
+                      <p className="text-error text-sm mt-1">
+                        {areaForm.formState.errors.description.message}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <Button type="submit" className="flex-1" disabled={createAreaMutation.isPending}>
+                      {createAreaMutation.isPending 
+                        ? (editingArea ? 'Updating...' : 'Creating...') 
+                        : (editingArea ? 'Update Area' : 'Create Area')
+                      }
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setIsAreaDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+          
+          {/* Areas List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {loadingAreas ? (
+              <div className="col-span-full text-center py-4">
+                <p>Loading areas...</p>
+              </div>
+            ) : areas.length === 0 ? (
+              <div className="col-span-full text-center py-4">
+                <p className="text-gray-500">No areas created yet</p>
+                <p className="text-sm text-gray-400">Areas help organize your work sites</p>
+              </div>
+            ) : (
+              areas.map((area: any) => (
+                <Card key={area.id} className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-medium text-gray-900">{area.name}</h3>
+                    <div className="flex space-x-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditArea(area)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteArea(area)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  {area.description && (
+                    <p className="text-sm text-gray-600 mb-2">{area.description}</p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    {sites.filter((site: any) => site.areaId === area.id).length} sites
+                  </p>
+                </Card>
+              ))
+            )}
+          </div>
+        </div>
+
         {/* Site Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loadingSites ? (
@@ -467,7 +717,12 @@ export default function SiteManagement() {
                       {site.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-600 mb-4">{site.address}</p>
+                  <p className="text-sm text-gray-600 mb-2">{site.address}</p>
+                  {site.areaId && (
+                    <p className="text-xs text-blue-600 mb-4">
+                      Area: {areas.find((area: any) => area.id === site.areaId)?.name || 'Unknown'}
+                    </p>
+                  )}
                   
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-sm">

@@ -2,18 +2,21 @@ import {
   admins,
   employees,
   workSites,
+  areas,
   departments,
   locationTracking,
   attendance,
   type Admin,
   type Employee,
   type WorkSite,
+  type Area,
   type Department,
   type LocationTracking,
   type Attendance,
   type InsertAdmin,
   type InsertEmployee,
   type InsertWorkSite,
+  type InsertArea,
   type InsertDepartment,
   type InsertLocationTracking,
   type InsertAttendance,
@@ -38,6 +41,13 @@ export interface IStorage {
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: number, employee: Partial<InsertEmployee>): Promise<Employee>;
   deleteEmployee(id: number): Promise<void>;
+
+  // Area operations
+  getArea(id: number): Promise<Area | undefined>;
+  getAreasByAdmin(adminId: number): Promise<Area[]>;
+  createArea(area: InsertArea): Promise<Area>;
+  updateArea(id: number, area: Partial<InsertArea>): Promise<Area>;
+  deleteArea(id: number): Promise<void>;
 
   // Work site operations
   getWorkSite(id: number): Promise<WorkSite | undefined>;
@@ -181,6 +191,38 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEmployee(id: number): Promise<void> {
     await db.delete(employees).where(eq(employees.id, id));
+  }
+
+  // Area operations
+  async getArea(id: number): Promise<Area | undefined> {
+    const [area] = await db.select().from(areas).where(eq(areas.id, id));
+    return area || undefined;
+  }
+
+  async getAreasByAdmin(adminId: number): Promise<Area[]> {
+    return db
+      .select()
+      .from(areas)
+      .where(and(eq(areas.adminId, adminId), eq(areas.isActive, true)))
+      .orderBy(areas.name);
+  }
+
+  async createArea(area: InsertArea): Promise<Area> {
+    const [newArea] = await db.insert(areas).values(area).returning();
+    return newArea;
+  }
+
+  async updateArea(id: number, area: Partial<InsertArea>): Promise<Area> {
+    const [updatedArea] = await db
+      .update(areas)
+      .set(area)
+      .where(eq(areas.id, id))
+      .returning();
+    return updatedArea;
+  }
+
+  async deleteArea(id: number): Promise<void> {
+    await db.delete(areas).where(eq(areas.id, id));
   }
 
   // Work site operations

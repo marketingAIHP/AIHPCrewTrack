@@ -12,6 +12,7 @@ import {
   insertAdminSchema,
   insertEmployeeSchema,
   insertWorkSiteSchema,
+  insertAreaSchema,
   insertDepartmentSchema,
   insertLocationTrackingSchema,
   insertAttendanceSchema,
@@ -1231,6 +1232,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error removing site image:', error);
       res.status(500).json({ message: 'Failed to remove site image' });
+    }
+  });
+
+  // Areas Management Routes
+  app.get('/api/admin/areas', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const areas = await storage.getAreasByAdmin(req.user!.id);
+      res.json(areas);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch areas' });
+    }
+  });
+
+  app.post('/api/admin/areas', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertAreaSchema.parse({
+        ...req.body,
+        adminId: req.user!.id,
+      });
+      const area = await storage.createArea(validatedData);
+      res.status(201).json(area);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+      }
+      res.status(400).json({ message: 'Failed to create area' });
+    }
+  });
+
+  app.put('/api/admin/areas/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const areaId = parseInt(req.params.id);
+      const validatedData = insertAreaSchema.partial().parse(req.body);
+      
+      // Check if this area belongs to the admin
+      const adminAreas = await storage.getAreasByAdmin(req.user!.id);
+      if (!adminAreas.find(area => area.id === areaId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const area = await storage.updateArea(areaId, validatedData);
+      res.json(area);
+    } catch (error) {
+      res.status(400).json({ message: 'Failed to update area' });
+    }
+  });
+
+  app.delete('/api/admin/areas/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const areaId = parseInt(req.params.id);
+      
+      // Check if this area belongs to the admin
+      const adminAreas = await storage.getAreasByAdmin(req.user!.id);
+      if (!adminAreas.find(area => area.id === areaId)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.deleteArea(areaId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete area' });
     }
   });
 
