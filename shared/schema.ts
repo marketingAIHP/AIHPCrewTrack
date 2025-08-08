@@ -177,7 +177,12 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: tru
   password: passwordSchema,
 });
 
-export const insertWorkSiteSchema = createInsertSchema(workSites).omit({ id: true, createdAt: true, isActive: true });
+export const insertWorkSiteSchema = createInsertSchema(workSites).omit({ id: true, createdAt: true, isActive: true }).extend({
+  latitude: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? val : val.toString()),
+  longitude: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? val : val.toString()),
+  geofenceRadius: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseInt(val) : val),
+  areaId: z.union([z.string(), z.number(), z.null()]).transform(val => val === null || val === 'none' ? null : typeof val === 'string' ? (val === 'none' ? null : parseInt(val)) : val).optional(),
+});
 export const insertAreaSchema = createInsertSchema(areas).omit({ id: true, createdAt: true, isActive: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true, isActive: true });
 export const insertLocationTrackingSchema = createInsertSchema(locationTracking).omit({ id: true, timestamp: true });

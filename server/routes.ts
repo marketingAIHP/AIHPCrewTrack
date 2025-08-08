@@ -1153,6 +1153,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(site);
     } catch (error) {
       console.error('Site creation error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+      }
       res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to create work site' });
     }
   });
