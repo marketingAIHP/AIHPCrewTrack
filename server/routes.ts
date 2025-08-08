@@ -645,6 +645,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recent activities endpoint
+  app.get('/api/admin/recent-activities', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const activities = await storage.getRecentActivities(req.user!.id, days);
+      res.json(activities);
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+      res.status(500).json({ message: 'Failed to fetch recent activities' });
+    }
+  });
+
   // Admin profile route
   app.get('/api/admin/profile', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {

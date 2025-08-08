@@ -65,6 +65,7 @@ export interface IStorage {
   getCurrentAttendance(employeeId: number): Promise<Attendance | undefined>;
   getAttendanceByAdmin(adminId: number, date?: Date): Promise<Attendance[]>;
   getEmployeeAttendanceHistory(employeeId: number, fromDate: Date): Promise<Attendance[]>;
+  getRecentActivities(adminId: number, days?: number): Promise<any[]>;
 
   // Dashboard stats
   getDashboardStats(adminId: number): Promise<{
@@ -384,6 +385,85 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(attendance.checkInTime));
+  }
+
+  async getRecentActivities(adminId: number, days: number = 7): Promise<any[]> {
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - days);
+    fromDate.setHours(0, 0, 0, 0);
+
+    const activities = await db
+      .select({
+        id: attendance.id,
+        employeeId: attendance.employeeId,
+        siteId: attendance.siteId,
+        checkInTime: attendance.checkInTime,
+        checkOutTime: attendance.checkOutTime,
+        employeeFirstName: employees.firstName,
+        employeeLastName: employees.lastName,
+        employeeProfileImage: employees.profileImage,
+        employeeEmail: employees.email,
+        siteName: workSites.name,
+      })
+      .from(attendance)
+      .innerJoin(employees, eq(attendance.employeeId, employees.id))
+      .innerJoin(workSites, eq(attendance.siteId, workSites.id))
+      .where(
+        and(
+          eq(employees.adminId, adminId),
+          sql`${attendance.checkInTime} >= ${fromDate}`
+        )
+      )
+      .orderBy(desc(attendance.checkInTime))
+      .limit(20);
+
+    // Process activities to include both check-ins and check-outs
+    const processedActivities: any[] = [];
+    
+    activities.forEach((record) => {
+      // Add check-in activity
+      processedActivities.push({
+        id: `${record.id}-checkin`,
+        type: 'check-in',
+        timestamp: record.checkInTime,
+        employee: {
+          id: record.employeeId,
+          firstName: record.employeeFirstName,
+          lastName: record.employeeLastName,
+          profileImage: record.employeeProfileImage,
+          email: record.employeeEmail,
+        },
+        site: {
+          id: record.siteId,
+          name: record.siteName,
+        },
+      });
+
+      // Add check-out activity if exists
+      if (record.checkOutTime) {
+        processedActivities.push({
+          id: `${record.id}-checkout`,
+          type: 'check-out',
+          timestamp: record.checkOutTime,
+          employee: {
+            id: record.employeeId,
+            firstName: record.employeeFirstName,
+            lastName: record.employeeLastName,
+            profileImage: record.employeeProfileImage,
+            email: record.employeeEmail,
+          },
+          site: {
+            id: record.siteId,
+            name: record.siteName,
+          },
+        });
+      }
+    });
+
+    // Sort by timestamp descending
+    processedActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return processedActivities.slice(0, 15); // Return top 15 activities
   }
 
   async getDashboardStats(adminId: number): Promise<{

@@ -23,8 +23,45 @@ import {
 import ExportReportDialog from '@/components/ExportReportDialog';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import { AuthenticatedImage } from '@/components/AuthenticatedImage';
+import { format, isToday, isYesterday, differenceInDays } from 'date-fns';
 
 
+
+// Helper functions for date formatting
+function formatDateLabel(date: Date): string {
+  if (isToday(date)) {
+    return 'Today';
+  } else if (isYesterday(date)) {
+    return 'Yesterday';
+  } else {
+    const daysDiff = differenceInDays(new Date(), date);
+    if (daysDiff < 7) {
+      return format(date, 'EEEE'); // Day name (e.g., "Monday")
+    } else {
+      return format(date, 'MMM d'); // Short date (e.g., "Jan 15")
+    }
+  }
+}
+
+function formatActivityTime(date: Date): string {
+  return format(date, 'h:mm a');
+}
+
+function groupActivitiesByDate(activities: any[]) {
+  const grouped: { [key: string]: any[] } = {};
+  
+  activities.forEach(activity => {
+    const date = new Date(activity.timestamp);
+    const dateKey = format(date, 'yyyy-MM-dd');
+    
+    if (!grouped[dateKey]) {
+      grouped[dateKey] = [];
+    }
+    grouped[dateKey].push(activity);
+  });
+  
+  return grouped;
+}
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -53,6 +90,19 @@ export default function AdminDashboard() {
         },
       });
       if (!response.ok) throw new Error('Failed to fetch profile');
+      return response.json();
+    },
+  });
+
+  const { data: recentActivities = [], isLoading: activitiesLoading } = useQuery({
+    queryKey: ['/api/admin/recent-activities'],
+    queryFn: async () => {
+      const response = await fetch('/api/admin/recent-activities?days=7', {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch activities');
       return response.json();
     },
   });
@@ -282,17 +332,81 @@ export default function AdminDashboard() {
             </div>
             <CardContent className="p-6">
               <div className="space-y-4">
-                {stats?.onSiteNow > 0 ? (
+                {activitiesLoading ? (
                   <div className="text-center text-gray-500 py-8">
-                    <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <p>No recent activity to display</p>
-                    <p className="text-sm">Activity will appear here when employees check in/out</p>
+                    <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4 animate-spin" />
+                    <p>Loading recent activity...</p>
                   </div>
-                ) : (
+                ) : recentActivities.length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
                     <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                     <p>No recent activity</p>
-                    <p className="text-sm">Add employees and work sites to start tracking</p>
+                    <p className="text-sm">Employee check-ins/check-outs will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6 max-h-96 overflow-y-auto">
+                    {Object.entries(groupActivitiesByDate(recentActivities)).map(([dateKey, dayActivities]) => {
+                      const date = new Date(dateKey);
+                      return (
+                        <div key={dateKey} className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <div className="h-px bg-gray-200 flex-1" />
+                            <span className="text-xs font-medium text-gray-500 px-2 bg-gray-50 rounded-full">
+                              {formatDateLabel(date)}
+                            </span>
+                            <div className="h-px bg-gray-200 flex-1" />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            {dayActivities.map((activity) => (
+                              <div
+                                key={activity.id}
+                                className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-slate-100 rounded-lg border border-gray-200 hover:shadow-sm transition-all"
+                              >
+                                <AuthenticatedImage
+                                  src={activity.employee.profileImage}
+                                  alt={`${activity.employee.firstName} ${activity.employee.lastName}`}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                  fallback={
+                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                                      <span className="text-xs font-bold text-white">
+                                        {activity.employee.firstName?.[0]}{activity.employee.lastName?.[0]}
+                                      </span>
+                                    </div>
+                                  }
+                                />
+                                
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {activity.employee.firstName} {activity.employee.lastName}
+                                    </span>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      activity.type === 'check-in' 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {activity.type === 'check-in' ? 'Check In' : 'Check Out'}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-4 mt-1">
+                                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                                      <MapPin className="h-3 w-3" />
+                                      <span>{activity.site.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                                      <Clock className="h-3 w-3" />
+                                      <span>{formatActivityTime(new Date(activity.timestamp))}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
