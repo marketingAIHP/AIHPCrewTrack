@@ -384,21 +384,40 @@ export default function SiteManagement() {
               </h1>
             </div>
             {!selectedAreaView && (
+              <Button 
+                className="bg-primary hover:bg-blue-700 text-white" 
+                onClick={() => {
+                  // Just show the areas management - no dialog for sites
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Work Site
+              </Button>
+            )}
+            
+            {selectedAreaView && (
               <Dialog open={isDialogOpen} onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) {
-                setEditingSite(null);
-                form.reset();
-                setSelectedLocation({ lat: 40.7128, lng: -74.0060 });
-                setSiteImageURL('');
-              }
-            }}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-blue-700 text-white" onClick={handleAddSite}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Site
-                </Button>
-              </DialogTrigger>
+                setIsDialogOpen(open);
+                if (!open) {
+                  setEditingSite(null);
+                  form.reset();
+                  setSelectedLocation({ lat: 40.7128, lng: -74.0060 });
+                  setSiteImageURL('');
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button 
+                    className="bg-primary hover:bg-blue-700 text-white" 
+                    onClick={() => {
+                      handleAddSite();
+                      // Pre-select this area in the form
+                      form.setValue('areaId', selectedAreaView.id.toString());
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Site to {selectedAreaView.name}
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
@@ -960,50 +979,7 @@ export default function SiteManagement() {
                     {sites.filter((site: any) => site.areaId === area.id).length} sites
                   </p>
                   
-                  {/* Add Site to Area Button */}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full text-xs"
-                    onClick={() => {
-                      handleAddSite();
-                      // Pre-select this area in the form
-                      form.setValue('areaId', area.id.toString());
-                    }}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Site to {area.name}
-                  </Button>
-                  
-                  {/* Show sites in this area */}
-                  {sites.filter((site: any) => site.areaId === area.id).length > 0 && (
-                    <div className="mt-2 pt-2 border-t">
-                      <p className="text-xs font-medium text-gray-700 mb-1">Sites in this area:</p>
-                      {sites.filter((site: any) => site.areaId === area.id).map((site: any) => (
-                        <div key={site.id} className="flex justify-between items-center text-xs text-gray-600 py-1">
-                          <span className="truncate">{site.name}</span>
-                          <div className="flex space-x-1">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => handleEditSite(site)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteSite(site)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+
                 </Card>
               ))
             )}
