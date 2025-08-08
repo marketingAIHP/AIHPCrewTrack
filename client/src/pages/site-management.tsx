@@ -83,17 +83,17 @@ export default function SiteManagement() {
       });
   }, []);
 
-  const { data: areas = [], isLoading: loadingAreas } = useQuery({
+  const { data: areas = [], isLoading: loadingAreas } = useQuery<any[]>({
     queryKey: ['/api/admin/areas'],
     enabled: !!getAuthToken(),
   });
 
-  const { data: sites = [], isLoading: loadingSites } = useQuery({
+  const { data: sites = [], isLoading: loadingSites } = useQuery<any[]>({
     queryKey: ['/api/admin/sites'],
     enabled: !!getAuthToken() && getUserType() === 'admin',
   });
 
-  const { data: employees = [] } = useQuery({
+  const { data: employees = [] } = useQuery<any[]>({
     queryKey: ['/api/admin/employees'],
     enabled: !!getAuthToken() && getUserType() === 'admin',
   });
@@ -106,7 +106,7 @@ export default function SiteManagement() {
       latitude: '',
       longitude: '',
       geofenceRadius: '200',
-      areaId: '',
+      areaId: 'none',
     },
   });
 
@@ -126,20 +126,14 @@ export default function SiteManagement() {
         latitude: parseFloat(data.latitude),
         longitude: parseFloat(data.longitude),
         geofenceRadius: parseInt(data.geofenceRadius),
-        areaId: data.areaId ? parseInt(data.areaId) : null,
+        areaId: data.areaId && data.areaId !== 'none' ? parseInt(data.areaId) : null,
         siteImage: siteImageURL || undefined,
       };
       
       if (editingSite) {
-        return apiRequest(`/api/admin/sites/${editingSite.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload),
-        });
+        return apiRequest('PUT', `/api/admin/sites/${editingSite.id}`, payload);
       } else {
-        return apiRequest('/api/admin/sites', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
+        return apiRequest('POST', '/api/admin/sites', payload);
       }
     },
     onSuccess: () => {
@@ -166,15 +160,9 @@ export default function SiteManagement() {
   const createAreaMutation = useMutation({
     mutationFn: async (data: AreaForm) => {
       if (editingArea) {
-        return apiRequest(`/api/admin/areas/${editingArea.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(data),
-        });
+        return apiRequest('PUT', `/api/admin/areas/${editingArea.id}`, data);
       } else {
-        return apiRequest('/api/admin/areas', {
-          method: 'POST',
-          body: JSON.stringify(data),
-        });
+        return apiRequest('POST', '/api/admin/areas', data);
       }
     },
     onSuccess: () => {
@@ -211,7 +199,7 @@ export default function SiteManagement() {
   };
 
   const getEmployeeCount = (siteId: number) => {
-    return Array.isArray(employees) ? employees.filter((emp: any) => emp.siteId === siteId).length : 0;
+    return employees.filter((emp: any) => emp.siteId === siteId).length;
   };
 
   const getCurrentlyOnSite = (siteId: number) => {
@@ -234,7 +222,7 @@ export default function SiteManagement() {
     form.setValue('latitude', site.latitude.toString());
     form.setValue('longitude', site.longitude.toString());
     form.setValue('geofenceRadius', site.geofenceRadius.toString());
-    form.setValue('areaId', site.areaId ? site.areaId.toString() : '');
+    form.setValue('areaId', site.areaId ? site.areaId.toString() : 'none');
     setSelectedLocation({ lat: parseFloat(site.latitude), lng: parseFloat(site.longitude) });
     setIsDialogOpen(true);
     
@@ -290,9 +278,7 @@ export default function SiteManagement() {
 
   const deleteSiteMutation = useMutation({
     mutationFn: async (siteId: number) => {
-      return apiRequest(`/api/admin/sites/${siteId}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/admin/sites/${siteId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/sites'] });
@@ -330,9 +316,7 @@ export default function SiteManagement() {
 
   const deleteAreaMutation = useMutation({
     mutationFn: async (areaId: number) => {
-      return apiRequest(`/api/admin/areas/${areaId}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/admin/areas/${areaId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/areas'] });
@@ -471,7 +455,7 @@ export default function SiteManagement() {
                         <SelectValue placeholder="Select an area (optional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No Area</SelectItem>
+                        <SelectItem value="none">No Area</SelectItem>
                         {areas.map((area: any) => (
                           <SelectItem key={area.id} value={area.id.toString()}>
                             {area.name}
