@@ -59,6 +59,7 @@ export default function SiteManagement() {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({ lat: 40.7128, lng: -74.0060 });
   const [siteImageURL, setSiteImageURL] = useState<string>('');
+  const [selectedAreaView, setSelectedAreaView] = useState<any>(null);
 
   useEffect(() => {
     if (!getAuthToken() || getUserType() !== 'admin') {
@@ -367,9 +368,23 @@ export default function SiteManagement() {
                   <ArrowLeft />
                 </Button>
               </Link>
-              <h1 className="text-xl font-semibold text-gray-900">Areas & Sites Management</h1>
+              {selectedAreaView && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setSelectedAreaView(null)}
+                  className="flex items-center mr-4"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Areas
+                </Button>
+              )}
+              <h1 className="text-xl font-semibold text-gray-900">
+                {selectedAreaView ? `${selectedAreaView.name} - Sites` : 'Areas & Sites Management'}
+              </h1>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            {!selectedAreaView && (
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) {
                 setEditingSite(null);
@@ -553,15 +568,286 @@ export default function SiteManagement() {
                 </form>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Areas Management Section */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Area Management</h2>
+        {selectedAreaView ? (
+          /* Selected Area Sites View */
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900">{selectedAreaView.name}</h2>
+                {selectedAreaView.description && (
+                  <p className="text-gray-600 mt-1">{selectedAreaView.description}</p>
+                )}
+              </div>
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) {
+                  setEditingSite(null);
+                  form.reset();
+                  setSelectedLocation({ lat: 40.7128, lng: -74.0060 });
+                  setSiteImageURL('');
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button 
+                    className="bg-primary hover:bg-blue-700 text-white" 
+                    onClick={() => {
+                      handleAddSite();
+                      // Pre-select this area in the form
+                      form.setValue('areaId', selectedAreaView.id.toString());
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Site to {selectedAreaView.name}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div>
+                      <Label htmlFor="name">Site Name</Label>
+                      <Input
+                        id="name"
+                        {...form.register('name')}
+                        placeholder="Downtown Construction Site"
+                      />
+                      {form.formState.errors.name && (
+                        <p className="text-error text-sm mt-1">
+                          {form.formState.errors.name.message}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="address">Address</Label>
+                      <Input
+                        id="address"
+                        {...form.register('address')}
+                        placeholder="123 Main Street, City, State"
+                      />
+                      {form.formState.errors.address && (
+                        <p className="text-error text-sm mt-1">
+                          {form.formState.errors.address.message}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="latitude">Latitude</Label>
+                        <Input
+                          id="latitude"
+                          {...form.register('latitude')}
+                          placeholder="40.7128"
+                          step="any"
+                        />
+                        {form.formState.errors.latitude && (
+                          <p className="text-error text-sm mt-1">
+                            {form.formState.errors.latitude.message}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="longitude">Longitude</Label>
+                        <Input
+                          id="longitude"
+                          {...form.register('longitude')}
+                          placeholder="-74.0060"
+                          step="any"
+                        />
+                        {form.formState.errors.longitude && (
+                          <p className="text-error text-sm mt-1">
+                            {form.formState.errors.longitude.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="area">Area</Label>
+                      <Select value={form.watch('areaId')} onValueChange={(value) => form.setValue('areaId', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an area" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {areas.map((area: any) => (
+                            <SelectItem key={area.id} value={area.id.toString()}>
+                              {area.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="geofenceRadius">Geofence Radius (meters)</Label>
+                      <Input
+                        id="geofenceRadius"
+                        {...form.register('geofenceRadius')}
+                        placeholder="200"
+                        type="number"
+                      />
+                      {form.formState.errors.geofenceRadius && (
+                        <p className="text-error text-sm mt-1">
+                          {form.formState.errors.geofenceRadius.message}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Site Image Upload Section */}
+                    <div>
+                      <Label>Site Image</Label>
+                      {siteImageURL && (
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-600 mb-2">Current Image:</p>
+                          <img 
+                            src={siteImageURL} 
+                            alt="Site preview"
+                            className="w-full h-32 object-cover rounded-lg border"
+                          />
+                        </div>
+                      )}
+                      <ObjectUploader
+                        maxNumberOfFiles={1}
+                        maxFileSize={10485760} // 10MB
+                        allowedFileTypes={['image/*']}
+                        onGetUploadParameters={handleGetUploadParameters}
+                        onComplete={handleUploadComplete}
+                        buttonClassName="w-full"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <Camera className="h-4 w-4" />
+                          <span>{siteImageURL ? 'Change Site Image' : 'Upload Site Image'}</span>
+                        </div>
+                      </ObjectUploader>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Upload a clear image of the work site. Supported formats: JPG, PNG. Max size: 10MB.
+                      </p>
+                    </div>
+                    
+                    {mapLoaded && (
+                      <div>
+                        <Label>Click on the map to select location</Label>
+                        <div className="h-64 mt-2">
+                          <GoogleMap
+                            center={selectedLocation}
+                            zoom={13}
+                            markers={[
+                              {
+                                position: selectedLocation,
+                                title: 'Selected Location',
+                                color: 'red',
+                              }
+                            ]}
+                            onMapClick={handleMapClick}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex space-x-2">
+                      <Button type="submit" className="flex-1" disabled={createSiteMutation.isPending}>
+                        {createSiteMutation.isPending 
+                          ? (editingSite ? 'Updating...' : 'Creating...') 
+                          : (editingSite ? 'Update Site' : 'Create Site')
+                        }
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+            
+            {/* Sites in Selected Area */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sites.filter((site: any) => site.areaId === selectedAreaView.id).length === 0 ? (
+                <div className="col-span-full text-center py-8">
+                  <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-500">No sites in this area yet</p>
+                  <p className="text-sm text-gray-400">Add the first site to get started</p>
+                </div>
+              ) : (
+                sites.filter((site: any) => site.areaId === selectedAreaView.id).map((site: any) => (
+                  <Card key={site.id} className="overflow-hidden">
+                    <div className="h-48 bg-gray-200 flex items-center justify-center">
+                      <div className="text-center">
+                        <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600">Work Site</p>
+                      </div>
+                    </div>
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">{site.name}</h3>
+                        <Badge 
+                          variant={site.isActive ? "default" : "secondary"}
+                          className={site.isActive ? "bg-success text-white" : ""}
+                        >
+                          {site.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-4">{site.address}</p>
+                      
+                      <div className="space-y-3 mb-6">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Assigned Workers</span>
+                          <span className="font-medium text-gray-900">{getEmployeeCount(site.id)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Currently On Site</span>
+                          <span className="font-medium text-success">{getCurrentlyOnSite(site.id)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Geofence Radius</span>
+                          <span className="font-medium text-gray-900">{site.geofenceRadius}m</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button 
+                          className="flex-1 bg-primary text-white hover:bg-blue-700"
+                          onClick={() => handleViewSiteMap(site)}
+                        >
+                          <MapPin className="mr-2 h-4 w-4" />
+                          View Map
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditSite(site)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteSite(site)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            {/* Areas Management Section */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Area Management</h2>
             <Dialog open={isAreaDialogOpen} onOpenChange={(open) => {
               setIsAreaDialogOpen(open);
               if (!open) {
@@ -642,6 +928,14 @@ export default function SiteManagement() {
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-medium text-gray-900">{area.name}</h3>
                     <div className="flex space-x-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setSelectedAreaView(area)}
+                        title="View sites in this area"
+                      >
+                        <Building2 className="h-3 w-3" />
+                      </Button>
                       <Button 
                         variant="ghost" 
                         size="sm"
@@ -797,7 +1091,92 @@ export default function SiteManagement() {
               </Card>
             ))
           )}
-        </div>
+            </div>
+            
+            {/* All Sites Overview for main view */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {loadingSites ? (
+                <div className="col-span-full text-center py-8">
+                  <p>Loading work sites...</p>
+                </div>
+              ) : !sites || !Array.isArray(sites) || sites.length === 0 ? (
+                <div className="col-span-full text-center py-8">
+                  <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-500">No work sites found</p>
+                  <p className="text-sm text-gray-400">Add work sites to start managing locations</p>
+                </div>
+              ) : (
+                Array.isArray(sites) && sites.map((site: any) => (
+                  <Card key={site.id} className="overflow-hidden">
+                    <div className="h-48 bg-gray-200 flex items-center justify-center">
+                      <div className="text-center">
+                        <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600">Work Site</p>
+                      </div>
+                    </div>
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">{site.name}</h3>
+                        <Badge 
+                          variant={site.isActive ? "default" : "secondary"}
+                          className={site.isActive ? "bg-success text-white" : ""}
+                        >
+                          {site.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">{site.address}</p>
+                      {site.areaId && (
+                        <p className="text-xs text-blue-600 mb-4">
+                          Area: {areas.find((area: any) => area.id === site.areaId)?.name || 'Unknown'}
+                        </p>
+                      )}
+                      
+                      <div className="space-y-3 mb-6">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Assigned Workers</span>
+                          <span className="font-medium text-gray-900">{getEmployeeCount(site.id)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Currently On Site</span>
+                          <span className="font-medium text-success">{getCurrentlyOnSite(site.id)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Geofence Radius</span>
+                          <span className="font-medium text-gray-900">{site.geofenceRadius}m</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button 
+                          className="flex-1 bg-primary text-white hover:bg-blue-700"
+                          onClick={() => handleViewSiteMap(site)}
+                        >
+                          <MapPin className="mr-2 h-4 w-4" />
+                          View Map
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditSite(site)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteSite(site)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
