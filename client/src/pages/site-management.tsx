@@ -58,7 +58,7 @@ export default function SiteManagement() {
   const [editingSite, setEditingSite] = useState<any>(null);
   const [editingArea, setEditingArea] = useState<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState({ lat: 40.7128, lng: -74.0060 });
+  const [selectedLocation, setSelectedLocation] = useState({ lat: 28.4595, lng: 77.0266 });
   const [siteImageURL, setSiteImageURL] = useState<string>('');
   const [selectedAreaView, setSelectedAreaView] = useState<any>(null);
 
