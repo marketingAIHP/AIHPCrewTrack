@@ -781,22 +781,22 @@ export default function SiteManagement() {
               </div>
             ) : (
               areas.map((area: any) => (
-                <Card key={area.id} className="p-4">
+                <Card 
+                  key={area.id} 
+                  className="p-4 cursor-pointer hover:shadow-md hover:bg-gray-50 transition-all duration-200 relative"
+                  onClick={() => setSelectedAreaView(area)}
+                >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-medium text-gray-900">{area.name}</h3>
-                    <div className="flex space-x-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setSelectedAreaView(area)}
-                        title="View sites in this area"
-                      >
-                        <Building2 className="h-3 w-3" />
-                      </Button>
+                    <div 
+                      className="flex space-x-1 relative z-10"
+                      onClick={(e) => e.stopPropagation()} // Prevent card click when clicking buttons
+                    >
                       <Button 
                         variant="ghost" 
                         size="sm"
                         onClick={() => handleEditArea(area)}
+                        title="Edit area"
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
@@ -805,6 +805,7 @@ export default function SiteManagement() {
                         size="sm"
                         onClick={() => handleDeleteArea(area)}
                         className="text-red-600 hover:text-red-700"
+                        title="Delete area"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -813,10 +814,15 @@ export default function SiteManagement() {
                   {area.description && (
                     <p className="text-sm text-gray-600 mb-2">{area.description}</p>
                   )}
-                  <p className="text-xs text-gray-500 mb-3">
-                    {sites.filter((site: any) => site.areaId === area.id).length} sites
-                  </p>
-                  
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs text-gray-500">
+                      {sites.filter((site: any) => site.areaId === area.id).length} sites
+                    </p>
+                    <div className="flex items-center text-xs text-blue-600">
+                      <span>Click to view sites</span>
+                      <Building2 className="h-3 w-3 ml-1" />
+                    </div>
+                  </div>
 
                 </Card>
               ))
