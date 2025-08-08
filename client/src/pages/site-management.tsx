@@ -290,8 +290,9 @@ export default function SiteManagement() {
 
   const deleteSiteMutation = useMutation({
     mutationFn: async (siteId: number) => {
-      const response = await apiRequest('DELETE', `/api/admin/sites/${siteId}`);
-      return response.json();
+      return apiRequest(`/api/admin/sites/${siteId}`, {
+        method: 'DELETE',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/sites'] });
