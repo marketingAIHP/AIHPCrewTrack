@@ -1160,12 +1160,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/admin/sites/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log('Site update request body:', JSON.stringify(req.body, null, 2));
+      
       const validatedData = insertWorkSiteSchema.partial().parse(req.body);
+      console.log('Validated site update data:', JSON.stringify(validatedData, null, 2));
       
       const site = await storage.updateWorkSite(id, validatedData);
       res.json(site);
     } catch (error) {
-      res.status(400).json({ message: 'Failed to update work site' });
+      console.error('Site update error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+      }
+      res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to update work site' });
     }
   });
 
