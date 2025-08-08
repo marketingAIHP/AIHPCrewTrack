@@ -662,9 +662,54 @@ export default function SiteManagement() {
                   {area.description && (
                     <p className="text-sm text-gray-600 mb-2">{area.description}</p>
                   )}
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 mb-3">
                     {sites.filter((site: any) => site.areaId === area.id).length} sites
                   </p>
+                  
+                  {/* Add Site to Area Button */}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full text-xs"
+                    onClick={() => {
+                      handleAddSite();
+                      // Pre-select this area in the form
+                      form.setValue('areaId', area.id.toString());
+                    }}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Site to {area.name}
+                  </Button>
+                  
+                  {/* Show sites in this area */}
+                  {sites.filter((site: any) => site.areaId === area.id).length > 0 && (
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="text-xs font-medium text-gray-700 mb-1">Sites in this area:</p>
+                      {sites.filter((site: any) => site.areaId === area.id).map((site: any) => (
+                        <div key={site.id} className="flex justify-between items-center text-xs text-gray-600 py-1">
+                          <span className="truncate">{site.name}</span>
+                          <div className="flex space-x-1">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleEditSite(site)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteSite(site)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Card>
               ))
             )}
