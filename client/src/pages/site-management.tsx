@@ -593,18 +593,7 @@ export default function SiteManagement() {
                   <p className="text-gray-600 mt-1">{selectedAreaView.description}</p>
                 )}
               </div>
-              <Button 
-                className="bg-primary hover:bg-blue-700 text-white" 
-                onClick={() => {
-                  handleAddSite();
-                  setIsDialogOpen(true);
-                  // Pre-select this area in the form
-                  form.setValue('areaId', selectedAreaView.id.toString());
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Site to {selectedAreaView.name}
-              </Button>
+
             </div>
             
             {/* Sites in Selected Area */}
