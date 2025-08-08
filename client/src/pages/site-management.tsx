@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -88,16 +88,15 @@ export default function SiteManagement() {
   const { data: areas = [], isLoading: loadingAreas } = useQuery<any[]>({
     queryKey: ['/api/admin/areas'],
     enabled: !!getAuthToken(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   const { data: sites = [], isLoading: loadingSites } = useQuery<any[]>({
     queryKey: ['/api/admin/sites'],
     enabled: !!getAuthToken() && getUserType() === 'admin',
-  });
-
-  const { data: employees = [] } = useQuery<any[]>({
-    queryKey: ['/api/admin/employees'],
-    enabled: !!getAuthToken() && getUserType() === 'admin',
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const form = useForm<SiteForm>({
@@ -194,26 +193,25 @@ export default function SiteManagement() {
     createAreaMutation.mutate(data);
   };
 
-  const handleMapClick = (lat: number, lng: number) => {
+  const handleMapClick = useCallback((lat: number, lng: number) => {
     setSelectedLocation({ lat, lng });
     form.setValue('latitude', lat.toString());
     form.setValue('longitude', lng.toString());
-  };
+  }, [form]);
 
   const getEmployeeCount = (siteId: number) => {
-    return employees.filter((emp: any) => emp.siteId === siteId).length;
+    // This would normally come from employee/attendance data
+    return 0; // Placeholder - would fetch from API if needed
   };
 
   const getCurrentlyOnSite = (siteId: number) => {
     // This would normally come from attendance data
-    // For now, we'll return a placeholder
-    return Math.floor(Math.random() * getEmployeeCount(siteId));
+    return 0; // Placeholder - would fetch from API if needed
   };
 
-  const handleViewSiteMap = (site: any) => {
-    // Navigate to live tracking focused on this site
+  const handleViewSiteMap = useCallback((site: any) => {
     setLocation(`/admin/tracking?siteId=${site.id}`);
-  };
+  }, [setLocation]);
 
   const handleEditSite = (site: any) => {
     // Set editing mode and populate form with site data
@@ -612,14 +610,16 @@ export default function SiteManagement() {
             
             {/* Sites in Selected Area */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sites.filter((site: any) => site.areaId === selectedAreaView.id).length === 0 ? (
+              {useMemo(() => {
+                const areaSites = sites.filter((site: any) => site.areaId === selectedAreaView.id);
+                return areaSites.length === 0 ? (
                 <div className="col-span-full text-center py-8">
                   <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                   <p className="text-gray-500">No sites in this area yet</p>
                   <p className="text-sm text-gray-400">Add the first site to get started</p>
                 </div>
-              ) : (
-                sites.filter((site: any) => site.areaId === selectedAreaView.id).map((site: any) => (
+                ) : (
+                  areaSites.map((site: any) => (
                   <Card key={site.id} className="overflow-hidden">
                     <div className="h-48 bg-gray-200 flex items-center justify-center overflow-hidden">
                       {site.siteImage ? (
@@ -695,7 +695,8 @@ export default function SiteManagement() {
                     </CardContent>
                   </Card>
                 ))
-              )}
+                );
+              }, [sites, selectedAreaView.id])}
             </div>
           </div>
         ) : (

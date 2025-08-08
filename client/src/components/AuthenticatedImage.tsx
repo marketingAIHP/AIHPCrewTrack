@@ -1,4 +1,5 @@
 import { useAuthenticatedImage } from '@/hooks/useAuthenticatedImage';
+import React from 'react';
 
 interface AuthenticatedImageProps {
   src?: string;
@@ -8,7 +9,7 @@ interface AuthenticatedImageProps {
   fallback?: React.ReactNode;
 }
 
-export function AuthenticatedImage({ 
+export const AuthenticatedImage = React.memo(function AuthenticatedImage({ 
   src, 
   alt, 
   className, 
@@ -35,6 +36,7 @@ export function AuthenticatedImage({
       alt={alt}
       className={className}
       onClick={onClick}
+      loading="lazy"
     />
   );
-}
+});
