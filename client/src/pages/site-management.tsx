@@ -608,10 +608,18 @@ export default function SiteManagement() {
                 sites.filter((site: any) => site.areaId === selectedAreaView.id).map((site: any) => (
                   <Card key={site.id} className="overflow-hidden">
                     <div className="h-48 bg-gray-200 flex items-center justify-center">
-                      <div className="text-center">
-                        <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">Work Site</p>
-                      </div>
+                      {site.siteImage ? (
+                        <img 
+                          src={site.siteImage} 
+                          alt={site.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="text-center">
+                          <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-600">Work Site</p>
+                        </div>
+                      )}
                     </div>
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
