@@ -272,7 +272,7 @@ export default function SiteManagement() {
       areaId: site.areaId ? site.areaId.toString() : 'none',
     });
     setSiteImageURL(site.siteImage || '');
-    setSelectedLocation({ lat: site.latitude, lng: site.longitude });
+    setSelectedLocation({ lat: Number(site.latitude), lng: Number(site.longitude) });
     setIsDialogOpen(true);
   }, [form]);
 
@@ -588,7 +588,7 @@ export default function SiteManagement() {
                       <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
                         <span className="flex items-center">
                           <MapPin className="h-4 w-4 mr-1" />
-                          {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}
+                          {Number(site.latitude).toFixed(4)}, {Number(site.longitude).toFixed(4)}
                         </span>
                         <span>Radius: {site.geofenceRadius}m</span>
                       </div>
