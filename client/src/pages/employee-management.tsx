@@ -38,6 +38,7 @@ interface Department {
 
 // Form schemas
 const createEmployeeSchema = z.object({
+  employeeId: z.string().optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
@@ -112,6 +113,7 @@ export default function EmployeeManagement() {
   const createEmployeeForm = useForm<z.infer<typeof createEmployeeSchema>>({
     resolver: zodResolver(createEmployeeSchema),
     defaultValues: {
+      employeeId: '',
       firstName: '',
       lastName: '',
       email: '',
@@ -482,7 +484,12 @@ export default function EmployeeManagement() {
               </Form>
             </DialogContent>
           </Dialog>
-          <Dialog open={isCreateEmployeeOpen} onOpenChange={setIsCreateEmployeeOpen}>
+          <Dialog open={isCreateEmployeeOpen} onOpenChange={(open) => {
+            setIsCreateEmployeeOpen(open);
+            if (!open) {
+              createEmployeeForm.reset();
+            }
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -493,12 +500,29 @@ export default function EmployeeManagement() {
               <DialogHeader>
                 <DialogTitle>Create New Employee</DialogTitle>
                 <DialogDescription>
-                  Add a new employee to your workforce management system.
+                  Add a new employee to your workforce.
                 </DialogDescription>
               </DialogHeader>
               <Form {...createEmployeeForm}>
-                <form onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))} className="space-y-6">
+                  
+                  {/* Employee ID */}
+                  <FormField
+                    control={createEmployeeForm.control}
+                    name="employeeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Employee ID</FormLabel>
+                        <FormControl>
+                          <Input placeholder="EMP001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Name Fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={createEmployeeForm.control}
                       name="firstName"
@@ -506,7 +530,7 @@ export default function EmployeeManagement() {
                         <FormItem>
                           <FormLabel>First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter first name" {...field} />
+                            <Input placeholder="John" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -519,13 +543,15 @@ export default function EmployeeManagement() {
                         <FormItem>
                           <FormLabel>Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter last name" {...field} />
+                            <Input placeholder="Doe" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
+
+                  {/* Contact Information */}
                   <FormField
                     control={createEmployeeForm.control}
                     name="email"
@@ -533,12 +559,13 @@ export default function EmployeeManagement() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="Enter email address" {...field} />
+                          <Input type="email" placeholder="john.doe@example.com" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  
                   <FormField
                     control={createEmployeeForm.control}
                     name="phone"
@@ -546,12 +573,14 @@ export default function EmployeeManagement() {
                       <FormItem>
                         <FormLabel>Phone Number</FormLabel>
                         <FormControl>
-                          <Input type="tel" placeholder="Enter phone number" {...field} />
+                          <Input type="tel" placeholder="+1 (555) 123-4567" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  {/* Password */}
                   <FormField
                     control={createEmployeeForm.control}
                     name="password"
@@ -580,17 +609,19 @@ export default function EmployeeManagement() {
                       </FormItem>
                     )}
                   />
-                  <div className="grid grid-cols-2 gap-4">
+
+                  {/* Assignment Fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={createEmployeeForm.control}
                       name="departmentId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Department (Optional)</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormLabel>Department</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select a department" />
+                                <SelectValue placeholder="Select department" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -606,29 +637,26 @@ export default function EmployeeManagement() {
                         </FormItem>
                       )}
                     />
+                    
                     <FormField
                       control={createEmployeeForm.control}
                       name="siteId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Work Site (Optional)</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormLabel>Work Site Assignment</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select a work site" />
+                                <SelectValue placeholder="Select work site" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="">No Site Assignment</SelectItem>
-                              {Array.isArray(workSites) && workSites.length > 0 ? (
-                                workSites.map((site: any) => (
-                                  <SelectItem key={site.id} value={site.id.toString()}>
-                                    {site.name}
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <SelectItem value="" disabled>No work sites available</SelectItem>
-                              )}
+                              {Array.isArray(workSites) && workSites.map((site: any) => (
+                                <SelectItem key={site.id} value={site.id.toString()}>
+                                  {site.name}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -636,7 +664,14 @@ export default function EmployeeManagement() {
                       )}
                     />
                   </div>
+
                   <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => {
+                      setIsCreateEmployeeOpen(false);
+                      createEmployeeForm.reset();
+                    }}>
+                      Cancel
+                    </Button>
                     <Button type="submit" disabled={createEmployeeMutation.isPending}>
                       {createEmployeeMutation.isPending ? 'Creating...' : 'Create Employee'}
                     </Button>
