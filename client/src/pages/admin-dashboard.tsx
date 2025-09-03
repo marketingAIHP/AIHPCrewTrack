@@ -139,39 +139,39 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-xl shadow-lg border-b border-white/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4 lg:py-6">
             <Link href="/admin/dashboard">
               <div className="flex items-center cursor-pointer hover:opacity-80 transition-all duration-300 hover:scale-105">
-                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl w-12 h-12 flex items-center justify-center shadow-lg">
-                  <Users className="text-white w-6 h-6" />
+                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shadow-lg">
+                  <Users className="text-white w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <div className="ml-4">
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                <div className="ml-3 sm:ml-4 hidden sm:block">
+                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                     WorkSite Tracker
                   </h1>
-                  <p className="text-sm text-gray-600 font-medium">Admin Dashboard</p>
+                  <p className="text-xs sm:text-sm text-gray-600 font-medium">Admin Dashboard</p>
                 </div>
               </div>
             </Link>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <NotificationDropdown />
               
               <Link href="/admin/profile">
-                <div className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-all duration-300 bg-gradient-to-r from-white/60 to-white/40 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-md">
+                <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer hover:opacity-80 transition-all duration-300 bg-gradient-to-r from-white/60 to-white/40 backdrop-blur-sm rounded-lg px-2 sm:px-4 py-1 sm:py-2 border border-white/20">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-md">
                     <AuthenticatedImage
                       src={adminProfile?.profileImage}
                       alt={`${user?.firstName} ${user?.lastName}`}
-                      className="w-10 h-10 rounded-full object-cover"
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover"
                       fallback={
-                        <span className="text-sm font-bold text-white">
+                        <span className="text-xs sm:text-sm font-bold text-white">
                           {user?.firstName?.[0]}{user?.lastName?.[0]}
                         </span>
                       }
                     />
                   </div>
-                  <div>
+                  <div className="hidden sm:block">
                     <span className="text-sm font-semibold text-gray-800 block">
                       {user?.firstName} {user?.lastName}
                     </span>
@@ -184,10 +184,10 @@ export default function AdminDashboard() {
                 variant="outline" 
                 size="sm" 
                 onClick={handleLogout}
-                className="bg-gradient-to-r from-red-50 to-pink-50 border-red-200 text-red-700 hover:from-red-100 hover:to-pink-100 hover:border-red-300 hover:text-red-800 font-medium shadow-sm transition-all duration-300"
+                className="bg-gradient-to-r from-red-50 to-pink-50 border-red-200 text-red-700 hover:from-red-100 hover:to-pink-100 hover:border-red-300 hover:text-red-800 font-medium shadow-sm transition-all duration-300 px-2 sm:px-3"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
+                <LogOut className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>
@@ -195,7 +195,7 @@ export default function AdminDashboard() {
       </header>
 
       {/* Dashboard Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
 
 
         {/* Stats Cards */}
@@ -276,18 +276,18 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <Card className="mb-8 bg-gradient-to-r from-white to-slate-50 border-0 shadow-lg">
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Quick Actions</h3>
-              <div className="w-12 h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></div>
+        <Card className="mb-6 sm:mb-8 bg-gradient-to-r from-white to-slate-50 border-0 shadow-lg">
+          <CardContent className="p-4 sm:p-6 lg:p-8">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Quick Actions</h3>
+              <div className="w-8 sm:w-12 h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
               <a href="/admin/employee-management" onClick={(e) => { e.preventDefault(); window.location.href = '/admin/employee-management'; }}>
-                <Button variant="outline" className="w-full flex items-center p-6 h-auto bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all duration-300 hover:scale-105 shadow-md">
-                  <Users className="text-blue-600 w-6 h-6 mr-3" />
+                <Button variant="outline" className="w-full flex items-center p-3 sm:p-4 lg:p-6 h-auto bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all duration-300 hover:scale-105 shadow-md">
+                  <Users className="text-blue-600 w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
                   <div className="text-left">
-                    <div className="font-semibold text-gray-900">Employee Management</div>
+                    <div className="font-semibold text-gray-900 text-sm sm:text-base">Employee Management</div>
                     <div className="text-xs text-gray-600">Manage workforce</div>
                   </div>
                 </Button>
@@ -324,13 +324,13 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
           {/* Recent Activity */}
           <Card className="bg-gradient-to-br from-white to-slate-50 border-0 shadow-lg">
-            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
-              <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Recent Activity</h3>
+            <div className="p-4 sm:p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
+              <h3 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Recent Activity</h3>
             </div>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="space-y-4">
                 {activitiesLoading ? (
                   <div className="text-center text-gray-500 py-8">

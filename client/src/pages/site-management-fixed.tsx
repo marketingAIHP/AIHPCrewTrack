@@ -331,12 +331,13 @@ export default function SiteManagement() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 sm:py-4 gap-2 sm:gap-0">
             <div className="flex items-center">
               <Link href="/admin/dashboard">
-                <Button variant="ghost" size="sm" className="mr-4">
-                  <ArrowLeft />
+                <Button variant="ghost" size="sm" className="mr-2 sm:mr-4">
+                  <ArrowLeft className="h-4 w-4 mr-1 sm:mr-0" />
+                  <span className="sm:hidden">Back</span>
                 </Button>
               </Link>
               {selectedAreaView && (
@@ -344,13 +345,14 @@ export default function SiteManagement() {
                   variant="ghost" 
                   size="sm"
                   onClick={() => setSelectedAreaView(null)}
-                  className="flex items-center mr-4"
+                  className="flex items-center mr-2 sm:mr-4"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Areas
+                  <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Back to Areas</span>
+                  <span className="sm:hidden">Areas</span>
                 </Button>
               )}
-              <h1 className="text-xl font-semibold text-gray-900">
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
                 {selectedAreaView ? `${selectedAreaView.name} - Sites` : 'Areas & Sites Management'}
               </h1>
             </div>
@@ -370,9 +372,9 @@ export default function SiteManagement() {
                     Add Site
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
                   <DialogHeader>
-                    <DialogTitle>{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
+                    <DialogTitle className="text-lg sm:text-xl">{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <div>
@@ -421,7 +423,7 @@ export default function SiteManagement() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="latitude">Latitude</Label>
                         <Input
@@ -516,7 +518,7 @@ export default function SiteManagement() {
                       )}
                     </div>
                     
-                    <div className="flex space-x-2">
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                       <Button type="submit" className="flex-1" disabled={createSiteMutation.isPending}>
                         {createSiteMutation.isPending 
                           ? (editingSite ? 'Updating...' : 'Creating...') 
@@ -535,7 +537,7 @@ export default function SiteManagement() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {selectedAreaView ? (
           <div>
             <div className="flex justify-between items-center mb-6">

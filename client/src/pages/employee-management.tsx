@@ -355,18 +355,20 @@ export default function EmployeeManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto p-3 sm:p-4 lg:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-4">
         <div className="flex items-center">
           <Link href="/admin/dashboard">
-            <Button variant="ghost" size="sm" className="mr-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+            <Button variant="ghost" size="sm" className="mr-2 sm:mr-4">
+              <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Back to Dashboard</span>
+              <span className="sm:hidden">Back</span>
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold flex items-center">
-            <Users className="h-6 w-6 mr-2" />
-            Employee Management
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center">
+            <Users className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
+            <span className="hidden sm:inline">Employee Management</span>
+            <span className="sm:hidden">Employees</span>
           </h1>
         </div>
         <div className="flex gap-2">
