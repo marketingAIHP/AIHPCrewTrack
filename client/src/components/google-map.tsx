@@ -35,7 +35,7 @@ export default function GoogleMap({
   const circlesRef = useRef<google.maps.Circle[]>([]);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !window.google) return;
 
     // Initialize Google Map
     mapInstanceRef.current = new google.maps.Map(mapRef.current, {

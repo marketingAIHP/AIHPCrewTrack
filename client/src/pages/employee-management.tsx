@@ -70,6 +70,7 @@ export default function EmployeeManagement() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [imageDialogEmployee, setImageDialogEmployee] = useState<Employee | null>(null);
+  const isAuthenticated = !!getAuthToken();
 
   // Fetch employees
   const { data: employees = [], isLoading: employeesLoading } = useQuery({
@@ -102,15 +103,9 @@ export default function EmployeeManagement() {
   // Fetch work sites
   const { data: workSites = [], isLoading: workSitesLoading } = useQuery({
     queryKey: ['/api/admin/sites'],
-    queryFn: async () => {
-      const response = await fetch(`/api/admin/sites`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch work sites');
-      return response.json();
-    },
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   // Forms
@@ -391,7 +386,7 @@ export default function EmployeeManagement() {
 
   const getSiteName = (siteId?: number) => {
     if (!siteId) return 'No Site Assigned';
-    const site = workSites.find((s: any) => s.id === siteId);
+    const site = Array.isArray(workSites) ? workSites.find((s: any) => s.id === siteId) : null;
     return site?.name || 'Unknown Site';
   };
 
