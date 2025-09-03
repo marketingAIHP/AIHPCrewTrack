@@ -1142,6 +1142,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Convert siteId to number if it's a string
+      if (validatedData.siteId) {
+        if (typeof validatedData.siteId === 'string') {
+          if (validatedData.siteId === 'none' || validatedData.siteId === '') {
+            (validatedData as any).siteId = null;
+          } else {
+            (validatedData as any).siteId = parseInt(validatedData.siteId);
+          }
+        }
+      }
+      
       console.log('Validated data:', JSON.stringify(validatedData, null, 2));
       
       // Check if email already exists across both admin and employee tables

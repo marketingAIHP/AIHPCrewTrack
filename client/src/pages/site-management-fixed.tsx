@@ -237,20 +237,61 @@ export default function SiteManagement() {
 
   // All useCallback hooks
   const handleGetUploadParameters = useCallback(async () => {
-    return {
-      url: '/api/object-storage/upload',
-      method: 'PUT' as const,
-    };
+    try {
+      const response = await fetch('/api/object-storage/upload', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get upload parameters');
+      }
+      
+      const { uploadURL } = await response.json();
+      console.log('Got upload parameters for site image:', { uploadURL });
+      
+      return {
+        method: 'PUT' as const,
+        url: uploadURL,
+      };
+    } catch (error) {
+      console.error('Upload parameters error:', error);
+      throw error;
+    }
   }, []);
 
   const handleUploadComplete = useCallback((result: any) => {
-    if (result.successful && result.successful[0]) {
+    console.log('Site image upload complete:', result);
+    if (result.successful && result.successful.length > 0) {
       const uploadedFile = result.successful[0];
-      const imageUrl = `/api/object-storage/files/${uploadedFile.response.body.key}`;
-      setSiteImageURL(imageUrl);
+      console.log('Site uploaded file details:', uploadedFile);
+      
+      // Try multiple possible fields for the upload URL
+      const imageURL = uploadedFile.uploadURL || uploadedFile.response?.uploadURL || uploadedFile.url;
+      
+      if (imageURL) {
+        setSiteImageURL(imageURL);
+        toast({
+          title: 'Success',
+          description: 'Site image uploaded successfully',
+        });
+      } else {
+        console.error('No upload URL found in site upload result:', uploadedFile);
+        toast({
+          title: 'Upload Error',
+          description: 'Image uploaded but URL not found. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      console.error('Site image upload failed:', result);
       toast({
-        title: 'Success',
-        description: 'Site image uploaded successfully',
+        title: 'Upload Failed',
+        description: 'Site image upload was not successful. Please try again.',
+        variant: 'destructive',
       });
     }
   }, [toast]);

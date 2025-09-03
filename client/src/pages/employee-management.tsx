@@ -24,6 +24,7 @@ interface Employee {
   lastName: string;
   email: string;
   departmentId?: number;
+  siteId?: number;
   profileImage?: string;
   isActive: boolean;
   createdAt: string;
@@ -198,7 +199,30 @@ export default function EmployeeManagement() {
 
   const deleteEmployeeMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/admin/employees/${id}`, 'DELETE');
+      try {
+        const response = await fetch(`/api/admin/employees/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Failed to delete employee' }));
+          throw new Error(errorData.message || 'Failed to delete employee');
+        }
+        
+        // For 204 No Content responses, we don't need to parse JSON
+        if (response.status === 204) {
+          return { success: true };
+        }
+        
+        return await response.json();
+      } catch (error: any) {
+        console.error('Delete employee error:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast({
@@ -208,6 +232,7 @@ export default function EmployeeManagement() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
     },
     onError: (error: any) => {
+      console.error('Delete employee mutation error:', error);
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete employee.",
@@ -299,29 +324,62 @@ export default function EmployeeManagement() {
 
   // Helper functions
   const handleGetUploadParameters = async () => {
-    const response = await fetch('/api/objects/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to get upload parameters');
-    const { uploadURL } = await response.json();
-    return {
-      method: 'PUT' as const,
-      url: uploadURL,
-    };
+    try {
+      const response = await fetch('/api/object-storage/upload', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to get upload parameters' }));
+        throw new Error(errorData.message || 'Failed to get upload parameters');
+      }
+      
+      const { uploadURL } = await response.json();
+      console.log('Got upload parameters:', { uploadURL });
+      
+      return {
+        method: 'PUT' as const,
+        url: uploadURL,
+      };
+    } catch (error) {
+      console.error('Upload parameters error:', error);
+      throw error;
+    }
   };
 
   const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    console.log('Upload complete result:', result);
     if (result.successful && result.successful.length > 0 && imageDialogEmployee) {
       const uploadedFile = result.successful[0];
-      if (uploadedFile.uploadURL) {
+      console.log('Uploaded file details:', uploadedFile);
+      
+      // Try multiple possible fields for the upload URL
+      const imageURL = uploadedFile.uploadURL || (uploadedFile.response as any)?.uploadURL || (uploadedFile as any).url;
+      
+      if (imageURL) {
         uploadEmployeeImageMutation.mutate({
           employeeId: imageDialogEmployee.id,
-          imageURL: uploadedFile.uploadURL,
+          imageURL: imageURL,
+        });
+      } else {
+        console.error('No upload URL found in result:', uploadedFile);
+        toast({
+          title: "Upload Error",
+          description: "Image uploaded but URL not found. Please try again.",
+          variant: "destructive",
         });
       }
+    } else {
+      console.error('Upload failed or no employee selected:', { result, imageDialogEmployee });
+      toast({
+        title: "Upload Failed",
+        description: "Image upload was not successful. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -329,6 +387,12 @@ export default function EmployeeManagement() {
     if (!departmentId) return 'No Department';
     const department = departments.find((d: Department) => d.id === departmentId);
     return department?.name || 'Unknown Department';
+  };
+
+  const getSiteName = (siteId?: number) => {
+    if (!siteId) return 'No Site Assigned';
+    const site = workSites.find((s: any) => s.id === siteId);
+    return site?.name || 'Unknown Site';
   };
 
   const handleEditEmployee = (employee: Employee) => {
@@ -683,8 +747,12 @@ export default function EmployeeManagement() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center text-sm text-gray-600">
-                <MapPin className="h-4 w-4 mr-2" />
+                <Users className="h-4 w-4 mr-2" />
                 {getDepartmentName(employee.departmentId)}
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <MapPin className="h-4 w-4 mr-2" />
+                {getSiteName(employee.siteId)}
               </div>
               <div className="flex items-center text-sm text-gray-600">
                 <Clock className="h-4 w-4 mr-2" />
