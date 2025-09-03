@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Users, Plus, MapPin, Clock, Edit, Trash2, Camera, Upload, X, Eye, EyeOff } from 'lucide-react';
 import { AdaptiveImage } from '../components/AdaptiveImage';
+import { CompressedImagePreview } from '../components/CompressedImagePreview';
 import { getAuthToken } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -767,6 +768,23 @@ export default function EmployeeManagement() {
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
+                          {employee.profileImage && (
+                            <div className="flex justify-center mb-4">
+                              <CompressedImagePreview
+                                src={employee.profileImage}
+                                alt={`${employee.firstName} ${employee.lastName}`}
+                                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+                                showCompressionInfo={true}
+                                fallback={
+                                  <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span className="text-blue-600 font-bold text-lg">
+                                      {employee.firstName[0]}{employee.lastName[0]}
+                                    </span>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          )}
                           <ObjectUploader
                             maxNumberOfFiles={1}
                             maxFileSize={5242880} // 5MB
@@ -776,7 +794,7 @@ export default function EmployeeManagement() {
                             buttonClassName="w-full"
                           >
                             <Upload className="h-4 w-4 mr-2" />
-                            {uploadEmployeeImageMutation.isPending ? 'Processing...' : 'Upload New Image'}
+                            {uploadEmployeeImageMutation.isPending ? 'Processing & Compressing...' : 'Upload & Compress Image'}
                           </ObjectUploader>
                           {employee.profileImage && (
                             <Button
