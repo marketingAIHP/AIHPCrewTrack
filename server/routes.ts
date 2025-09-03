@@ -1301,8 +1301,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: true 
       }).partial().parse(processedData);
       
-      if (validatedData.password) {
-        validatedData.password = await bcrypt.hash(validatedData.password, 10);
+      // Handle password updates separately if provided in original body
+      let hashedPassword;
+      if (req.body.password) {
+        hashedPassword = await bcrypt.hash(req.body.password, 10);
       }
       
       // Normalize profile image URL if provided
@@ -1311,7 +1313,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.profileImage = await objectStorageService.trySetObjectEntityPath(validatedData.profileImage);
       }
       
-      const employee = await storage.updateEmployee(id, validatedData);
+      const employee = await storage.updateEmployee(id, {
+        ...validatedData,
+        ...(hashedPassword && { password: hashedPassword })
+      });
       res.json(employee);
     } catch (error) {
       console.error('Employee update error:', error);

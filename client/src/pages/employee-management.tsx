@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Users, Plus, MapPin, Clock, Edit, Trash2, Camera, Upload, X, Eye, EyeOff } from 'lucide-react';
 import { AdaptiveImage } from '../components/AdaptiveImage';
 import { CompressedImagePreview } from '../components/CompressedImagePreview';
+import { SmartCompressionPreview } from '../components/SmartCompressionPreview';
+import { CompressionThumbnailGrid } from '../components/CompressionThumbnailGrid';
 import { getAuthToken } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -729,6 +731,33 @@ export default function EmployeeManagement() {
       )}
 
       {/* Employees Grid */}
+      {/* Employee Images Preview */}
+      {employees.filter(emp => emp.profileImage).length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5 text-blue-500" />
+              Employee Profile Images
+              <Badge variant="default" className="bg-green-500">
+                Smart Compressed
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CompressionThumbnailGrid
+              images={employees.filter(emp => emp.profileImage).map(emp => ({
+                id: emp.id.toString(),
+                src: emp.profileImage!,
+                alt: `${emp.firstName} ${emp.lastName}`,
+                title: `${emp.firstName} ${emp.lastName}`
+              }))}
+              showPreviewDialog={true}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Employees Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {employees.map((employee: Employee) => (
           <Card key={employee.id} className="hover:shadow-lg transition-shadow">
@@ -776,19 +805,13 @@ export default function EmployeeManagement() {
                         </DialogHeader>
                         <div className="space-y-4">
                           {employee.profileImage && (
-                            <div className="flex justify-center mb-4">
-                              <CompressedImagePreview
+                            <div className="space-y-3">
+                              <SmartCompressionPreview
                                 src={employee.profileImage}
                                 alt={`${employee.firstName} ${employee.lastName}`}
-                                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
-                                showCompressionInfo={true}
-                                fallback={
-                                  <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <span className="text-blue-600 font-bold text-lg">
-                                      {employee.firstName[0]}{employee.lastName[0]}
-                                    </span>
-                                  </div>
-                                }
+                                className="w-full h-32 rounded-lg object-cover"
+                                showControls={true}
+                                showStats={false}
                               />
                             </div>
                           )}
