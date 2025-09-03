@@ -625,11 +625,15 @@ export default function EmployeeManagement() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="">No Site Assignment</SelectItem>
-                              {workSites.map((site: any) => (
-                                <SelectItem key={site.id} value={site.id.toString()}>
-                                  {site.name}
-                                </SelectItem>
-                              ))}
+                              {Array.isArray(workSites) && workSites.length > 0 ? (
+                                workSites.map((site: any) => (
+                                  <SelectItem key={site.id} value={site.id.toString()}>
+                                    {site.name}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="" disabled>No work sites available</SelectItem>
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />

@@ -238,8 +238,8 @@ export default function SiteManagement() {
   // All useCallback hooks
   const handleGetUploadParameters = useCallback(async () => {
     try {
-      const response = await fetch('/api/object-storage/upload', {
-        method: 'PUT',
+      const response = await fetch('/api/objects/upload', {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
           'Content-Type': 'application/json',
@@ -546,7 +546,9 @@ export default function SiteManagement() {
                         onGetUploadParameters={handleGetUploadParameters}
                         onComplete={handleUploadComplete}
                         buttonClassName="w-full"
-                      />
+                      >
+                        Upload Site Image
+                      </ObjectUploader>
                       {siteImageURL && (
                         <Button
                           type="button"
