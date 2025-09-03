@@ -25,6 +25,7 @@ import * as XLSX from 'xlsx';
 import { createObjectCsvWriter } from 'csv-writer';
 import PDFDocument from 'pdfkit';
 import { ObjectStorageService, ObjectNotFoundError } from './objectStorage';
+import { ImageCompressionService } from './imageCompression';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -820,17 +821,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve object storage images
+  // Serve object storage images with adaptive compression
   app.get('/objects/*', async (req, res) => {
     try {
       const objectPath = req.path; // Full path like /objects/profile-images/uuid
       const objectStorageService = new ObjectStorageService();
+      const compressionService = new ImageCompressionService();
       
       // Get the file object
       const file = await objectStorageService.getObjectEntityFile(objectPath);
       
-      // Download and stream the file
-      await objectStorageService.downloadObject(file, res);
+      // Check if compression is requested via query params
+      const compress = req.query.compress === 'true' || req.query.size;
+      
+      if (compress && objectPath.includes('profile-images') || objectPath.includes('site-images')) {
+        // Get optimal compression settings
+        const compressionOptions = compressionService.getOptimalSettings(req);
+        
+        // Apply size override if specified
+        if (req.query.size) {
+          const size = req.query.size as string;
+          switch (size) {
+            case 'thumbnail':
+              compressionOptions.width = 150;
+              compressionOptions.height = 150;
+              break;
+            case 'medium':
+              compressionOptions.width = 400;
+              break;
+            case 'large':
+              compressionOptions.width = 800;
+              break;
+          }
+        }
+        
+        // Get original file buffer
+        const chunks: Buffer[] = [];
+        const stream = file.createReadStream();
+        
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+        const originalBuffer = Buffer.concat(chunks);
+        
+        // Compress the image
+        const compressedBuffer = await compressionService.compressImage(originalBuffer, compressionOptions);
+        
+        // Set appropriate headers
+        res.set({
+          'Content-Type': compressionService.getContentType(compressionOptions.format!),
+          'Content-Length': compressedBuffer.length.toString(),
+          'Cache-Control': 'public, max-age=86400', // 24 hours
+          'Vary': 'Accept, User-Agent'
+        });
+        
+        res.send(compressedBuffer);
+      } else {
+        // Serve original file without compression
+        await objectStorageService.downloadObject(file, res);
+      }
     } catch (error) {
       console.error('Error serving object:', error);
       res.status(404).json({ message: 'Object not found' });

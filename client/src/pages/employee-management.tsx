@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Users, Plus, MapPin, Clock, Edit, Trash2, Camera, Upload, X, Eye, EyeOff } from 'lucide-react';
+import { AdaptiveImage } from '../components/AdaptiveImage';
 import { getAuthToken } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -728,24 +729,19 @@ export default function EmployeeManagement() {
                 <div className="flex items-center space-x-3">
                   <div className="relative">
                     {employee.profileImage ? (
-                      <>
-                        <img 
-                          src={employee.profileImage} 
-                          alt="Profile" 
-                          className="w-12 h-12 rounded-full object-cover"
-                          onError={(e) => {
-                            console.error('Image failed to load:', employee.profileImage);
-                            e.currentTarget.style.display = 'none';
-                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center hidden">
-                          <span className="text-blue-600 font-bold">
-                            {employee.firstName[0]}{employee.lastName[0]}
-                          </span>
-                        </div>
-                      </>
+                      <AdaptiveImage
+                        src={employee.profileImage}
+                        alt={`${employee.firstName} ${employee.lastName}`}
+                        className="w-12 h-12 rounded-full object-cover"
+                        sizes="thumbnail"
+                        fallback={
+                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-blue-600 font-bold">
+                              {employee.firstName[0]}{employee.lastName[0]}
+                            </span>
+                          </div>
+                        }
+                      />
                     ) : (
                       <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-blue-600 font-bold">

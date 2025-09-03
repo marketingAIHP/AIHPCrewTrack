@@ -19,6 +19,7 @@ import GoogleMap from '@/components/google-map';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { AuthenticatedImage } from '@/components/AuthenticatedImage';
+import { AdaptiveImage } from '../components/AdaptiveImage';
 import { 
   ArrowLeft, 
   Plus, 
@@ -604,23 +605,18 @@ export default function SiteManagement() {
                   <Card key={site.id} className="overflow-hidden">
                     <div className="h-48 bg-gray-200 flex items-center justify-center overflow-hidden">
                       {site.siteImage ? (
-                        <>
-                          <img 
-                            src={site.siteImage} 
-                            alt={site.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              console.error('Image failed to load:', site.siteImage);
-                              e.currentTarget.style.display = 'none';
-                              const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                              if (fallback) fallback.style.display = 'flex';
-                            }}
-                          />
-                          <div className="text-center hidden">
-                            <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                            <p className="text-sm text-gray-600">Image Failed to Load</p>
-                          </div>
-                        </>
+                        <AdaptiveImage
+                          src={site.siteImage}
+                          alt={site.name}
+                          className="w-full h-full object-cover"
+                          sizes="medium"
+                          fallback={
+                            <div className="text-center">
+                              <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                              <p className="text-sm text-gray-600">Work Site</p>
+                            </div>
+                          }
+                        />
                       ) : (
                         <div className="text-center">
                           <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
