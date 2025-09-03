@@ -40,12 +40,13 @@ const createEmployeeSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
-  phone: z.string().min(1, "Phone number is required"),
+  phone: z.string().optional(),
   password: z.string()
     .min(8, "Password must be at least 8 characters")
     .regex(/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
       "Password must contain letters, numbers, and special characters"),
   departmentId: z.string().optional(),
+  siteId: z.string().optional(),
 });
 
 const editEmployeeSchema = z.object({
@@ -97,6 +98,20 @@ export default function EmployeeManagement() {
     },
   });
 
+  // Fetch work sites
+  const { data: workSites = [], isLoading: workSitesLoading } = useQuery({
+    queryKey: ['/api/admin/sites'],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/sites`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch work sites');
+      return response.json();
+    },
+  });
+
   // Forms
   const createEmployeeForm = useForm<z.infer<typeof createEmployeeSchema>>({
     resolver: zodResolver(createEmployeeSchema),
@@ -107,6 +122,7 @@ export default function EmployeeManagement() {
       phone: '',
       password: '',
       departmentId: '',
+      siteId: '',
     },
   });
 
@@ -134,6 +150,7 @@ export default function EmployeeManagement() {
       return await apiRequest('/api/admin/employees', 'POST', {
         ...data,
         departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
+        siteId: data.siteId ? parseInt(data.siteId) : undefined,
       });
     },
     onSuccess: () => {
@@ -360,7 +377,7 @@ export default function EmployeeManagement() {
                 Add Department
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Department</DialogTitle>
                 <DialogDescription>
@@ -411,7 +428,7 @@ export default function EmployeeManagement() {
                 Add Employee
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Employee</DialogTitle>
                 <DialogDescription>
@@ -502,31 +519,58 @@ export default function EmployeeManagement() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={createEmployeeForm.control}
-                    name="departmentId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Department (Optional)</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a department" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="">No Department</SelectItem>
-                            {departments.map((dept: Department) => (
-                              <SelectItem key={dept.id} value={dept.id.toString()}>
-                                {dept.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={createEmployeeForm.control}
+                      name="departmentId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department (Optional)</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a department" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">No Department</SelectItem>
+                              {departments.map((dept: Department) => (
+                                <SelectItem key={dept.id} value={dept.id.toString()}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={createEmployeeForm.control}
+                      name="siteId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Work Site (Optional)</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a work site" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">No Site Assignment</SelectItem>
+                              {workSites.map((site: any) => (
+                                <SelectItem key={site.id} value={site.id.toString()}>
+                                  {site.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <DialogFooter>
                     <Button type="submit" disabled={createEmployeeMutation.isPending}>
                       {createEmployeeMutation.isPending ? 'Creating...' : 'Create Employee'}
