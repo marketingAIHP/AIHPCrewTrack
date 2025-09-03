@@ -1130,6 +1130,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Remove adminId from validation since we set it manually
       const validatedData = insertEmployeeSchema.omit({ adminId: true }).parse(req.body);
+      
+      // Convert departmentId to number if it's a string
+      if (validatedData.departmentId) {
+        if (typeof validatedData.departmentId === 'string') {
+          if (validatedData.departmentId === 'none' || validatedData.departmentId === '') {
+            validatedData.departmentId = null;
+          } else {
+            validatedData.departmentId = parseInt(validatedData.departmentId);
+          }
+        }
+      }
+      
       console.log('Validated data:', JSON.stringify(validatedData, null, 2));
       
       // Check if email already exists across both admin and employee tables
