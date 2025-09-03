@@ -187,7 +187,8 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   isActive: true 
 }).extend({
   password: passwordSchema,
-  departmentId: z.union([z.string(), z.number()]).optional(),
+  departmentId: z.union([z.string(), z.number(), z.null()]).transform(val => val === null || val === 'none' ? null : typeof val === 'string' ? (val === 'none' ? null : parseInt(val)) : val).optional(),
+  siteId: z.union([z.string(), z.number(), z.null()]).transform(val => val === null || val === 'none' ? null : typeof val === 'string' ? (val === 'none' ? null : parseInt(val)) : val).optional(),
   phone: z.string().optional(),
 });
 

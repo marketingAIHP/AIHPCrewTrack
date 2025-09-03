@@ -1128,30 +1128,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('Employee creation request body:', JSON.stringify(req.body, null, 2));
       
-      // Remove adminId from validation since we set it manually
-      const validatedData = insertEmployeeSchema.omit({ adminId: true }).parse(req.body);
+      // Pre-process data before validation
+      const processedData = { ...req.body };
       
       // Convert departmentId to number if it's a string
-      if (validatedData.departmentId) {
-        if (typeof validatedData.departmentId === 'string') {
-          if (validatedData.departmentId === 'none' || validatedData.departmentId === '') {
-            (validatedData as any).departmentId = null;
+      if (processedData.departmentId) {
+        if (typeof processedData.departmentId === 'string') {
+          if (processedData.departmentId === 'none' || processedData.departmentId === '') {
+            processedData.departmentId = null;
           } else {
-            (validatedData as any).departmentId = parseInt(validatedData.departmentId);
+            processedData.departmentId = parseInt(processedData.departmentId);
           }
         }
       }
       
       // Convert siteId to number if it's a string
-      if (validatedData.siteId) {
-        if (typeof validatedData.siteId === 'string') {
-          if (validatedData.siteId === 'none' || validatedData.siteId === '') {
-            (validatedData as any).siteId = null;
+      if (processedData.siteId) {
+        if (typeof processedData.siteId === 'string') {
+          if (processedData.siteId === 'none' || processedData.siteId === '') {
+            processedData.siteId = null;
           } else {
-            (validatedData as any).siteId = parseInt(validatedData.siteId);
+            processedData.siteId = parseInt(processedData.siteId);
           }
         }
       }
+      
+      // Remove adminId from validation since we set it manually
+      const validatedData = insertEmployeeSchema.omit({ adminId: true }).parse(processedData);
       
       console.log('Validated data:', JSON.stringify(validatedData, null, 2));
       
@@ -1201,7 +1204,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/admin/employees/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
-      const validatedData = insertEmployeeSchema.partial().parse(req.body);
+      
+      // Pre-process data before validation
+      const processedData = { ...req.body };
+      
+      // Convert departmentId to number if it's a string
+      if (processedData.departmentId) {
+        if (typeof processedData.departmentId === 'string') {
+          if (processedData.departmentId === 'none' || processedData.departmentId === '') {
+            processedData.departmentId = null;
+          } else {
+            processedData.departmentId = parseInt(processedData.departmentId);
+          }
+        }
+      }
+      
+      // Convert siteId to number if it's a string
+      if (processedData.siteId) {
+        if (typeof processedData.siteId === 'string') {
+          if (processedData.siteId === 'none' || processedData.siteId === '') {
+            processedData.siteId = null;
+          } else {
+            processedData.siteId = parseInt(processedData.siteId);
+          }
+        }
+      }
+      
+      const validatedData = insertEmployeeSchema.partial().parse(processedData);
       
       if (validatedData.password) {
         validatedData.password = await bcrypt.hash(validatedData.password, 10);
@@ -1216,6 +1245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employee = await storage.updateEmployee(id, validatedData);
       res.json(employee);
     } catch (error) {
+      console.error('Employee update error:', error);
       res.status(400).json({ message: 'Failed to update employee' });
     }
   });
