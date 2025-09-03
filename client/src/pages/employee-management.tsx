@@ -153,11 +153,15 @@ export default function EmployeeManagement() {
   // Mutations
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createEmployeeSchema>) => {
-      return await apiRequest('/api/admin/employees', 'POST', {
+      const payload = {
         ...data,
-        departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
-        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : undefined,
-      });
+        departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : null,
+        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
+        phone: data.phone || undefined,
+        employeeId: data.employeeId || undefined,
+      };
+      console.log('Sending employee creation payload:', payload);
+      return await apiRequest('/api/admin/employees', 'POST', payload);
     },
     onSuccess: () => {
       toast({
@@ -179,11 +183,14 @@ export default function EmployeeManagement() {
 
   const updateEmployeeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof editEmployeeSchema> }) => {
-      return await apiRequest(`/api/admin/employees/${id}`, 'PUT', {
+      const payload = {
         ...data,
-        departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
-        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : undefined,
-      });
+        departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : null,
+        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
+        phone: data.phone || undefined,
+      };
+      console.log('Sending employee update payload:', payload);
+      return await apiRequest(`/api/admin/employees/${id}`, 'PUT', payload);
     },
     onSuccess: () => {
       toast({
