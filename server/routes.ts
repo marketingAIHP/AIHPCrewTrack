@@ -16,6 +16,9 @@ import {
   insertDepartmentSchema,
   insertLocationTrackingSchema,
   insertAttendanceSchema,
+  updateEmployeeProfileSchema,
+  adminVerificationSchema,
+  adminActivationSchema,
 } from "@shared/schema";
 import { sendEmail } from './sendgrid';
 import * as XLSX from 'xlsx';
@@ -76,12 +79,12 @@ function notifyAdmin(adminId: number, notification: any) {
 interface AuthenticatedRequest extends Request {
   user?: {
     id: number;
-    type: 'admin' | 'employee';
+    type: 'admin' | 'employee' | 'super_admin';
   };
 }
 
 // Authentication middleware
-const authenticateToken = (userType?: 'admin' | 'employee' | ('admin' | 'employee')[]) => {
+const authenticateToken = (userType?: 'admin' | 'employee' | 'super_admin' | ('admin' | 'employee' | 'super_admin')[]) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -183,12 +186,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: employee.lastName,
         email: employee.email,
         phone: employee.phone,
+        address: employee.address,
         siteId: employee.siteId,
         profileImage: employee.profileImage,
       });
     } catch (error) {
       console.error('Error fetching employee profile:', error);
       res.status(500).json({ message: 'Failed to fetch profile' });
+    }
+  });
+
+  // Employee profile update route (limited fields)
+  app.put('/api/employee/profile', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = updateEmployeeProfileSchema.parse(req.body);
+      
+      // Normalize profile image URL if provided
+      if (validatedData.profileImage) {
+        const objectStorageService = new ObjectStorageService();
+        validatedData.profileImage = await objectStorageService.trySetObjectEntityPath(validatedData.profileImage);
+      }
+      
+      const employee = await storage.updateEmployee(req.user!.id, validatedData);
+      const { password, ...employeeData } = employee;
+      res.json(employeeData);
+    } catch (error) {
+      console.error('Error updating employee profile:', error);
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+        return res.status(400).json({ message: errorMessages.join(', ') });
+      }
+      res.status(400).json({ message: 'Failed to update profile' });
     }
   });
 
@@ -239,7 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Work site not found' });
       }
 
-      // Check if employee is within geofence
+      // Check if employee is within geofence with improved accuracy
       const distance = calculateDistance(
         latitude,
         longitude,
@@ -247,9 +275,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseFloat(site.longitude)
       );
 
-      if (distance > site.geofenceRadius) {
+      // Add buffer for GPS accuracy issues (typically 3-5m accuracy for mobile GPS)
+      const gpsAccuracyBuffer = 10; // meters
+      const effectiveRadius = site.geofenceRadius + gpsAccuracyBuffer;
+
+      console.log(`Geofence check: Distance=${Math.round(distance)}m, Radius=${site.geofenceRadius}m, EffectiveRadius=${effectiveRadius}m`);
+
+      if (distance > effectiveRadius) {
         return res.status(400).json({ 
-          message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(distance)}m away.`
+          message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(distance)}m away.`,
+          distance: Math.round(distance),
+          requiredRadius: site.geofenceRadius
         });
       }
 
@@ -555,6 +591,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
+      // Check if admin is verified and active
+      if (!admin.isVerified) {
+        return res.status(401).json({ message: 'Email not verified. Please check your email and verify your account.' });
+      }
+
+      if (!admin.isActive) {
+        return res.status(401).json({ message: 'Account pending activation by Super Admin. Please contact support.' });
+      }
+
       const token = jwt.sign(
         { id: admin.id, type: 'admin' },
         JWT_SECRET,
@@ -568,7 +613,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: admin.firstName, 
           lastName: admin.lastName,
           companyName: admin.companyName,
-          email: admin.email 
+          email: admin.email,
+          role: admin.role 
         } 
       });
     } catch (error) {
@@ -1081,6 +1127,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/employees', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       console.log('Employee creation request body:', JSON.stringify(req.body, null, 2));
+      
+      // Remove adminId from validation since we set it manually
       const validatedData = insertEmployeeSchema.omit({ adminId: true }).parse(req.body);
       console.log('Validated data:', JSON.stringify(validatedData, null, 2));
       
@@ -1101,8 +1149,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         profileImage = await objectStorageService.trySetObjectEntityPath(profileImage);
       }
       
+      // Auto-generate employeeId if not provided
+      let employeeId = validatedData.employeeId;
+      if (!employeeId) {
+        const employees = await storage.getEmployeesByAdmin(req.user!.id);
+        employeeId = `EMP${String(employees.length + 1).padStart(3, '0')}`;
+      }
+      
       const employee = await storage.createEmployee({
         ...validatedData,
+        employeeId,
         password: hashedPassword,
         profileImage,
         adminId: req.user!.id,
@@ -1602,11 +1658,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (emailSent) {
         res.json({ message: 'Report sent successfully' });
       } else {
-        res.status(500).json({ message: 'Failed to send email' });
+        res.status(500).json({ message: 'Failed to send email (export failed)' });
       }
     } catch (error) {
       console.error('Export report error:', error);
-      res.status(500).json({ message: 'Failed to generate and send report' });
+      res.status(500).json({ message: 'Failed to generate and send report (export failed)' });
+    }
+  });
+
+  // Super Admin Routes
+  app.post('/api/super-admin/login', async (req, res) => {
+    try {
+      const { email, password } = adminLoginSchema.parse(req.body);
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== 'super_admin') {
+        return res.status(401).json({ message: 'Invalid credentials or insufficient permissions' });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, admin.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const token = jwt.sign(
+        { id: admin.id, type: 'super_admin' },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      res.json({ 
+        token,
+        admin: {
+          id: admin.id,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          email: admin.email,
+          role: admin.role,
+        }
+      });
+    } catch (error) {
+      res.status(401).json({ message: 'Invalid credentials' });
+    }
+  });
+
+  // Super Admin - Get all pending admins
+  app.get('/api/super-admin/pending-admins', authenticateToken('super_admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const pendingAdmins = await storage.getPendingAdmins();
+      res.json(pendingAdmins);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch pending admins' });
+    }
+  });
+
+  // Super Admin - Activate/Deactivate admin
+  app.put('/api/super-admin/activate-admin', authenticateToken('super_admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { adminId, isActive } = adminActivationSchema.parse(req.body);
+      
+      const updatedAdmin = await storage.updateAdminStatus(adminId, isActive);
+      res.json(updatedAdmin);
+    } catch (error) {
+      res.status(400).json({ message: 'Failed to update admin status' });
+    }
+  });
+
+  // Admin Email Verification
+  app.post('/api/admin/verify-email', async (req, res) => {
+    try {
+      const { token } = adminVerificationSchema.parse(req.body);
+      
+      const admin = await storage.verifyAdminEmail(token);
+      if (!admin) {
+        return res.status(400).json({ message: 'Invalid or expired verification token' });
+      }
+
+      res.json({ message: 'Email verified successfully. Your account is pending activation by a Super Admin.' });
+    } catch (error) {
+      res.status(400).json({ message: 'Invalid verification token' });
+    }
+  });
+
+  // Enhanced Admin Signup with email verification
+  app.post('/api/admin/signup', async (req, res) => {
+    try {
+      const validatedData = insertAdminSchema.parse(req.body);
+      
+      // Check if email already exists
+      const existingAdmin = await storage.getAdminByEmail(validatedData.email);
+      if (existingAdmin) {
+        return res.status(400).json({ message: 'Email already registered' });
+      }
+
+      const hashedPassword = await bcrypt.hash(validatedData.password, 10);
+      
+      // Generate verification token
+      const verificationToken = jwt.sign(
+        { email: validatedData.email, timestamp: Date.now() },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      const admin = await storage.createAdmin({
+        ...validatedData,
+        password: hashedPassword,
+        verificationToken,
+        isVerified: false,
+        isActive: false,
+      });
+
+      // Send verification email
+      const verificationLink = `${req.protocol}://${req.get('host')}/verify-email?token=${verificationToken}`;
+      
+      const emailSent = await sendEmail({
+        to: validatedData.email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@labourtrackr.com',
+        subject: 'Verify Your Admin Account - LabourTrackr',
+        html: `
+          <h2>Welcome to LabourTrackr!</h2>
+          <p>Please verify your email address by clicking the link below:</p>
+          <a href="${verificationLink}" style="background: #007cba; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
+          <p>This link will expire in 24 hours.</p>
+          <p>After verification, a Super Admin will need to activate your account.</p>
+        `,
+        text: `Welcome to LabourTrackr! Please verify your email by visiting: ${verificationLink}`
+      });
+
+      if (emailSent) {
+        res.status(201).json({ 
+          message: 'Account created successfully. Please check your email to verify your account.',
+          requiresVerification: true 
+        });
+      } else {
+        res.status(201).json({ 
+          message: 'Account created but verification email failed to send. Please contact support.',
+          requiresVerification: true 
+        });
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+        return res.status(400).json({ message: errorMessages.join(', ') });
+      }
+      res.status(400).json({ message: 'Failed to create admin account' });
     }
   });
 

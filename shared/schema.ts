@@ -8,21 +8,26 @@ export const admins = pgTable("admins", {
   id: serial("id").primaryKey(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  companyName: text("company_name").notNull().unique(),
+  companyName: text("company_name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   profileImage: text("profile_image"),
+  role: text("role").notNull().default("admin"), // "super_admin" or "admin"
+  isVerified: boolean("is_verified").default(false), // Email verification status
+  verificationToken: text("verification_token"), // For email verification
+  isActive: boolean("is_active").default(false), // Activated by super admin
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Labor employees table
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
-  employeeId: text("employee_id").notNull().unique(), // Custom employee ID (like "EMP001")
+  employeeId: text("employee_id"), // Custom employee ID (like "EMP001") - made optional to avoid conflicts
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  email: text("email").notNull().unique(),
+  email: text("email").notNull(),
   phone: text("phone").notNull(),
+  address: text("address"), // Added for employee profile updates
   password: text("password").notNull(),
   adminId: integer("admin_id").notNull().references(() => admins.id),
   siteId: integer("site_id").references(() => workSites.id),
@@ -169,12 +174,37 @@ const passwordSchema = z.string()
     "Password must contain at least one letter, one number, and one special character");
 
 // Insert schemas with password validation
-export const insertAdminSchema = createInsertSchema(admins).omit({ id: true, createdAt: true }).extend({
+export const insertAdminSchema = createInsertSchema(admins).omit({ 
+  id: true, 
+  createdAt: true 
+}).extend({
   password: passwordSchema,
 });
 
-export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, isActive: true }).extend({
+export const insertEmployeeSchema = createInsertSchema(employees).omit({ 
+  id: true, 
+  createdAt: true, 
+  isActive: true 
+}).extend({
   password: passwordSchema,
+});
+
+// Employee profile update schema (limited fields for employees)
+export const updateEmployeeProfileSchema = z.object({
+  phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  address: z.string().optional(),
+  profileImage: z.string().optional(),
+});
+
+// Admin verification schema
+export const adminVerificationSchema = z.object({
+  token: z.string(),
+});
+
+// Super admin schemas for managing regular admins
+export const adminActivationSchema = z.object({
+  adminId: z.number(),
+  isActive: z.boolean(),
 });
 
 export const insertWorkSiteSchema = createInsertSchema(workSites).omit({ id: true, createdAt: true, isActive: true }).extend({
@@ -218,3 +248,6 @@ export const employeeLoginSchema = z.object({
 
 export type AdminLogin = z.infer<typeof adminLoginSchema>;
 export type EmployeeLogin = z.infer<typeof employeeLoginSchema>;
+export type UpdateEmployeeProfile = z.infer<typeof updateEmployeeProfileSchema>;
+export type AdminVerification = z.infer<typeof adminVerificationSchema>;
+export type AdminActivation = z.infer<typeof adminActivationSchema>;

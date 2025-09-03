@@ -33,6 +33,11 @@ export interface IStorage {
   createAdmin(admin: InsertAdmin): Promise<Admin>;
   updateAdmin(id: number, data: Partial<InsertAdmin>): Promise<Admin>;
   updateAdminPassword(id: number, hashedPassword: string): Promise<void>;
+  
+  // Super Admin operations
+  getPendingAdmins(): Promise<Admin[]>;
+  updateAdminStatus(adminId: number, isActive: boolean): Promise<Admin>;
+  verifyAdminEmail(token: string): Promise<Admin | null>;
 
   // Employee operations
   getEmployee(id: number): Promise<Employee | undefined>;
@@ -138,6 +143,45 @@ export class DatabaseStorage implements IStorage {
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
     const [newAdmin] = await db.insert(admins).values(admin).returning();
     return newAdmin;
+  }
+
+  // Super Admin operations
+  async getPendingAdmins(): Promise<Admin[]> {
+    return db
+      .select()
+      .from(admins)
+      .where(and(eq(admins.isVerified, true), eq(admins.isActive, false)))
+      .orderBy(admins.createdAt);
+  }
+
+  async updateAdminStatus(adminId: number, isActive: boolean): Promise<Admin> {
+    const [updatedAdmin] = await db
+      .update(admins)
+      .set({ isActive })
+      .where(eq(admins.id, adminId))
+      .returning();
+    return updatedAdmin;
+  }
+
+  async verifyAdminEmail(token: string): Promise<Admin | null> {
+    const [admin] = await db
+      .select()
+      .from(admins)
+      .where(eq(admins.verificationToken, token));
+    
+    if (!admin) return null;
+
+    // Mark as verified
+    const [verifiedAdmin] = await db
+      .update(admins)
+      .set({ 
+        isVerified: true, 
+        verificationToken: null 
+      })
+      .where(eq(admins.id, admin.id))
+      .returning();
+
+    return verifiedAdmin;
   }
 
   // Employee operations
