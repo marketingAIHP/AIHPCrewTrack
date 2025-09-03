@@ -188,6 +188,7 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
 }).extend({
   password: passwordSchema,
   departmentId: z.union([z.string(), z.number()]).optional(),
+  phone: z.string().optional(),
 });
 
 // Employee profile update schema (limited fields for employees)
