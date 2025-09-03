@@ -834,7 +834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if compression is requested via query params
       const compress = req.query.compress === 'true' || req.query.size;
       
-      if (compress && objectPath.includes('profile-images') || objectPath.includes('site-images')) {
+      if (compress && (objectPath.includes('profile-images') || objectPath.includes('site-images'))) {
         // Get optimal compression settings
         const compressionOptions = compressionService.getOptimalSettings(req);
         

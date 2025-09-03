@@ -62,8 +62,7 @@ export class ImageCompressionService {
     switch (options.format) {
       case 'webp':
         transformer = transformer.webp({ 
-          quality: options.quality,
-          progressive: options.progressive 
+          quality: options.quality
         });
         break;
       case 'jpeg':

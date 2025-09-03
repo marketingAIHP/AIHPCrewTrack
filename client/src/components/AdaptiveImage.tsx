@@ -45,7 +45,7 @@ export function AdaptiveImage({
       const isMobile = window.innerWidth < 768;
       
       if (isSlowConnection || isMobile) {
-        size = 'medium';
+        size = 'thumbnail';
       } else if (window.innerWidth >= 1200) {
         size = 'large';
       } else {
@@ -55,7 +55,9 @@ export function AdaptiveImage({
       size = sizes;
     }
     
-    params.append('size', size);
+    if (size) {
+      params.append('size', size);
+    }
     
     return `${originalSrc}?${params.toString()}`;
   };
@@ -139,23 +141,34 @@ export function AdaptiveImage({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative overflow-hidden ${className}`}>
       {isLoading && (
-        <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
-          <div className="text-gray-400 text-sm">Loading...</div>
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
+          <div className="text-gray-500 text-xs font-medium">
+            Optimizing...
+          </div>
         </div>
       )}
-      <img
-        src={imageSrc}
-        alt={alt}
-        className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-        onError={() => setHasError(true)}
-        loading={lazy ? 'lazy' : 'eager'}
-        style={{ 
-          filter: isLoading ? 'blur(5px)' : 'none',
-          transition: 'filter 0.3s ease'
-        }}
-      />
+      {imageSrc && (
+        <img
+          src={imageSrc}
+          alt={alt}
+          className={`w-full h-full object-cover ${isLoading ? 'opacity-0' : 'opacity-100'} transition-all duration-500 ease-out`}
+          onError={() => setHasError(true)}
+          loading={lazy ? 'lazy' : 'eager'}
+          style={{ 
+            filter: isLoading ? 'blur(8px) brightness(0.8)' : 'none',
+            transform: isLoading ? 'scale(1.05)' : 'scale(1)',
+            transition: 'all 0.5s ease-out'
+          }}
+        />
+      )}
+      {/* Debug info for development */}
+      {process.env.NODE_ENV === 'development' && imageSrc && (
+        <div className="absolute bottom-0 right-0 bg-black bg-opacity-50 text-white text-xs px-1 py-0.5">
+          {connectionSpeed} | {sizes}
+        </div>
+      )}
     </div>
   );
 }
