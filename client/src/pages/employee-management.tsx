@@ -104,6 +104,7 @@ export default function EmployeeManagement() {
       firstName: '',
       lastName: '',
       email: '',
+      phone: '',
       password: '',
       departmentId: '',
     },
