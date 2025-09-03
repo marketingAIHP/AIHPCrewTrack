@@ -21,8 +21,10 @@ import {
   CalendarDays,
   RefreshCw,
   Calendar,
-  History
+  History,
+  Edit
 } from 'lucide-react';
+import { EmployeeProfileDialog } from '@/components/EmployeeProfileDialog';
 
 interface EmployeeData {
   id: number;
@@ -57,6 +59,7 @@ export default function EmployeeDashboard() {
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationError, setLocationError] = useState<string>('');
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
 
   // Check authentication
   useEffect(() => {
@@ -340,12 +343,12 @@ export default function EmployeeDashboard() {
 
   // Calculate today's total hours
   const calculateTodayHours = () => {
-    if (!attendanceHistory?.length) return 0;
+    if (!attendanceHistory || !(attendanceHistory as any[])?.length) return 0;
     
     const today = new Date().toDateString();
     let todayTotal = 0;
     
-    attendanceHistory.forEach(record => {
+    (attendanceHistory as any[]).forEach((record: any) => {
       const recordDate = new Date(record.checkInTime).toDateString();
       if (recordDate === today) {
         const hours = calculateWorkingHours(record.checkInTime, record.checkOutTime);
@@ -354,11 +357,11 @@ export default function EmployeeDashboard() {
     });
     
     // If currently checked in, add hours from current session
-    if (currentAttendance && !currentAttendance.checkOutTime) {
-      const currentDate = new Date(currentAttendance.checkInTime).toDateString();
+    if (currentAttendance && !(currentAttendance as any).checkOutTime) {
+      const currentDate = new Date((currentAttendance as any).checkInTime).toDateString();
       if (currentDate === today) {
         const hoursFromCurrentSession = calculateWorkingHours(
-          currentAttendance.checkInTime, 
+          (currentAttendance as any).checkInTime, 
           new Date().toISOString()
         );
         todayTotal += hoursFromCurrentSession;
@@ -411,8 +414,8 @@ export default function EmployeeDashboard() {
             
             <div className="flex items-center space-x-4">
               {employee && (
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">
+                <div className="text-right cursor-pointer" onClick={() => setIsProfileDialogOpen(true)}>
+                  <p className="text-sm font-medium text-gray-900 hover:text-blue-600">
                     {(employee as EmployeeData).firstName} {(employee as EmployeeData).lastName}
                   </p>
                   <p className="text-xs text-gray-500">{(employee as EmployeeData).email}</p>
@@ -680,6 +683,15 @@ export default function EmployeeDashboard() {
           </Card>
         </div>
       </main>
+
+      {/* Profile Dialog */}
+      {employee && (
+        <EmployeeProfileDialog
+          employee={employee as EmployeeData}
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1135,9 +1135,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.departmentId) {
         if (typeof validatedData.departmentId === 'string') {
           if (validatedData.departmentId === 'none' || validatedData.departmentId === '') {
-            validatedData.departmentId = null;
+            (validatedData as any).departmentId = null;
           } else {
-            validatedData.departmentId = parseInt(validatedData.departmentId);
+            (validatedData as any).departmentId = parseInt(validatedData.departmentId);
           }
         }
       }
