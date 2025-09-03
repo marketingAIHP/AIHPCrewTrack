@@ -26,7 +26,7 @@ export const employees = pgTable("employees", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
-  phone: text("phone").notNull(),
+  phone: text("phone"),
   address: text("address"), // Added for employee profile updates
   password: text("password").notNull(),
   adminId: integer("admin_id").notNull().references(() => admins.id),
