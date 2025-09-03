@@ -820,6 +820,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve object storage images
+  app.get('/objects/*', async (req, res) => {
+    try {
+      const objectPath = req.path; // Full path like /objects/profile-images/uuid
+      const objectStorageService = new ObjectStorageService();
+      
+      // Get the file object
+      const file = await objectStorageService.getObjectEntityFile(objectPath);
+      
+      // Download and stream the file
+      await objectStorageService.downloadObject(file, res);
+    } catch (error) {
+      console.error('Error serving object:', error);
+      res.status(404).json({ message: 'Object not found' });
+    }
+  });
+
   // Upload and process site image
   app.post('/api/admin/site-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
