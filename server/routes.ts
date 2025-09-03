@@ -1871,6 +1871,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resend Verification Email
+  app.post('/api/admin/resend-verification', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ message: 'Admin account not found' });
+      }
+
+      if (admin.isVerified) {
+        return res.status(400).json({ message: 'Email is already verified' });
+      }
+
+      // Generate new verification token
+      const verificationToken = jwt.sign(
+        { email: admin.email, timestamp: Date.now() },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      // Update admin with new token
+      await storage.updateAdmin(admin.id, { verificationToken });
+
+      // Send verification email
+      const verificationLink = `${req.protocol}://${req.get('host')}/admin/verify-email?token=${verificationToken}`;
+      
+      console.log('Resending verification email to:', email);
+      console.log('New verification link:', verificationLink);
+      
+      const emailSent = await sendEmail({
+        to: email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@labourtrackr.com',
+        subject: 'Verify Your Admin Account - LabourTrackr',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #007cba;">Email Verification - LabourTrackr</h2>
+            <p>Please verify your email address by clicking the button below:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationLink}" style="background: #007cba; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email Address</a>
+            </div>
+            <p><strong>Important:</strong> This verification link will expire in 24 hours.</p>
+            <p>After email verification, a Super Admin will need to activate your account before you can access the system.</p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #666; font-size: 12px;">If you didn't request this verification, please ignore this email.</p>
+          </div>
+        `,
+        text: `Please verify your email by visiting: ${verificationLink}. This link expires in 24 hours.`
+      });
+
+      if (emailSent) {
+        res.json({ 
+          message: 'Verification email sent successfully. Please check your email.',
+          details: 'A new verification email has been sent to your email address.'
+        });
+      } else {
+        console.error('Failed to resend verification email for admin:', email);
+        res.status(500).json({ 
+          message: 'Failed to send verification email. Please contact support.',
+          error: 'Email delivery failed'
+        });
+      }
+    } catch (error) {
+      console.error('Resend verification error:', error);
+      res.status(500).json({ message: 'Failed to resend verification email' });
+    }
+  });
+
   // Enhanced Admin Signup with email verification
   app.post('/api/admin/signup', async (req, res) => {
     try {
@@ -1900,21 +1968,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Send verification email
-      const verificationLink = `${req.protocol}://${req.get('host')}/verify-email?token=${verificationToken}`;
+      const verificationLink = `${req.protocol}://${req.get('host')}/admin/verify-email?token=${verificationToken}`;
+      
+      console.log('Sending verification email to:', validatedData.email);
+      console.log('Verification link:', verificationLink);
       
       const emailSent = await sendEmail({
         to: validatedData.email,
         from: process.env.SENDGRID_FROM_EMAIL || 'noreply@labourtrackr.com',
         subject: 'Verify Your Admin Account - LabourTrackr',
         html: `
-          <h2>Welcome to LabourTrackr!</h2>
-          <p>Please verify your email address by clicking the link below:</p>
-          <a href="${verificationLink}" style="background: #007cba; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-          <p>This link will expire in 24 hours.</p>
-          <p>After verification, a Super Admin will need to activate your account.</p>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #007cba;">Welcome to LabourTrackr!</h2>
+            <p>Thank you for signing up as an admin. Please verify your email address by clicking the button below:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationLink}" style="background: #007cba; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email Address</a>
+            </div>
+            <p><strong>Important:</strong> This verification link will expire in 24 hours.</p>
+            <p>After email verification, a Super Admin will need to activate your account before you can access the system.</p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #666; font-size: 12px;">If you didn't request this account, please ignore this email.</p>
+          </div>
         `,
-        text: `Welcome to LabourTrackr! Please verify your email by visiting: ${verificationLink}`
+        text: `Welcome to LabourTrackr! Please verify your email by visiting: ${verificationLink}. This link expires in 24 hours.`
       });
+
+      console.log('Email sent result:', emailSent);
 
       if (emailSent) {
         res.status(201).json({ 

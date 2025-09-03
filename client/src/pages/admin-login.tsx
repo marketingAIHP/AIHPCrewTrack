@@ -35,6 +35,9 @@ export default function AdminLogin() {
     },
   });
 
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+
   const loginMutation = useMutation({
     mutationFn: async (data: LoginForm) => {
       const response = await apiRequest('POST', '/api/admin/login', data);
@@ -51,9 +54,38 @@ export default function AdminLogin() {
       setLocation('/admin/dashboard');
     },
     onError: (error) => {
+      const errorMessage = error.message || 'Login failed';
+      
+      // Check if it's an email verification error
+      if (errorMessage.includes('Email not verified')) {
+        setShowResendVerification(true);
+        setResendEmail(form.getValues('email'));
+      }
+      
       toast({
         title: 'Error',
-        description: error.message || 'Login failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest('POST', '/api/admin/resend-verification', { email });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Success',
+        description: data.message || 'Verification email sent successfully',
+      });
+      setShowResendVerification(false);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send verification email',
         variant: 'destructive',
       });
     },
@@ -126,6 +158,41 @@ export default function AdminLogin() {
             >
               {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
             </Button>
+
+            {showResendVerification && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                <p className="text-sm text-blue-800">
+                  Your email is not verified. Need to resend the verification email?
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => resendVerificationMutation.mutate(resendEmail)}
+                    disabled={resendVerificationMutation.isPending || !resendEmail}
+                  >
+                    {resendVerificationMutation.isPending ? 'Sending...' : 'Resend'}
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowResendVerification(false)}
+                  className="w-full text-gray-600"
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
             
             <div className="text-center space-y-3">
               <p className="text-sm text-gray-600">
