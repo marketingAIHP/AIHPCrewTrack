@@ -119,8 +119,8 @@ export default function EmployeeManagement() {
       email: '',
       phone: '',
       password: '',
-      departmentId: '',
-      siteId: '',
+      departmentId: 'none',
+      siteId: 'none',
     },
   });
 
@@ -130,7 +130,7 @@ export default function EmployeeManagement() {
       firstName: '',
       lastName: '',
       email: '',
-      departmentId: '',
+      departmentId: 'none',
     },
   });
 
@@ -147,8 +147,8 @@ export default function EmployeeManagement() {
     mutationFn: async (data: z.infer<typeof createEmployeeSchema>) => {
       return await apiRequest('/api/admin/employees', 'POST', {
         ...data,
-        departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
-        siteId: data.siteId ? parseInt(data.siteId) : undefined,
+        departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
+        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : undefined,
       });
     },
     onSuccess: () => {
@@ -173,7 +173,7 @@ export default function EmployeeManagement() {
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof editEmployeeSchema> }) => {
       return await apiRequest(`/api/admin/employees/${id}`, 'PUT', {
         ...data,
-        departmentId: data.departmentId ? parseInt(data.departmentId) : undefined,
+        departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
       });
     },
     onSuccess: () => {
@@ -625,7 +625,7 @@ export default function EmployeeManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">No Department</SelectItem>
+                              <SelectItem value="none">No Department</SelectItem>
                               {departments.map((dept: Department) => (
                                 <SelectItem key={dept.id} value={dept.id.toString()}>
                                   {dept.name}
@@ -651,7 +651,7 @@ export default function EmployeeManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">No Site Assignment</SelectItem>
+                              <SelectItem value="none">No Site Assignment</SelectItem>
                               {Array.isArray(workSites) && workSites.length > 0 ? (
                                 workSites.map((site: any) => (
                                   <SelectItem key={site.id} value={site.id.toString()}>
@@ -659,7 +659,7 @@ export default function EmployeeManagement() {
                                   </SelectItem>
                                 ))
                               ) : (
-                                <SelectItem value="" disabled>
+                                <SelectItem value="loading" disabled>
                                   {workSitesLoading ? 'Loading sites...' : 'No work sites available'}
                                 </SelectItem>
                               )}
@@ -903,7 +903,7 @@ export default function EmployeeManagement() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No Department</SelectItem>
+                        <SelectItem value="none">No Department</SelectItem>
                         {departments.map((dept: Department) => (
                           <SelectItem key={dept.id} value={dept.id.toString()}>
                             {dept.name}
