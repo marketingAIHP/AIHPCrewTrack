@@ -161,7 +161,7 @@ export default function EmployeeManagement() {
         employeeId: data.employeeId || undefined,
       };
       console.log('Sending employee creation payload:', payload);
-      return await apiRequest('/api/admin/employees', 'POST', payload);
+      return await apiRequest('POST', '/api/admin/employees', payload);
     },
     onSuccess: () => {
       toast({
@@ -190,7 +190,7 @@ export default function EmployeeManagement() {
         phone: data.phone || undefined,
       };
       console.log('Sending employee update payload:', payload);
-      return await apiRequest(`/api/admin/employees/${id}`, 'PUT', payload);
+      return await apiRequest('PUT', `/api/admin/employees/${id}`, payload);
     },
     onSuccess: () => {
       toast({
@@ -256,7 +256,7 @@ export default function EmployeeManagement() {
 
   const createDepartmentMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createDepartmentSchema>) => {
-      return await apiRequest('/api/admin/departments', 'POST', data);
+      return await apiRequest('POST', '/api/admin/departments', data);
     },
     onSuccess: () => {
       toast({

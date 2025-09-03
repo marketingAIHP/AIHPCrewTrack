@@ -1296,7 +1296,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const validatedData = insertEmployeeSchema.partial().parse(processedData);
+      const validatedData = insertEmployeeSchema.omit({ 
+        adminId: true, 
+        password: true 
+      }).partial().parse(processedData);
       
       if (validatedData.password) {
         validatedData.password = await bcrypt.hash(validatedData.password, 10);
@@ -1312,7 +1315,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(employee);
     } catch (error) {
       console.error('Employee update error:', error);
-      res.status(400).json({ message: 'Failed to update employee' });
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+        return res.status(400).json({ message: errorMessages.join(', ') });
+      }
+      res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to update employee' });
     }
   });
 
