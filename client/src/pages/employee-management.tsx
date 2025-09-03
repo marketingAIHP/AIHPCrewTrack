@@ -496,7 +496,7 @@ export default function EmployeeManagement() {
                 Add Employee
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Employee</DialogTitle>
                 <DialogDescription>
@@ -652,11 +652,17 @@ export default function EmployeeManagement() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="">No Site Assignment</SelectItem>
-                              {Array.isArray(workSites) && workSites.map((site: any) => (
-                                <SelectItem key={site.id} value={site.id.toString()}>
-                                  {site.name}
+                              {Array.isArray(workSites) && workSites.length > 0 ? (
+                                workSites.map((site: any) => (
+                                  <SelectItem key={site.id} value={site.id.toString()}>
+                                    {site.name}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="" disabled>
+                                  {workSitesLoading ? 'Loading sites...' : 'No work sites available'}
                                 </SelectItem>
-                              ))}
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />
