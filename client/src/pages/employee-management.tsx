@@ -20,9 +20,11 @@ import type { UploadResult } from '@uppy/core';
 
 interface Employee {
   id: number;
+  employeeId?: string;
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
   departmentId?: number;
   siteId?: number;
   profileImage?: string;
@@ -55,7 +57,9 @@ const editEmployeeSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
+  phone: z.string().optional(),
   departmentId: z.string().optional(),
+  siteId: z.string().optional(),
 });
 
 const createDepartmentSchema = z.object({
@@ -130,7 +134,9 @@ export default function EmployeeManagement() {
       firstName: '',
       lastName: '',
       email: '',
+      phone: '',
       departmentId: 'none',
+      siteId: 'none',
     },
   });
 
@@ -174,6 +180,7 @@ export default function EmployeeManagement() {
       return await apiRequest(`/api/admin/employees/${id}`, 'PUT', {
         ...data,
         departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : undefined,
+        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : undefined,
       });
     },
     onSuccess: () => {
@@ -322,8 +329,8 @@ export default function EmployeeManagement() {
   // Helper functions
   const handleGetUploadParameters = async () => {
     try {
-      const response = await fetch('/api/object-storage/upload', {
-        method: 'PUT',
+      const response = await fetch('/api/objects/upload', {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
           'Content-Type': 'application/json',
@@ -397,7 +404,9 @@ export default function EmployeeManagement() {
     editEmployeeForm.setValue('firstName', employee.firstName);
     editEmployeeForm.setValue('lastName', employee.lastName);
     editEmployeeForm.setValue('email', employee.email);
-    editEmployeeForm.setValue('departmentId', employee.departmentId?.toString() || '');
+    editEmployeeForm.setValue('phone', employee.phone || '');
+    editEmployeeForm.setValue('departmentId', employee.departmentId?.toString() || 'none');
+    editEmployeeForm.setValue('siteId', employee.siteId?.toString() || 'none');
   };
 
   if (employeesLoading || departmentsLoading) {
@@ -838,7 +847,7 @@ export default function EmployeeManagement() {
 
       {/* Edit Employee Dialog */}
       <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Employee</DialogTitle>
             <DialogDescription>
@@ -848,8 +857,10 @@ export default function EmployeeManagement() {
           <Form {...editEmployeeForm}>
             <form onSubmit={editEmployeeForm.handleSubmit((data) => 
               editingEmployee && updateEmployeeMutation.mutate({ id: editingEmployee.id, data })
-            )} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            )} className="space-y-6">
+              
+              {/* Name Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={editEmployeeForm.control}
                   name="firstName"
@@ -877,6 +888,8 @@ export default function EmployeeManagement() {
                   )}
                 />
               </div>
+
+              {/* Contact Information */}
               <FormField
                 control={editEmployeeForm.control}
                 name="email"
@@ -890,32 +903,80 @@ export default function EmployeeManagement() {
                   </FormItem>
                 )}
               />
+              
               <FormField
                 control={editEmployeeForm.control}
-                name="departmentId"
+                name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Department</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a department" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No Department</SelectItem>
-                        {departments.map((dept: Department) => (
-                          <SelectItem key={dept.id} value={dept.id.toString()}>
-                            {dept.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input type="tel" placeholder="Enter phone number" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {/* Assignment Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={editEmployeeForm.control}
+                  name="departmentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || "none"}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No Department</SelectItem>
+                          {departments.map((dept: Department) => (
+                            <SelectItem key={dept.id} value={dept.id.toString()}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editEmployeeForm.control}
+                  name="siteId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Work Site Assignment</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || "none"}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select work site" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No Site Assignment</SelectItem>
+                          {Array.isArray(workSites) && workSites.map((site: any) => (
+                            <SelectItem key={site.id} value={site.id.toString()}>
+                              {site.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditingEmployee(null)}>
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={updateEmployeeMutation.isPending}>
                   {updateEmployeeMutation.isPending ? 'Updating...' : 'Update Employee'}
                 </Button>
