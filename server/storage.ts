@@ -38,6 +38,8 @@ export interface IStorage {
   getPendingAdmins(): Promise<Admin[]>;
   updateAdminStatus(adminId: number, isActive: boolean): Promise<Admin>;
   verifyAdminEmail(token: string): Promise<Admin | null>;
+  getAdminCount(): Promise<number>;
+  getSuperAdmins(): Promise<Admin[]>;
 
   // Employee operations
   getEmployee(id: number): Promise<Employee | undefined>;
@@ -143,6 +145,20 @@ export class DatabaseStorage implements IStorage {
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
     const [newAdmin] = await db.insert(admins).values(admin).returning();
     return newAdmin;
+  }
+
+  async getAdminCount(): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(admins);
+    return result.count;
+  }
+
+  async getSuperAdmins(): Promise<Admin[]> {
+    return db
+      .select()
+      .from(admins)
+      .where(eq(admins.role, 'super_admin'));
   }
 
   // Super Admin operations
