@@ -35,38 +35,52 @@ export default function GoogleMap({
   const circlesRef = useRef<google.maps.Circle[]>([]);
 
   useEffect(() => {
-    if (!mapRef.current || !window.google) return;
+    // Ensure DOM element exists and is valid before creating map
+    if (!mapRef.current || !window.google?.maps) {
+      console.warn('Map container or Google Maps API not ready');
+      return;
+    }
 
-    // Initialize Google Map
-    mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-      center,
-      zoom,
-      mapTypeId: mapType === 'satellite' ? 'satellite' : 'roadmap',
-      zoomControl: false,
-      mapTypeControl: false,
-      scaleControl: false,
-      streetViewControl: false,
-      rotateControl: false,
-      fullscreenControl: false,
-      disableDefaultUI: true,
-      scrollwheel: true, // Enable mouse wheel zoom
-      gestureHandling: 'auto', // Enable all gestures including zoom
-      styles: [
-        {
-          featureType: 'poi',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }],
-        },
-      ],
-    });
+    // Additional validation - check if element is actually in DOM
+    if (!document.contains(mapRef.current)) {
+      console.warn('Map container element not in document');
+      return;
+    }
 
-    // Add click listener
-    if (onMapClick) {
-      mapInstanceRef.current.addListener('click', (event: google.maps.MapMouseEvent) => {
-        if (event.latLng) {
-          onMapClick(event.latLng.lat(), event.latLng.lng());
-        }
+    try {
+      // Initialize Google Map with error handling
+      mapInstanceRef.current = new google.maps.Map(mapRef.current, {
+        center,
+        zoom,
+        mapTypeId: mapType === 'satellite' ? 'satellite' : 'roadmap',
+        zoomControl: false,
+        mapTypeControl: false,
+        scaleControl: false,
+        streetViewControl: false,
+        rotateControl: false,
+        fullscreenControl: false,
+        disableDefaultUI: true,
+        scrollwheel: true, // Enable mouse wheel zoom
+        gestureHandling: 'auto', // Enable all gestures including zoom
+        styles: [
+          {
+            featureType: 'poi',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }],
+          },
+        ],
       });
+
+      // Add click listener with null check
+      if (onMapClick && mapInstanceRef.current) {
+        mapInstanceRef.current.addListener('click', (event: google.maps.MapMouseEvent) => {
+          if (event.latLng) {
+            onMapClick(event.latLng.lat(), event.latLng.lng());
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to initialize Google Map:', error);
     }
   }, []);
 
@@ -79,10 +93,16 @@ export default function GoogleMap({
 
   // Update markers
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
+    if (!mapInstanceRef.current || !window.google?.maps) return;
 
-    // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null));
+    // Clear existing markers safely
+    markersRef.current.forEach(marker => {
+      try {
+        marker.setMap(null);
+      } catch (error) {
+        console.warn('Error clearing marker:', error);
+      }
+    });
     markersRef.current = [];
 
     // Add new markers with custom icons
@@ -141,10 +161,16 @@ export default function GoogleMap({
 
   // Update geofences
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
+    if (!mapInstanceRef.current || !window.google?.maps) return;
 
-    // Clear existing circles
-    circlesRef.current.forEach(circle => circle.setMap(null));
+    // Clear existing circles safely
+    circlesRef.current.forEach(circle => {
+      try {
+        circle.setMap(null);
+      } catch (error) {
+        console.warn('Error clearing geofence circle:', error);
+      }
+    });
     circlesRef.current = [];
 
     // Add new circles

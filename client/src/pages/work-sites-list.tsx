@@ -3,8 +3,9 @@ import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MapPin, Users, Navigation } from 'lucide-react';
+import { ArrowLeft, MapPin, Users, Navigation, Building2 } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth';
+import { AdaptiveImage } from '@/components/AdaptiveImage';
 
 interface WorkSite {
   id: number;
@@ -126,10 +127,16 @@ export default function WorkSitesList() {
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden">
                       {site.siteImage ? (
-                        <img 
+                        <AdaptiveImage 
                           src={site.siteImage} 
                           alt={site.name}
                           className="w-full h-full object-cover"
+                          sizes="thumbnail"
+                          fallback={
+                            <div className="w-full h-full bg-blue-100 flex items-center justify-center">
+                              <Building2 className="text-blue-600 h-6 w-6" />
+                            </div>
+                          }
                         />
                       ) : (
                         <MapPin className="text-blue-600 h-6 w-6" />

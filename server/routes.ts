@@ -1354,8 +1354,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertWorkSiteSchema.omit({ adminId: true }).parse(req.body);
       console.log('Validated site data:', JSON.stringify(validatedData, null, 2));
       
+      // Process site image URL if provided
+      let processedData = validatedData;
+      if (validatedData.siteImage) {
+        try {
+          const objectStorageService = new ObjectStorageService();
+          const objectPath = await objectStorageService.trySetObjectEntityPath(validatedData.siteImage);
+          processedData = {
+            ...validatedData,
+            siteImage: objectPath
+          };
+          console.log('Processed site image URL:', objectPath);
+        } catch (error) {
+          console.error('Error processing site image URL:', error);
+          // Continue without image rather than failing entire site creation
+          processedData = {
+            ...validatedData,
+            siteImage: undefined
+          };
+        }
+      }
+      
       const site = await storage.createWorkSite({
-        ...validatedData,
+        ...processedData,
         adminId: req.user!.id,
       });
 
@@ -1377,7 +1398,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertWorkSiteSchema.partial().parse(req.body);
       console.log('Validated site update data:', JSON.stringify(validatedData, null, 2));
       
-      const site = await storage.updateWorkSite(id, validatedData);
+      // Process site image URL if provided
+      let processedData = validatedData;
+      if (validatedData.siteImage) {
+        try {
+          const objectStorageService = new ObjectStorageService();
+          const objectPath = await objectStorageService.trySetObjectEntityPath(validatedData.siteImage);
+          processedData = {
+            ...validatedData,
+            siteImage: objectPath
+          };
+          console.log('Processed updated site image URL:', objectPath);
+        } catch (error) {
+          console.error('Error processing updated site image URL:', error);
+          // Continue with original data on image processing error
+        }
+      }
+      
+      const site = await storage.updateWorkSite(id, processedData);
       res.json(site);
     } catch (error) {
       console.error('Site update error:', error);
