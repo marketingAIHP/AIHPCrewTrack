@@ -151,13 +151,7 @@ export default function AdminLogin() {
               </div>
             </div>
             
-            <Button
-              type="submit"
-              className="w-full bg-primary hover:bg-blue-700 text-white"
-              disabled={loginMutation.isPending}
-            >
-              {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
-            </Button>
+            
 
             {showResendVerification && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
