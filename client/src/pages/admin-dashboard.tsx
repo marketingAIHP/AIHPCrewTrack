@@ -143,11 +143,13 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center py-4 lg:py-6">
             <Link href="/admin/dashboard">
               <div className="flex items-center cursor-pointer hover:opacity-80 transition-all duration-300 hover:scale-105">
-                <img 
-                  src="/logo-192.png" 
-                  alt="AIHP CrewTrack" 
-                  className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
-                />
+                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-2 shadow-md">
+                  <img 
+                    src="/logo-192.png" 
+                    alt="AIHP CrewTrack" 
+                    className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                  />
+                </div>
                 <div className="ml-3 sm:ml-4 hidden sm:block">
                   <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                     AIHP CrewTrack
