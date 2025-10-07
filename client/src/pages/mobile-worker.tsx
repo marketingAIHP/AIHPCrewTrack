@@ -248,7 +248,7 @@ export default function MobileWorker() {
               <Hammer className="text-white text-sm" />
             </div>
             <div>
-              <h1 className="font-semibold">WorkSite Tracker</h1>
+              <h1 className="font-semibold">AIHP CrewTrack</h1>
               <p className="text-sm opacity-90">
                 {user.firstName} {user.lastName}
               </p>
