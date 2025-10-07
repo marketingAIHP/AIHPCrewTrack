@@ -76,9 +76,13 @@ export default function EmployeeLogin() {
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center space-x-2">
-            <Building2 className="h-8 w-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">WorkTracker</h1>
+            <img 
+              src="/logo-192.png" 
+              alt="AIHP CrewTrack Logo" 
+              className="h-16 w-auto"
+            />
           </div>
+          <h1 className="text-2xl font-bold text-gray-900">AIHP CrewTrack</h1>
           <p className="text-gray-600">Employee Portal</p>
         </div>
 
