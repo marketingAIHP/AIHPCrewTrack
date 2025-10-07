@@ -1,12 +1,13 @@
 # Replit.md
 
 ## Overview
-This project is a full-stack labor tracking and workforce management application. It enables administrators to manage employees and work sites, offering real-time location tracking, geofencing capabilities for field workers, and comprehensive attendance reporting. The application's core purpose is to streamline workforce management, enhance operational efficiency through accurate attendance and location data, and provide robust tools for oversight.
+**AIHP CrewTrack** is a full-stack labor tracking and workforce management application. It enables administrators to manage employees and work sites, offering real-time location tracking, geofencing capabilities for field workers, and comprehensive attendance reporting. The application's core purpose is to streamline workforce management, enhance operational efficiency through accurate attendance and location data, and provide robust tools for oversight.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (September 2025)
+- **Branding Update (September 4, 2025)**: Complete rebranding to "AIHP CrewTrack" with new logo implementation across all pages, updated favicons, PWA manifest for mobile app support, and comprehensive meta tags for SEO and social sharing.
 - **Production-Ready Deployment**: Implemented comprehensive responsive design across all admin panels (dashboard, employee management, site management)
 - **Employee Management Enhancement**: Added site assignment functionality to employee creation form with proper backend handling
 - **Image Upload Fixes**: Resolved image upload stuck at 100% issue for both employee profiles and site images with improved error handling
