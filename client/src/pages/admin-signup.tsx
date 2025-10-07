@@ -78,12 +78,16 @@ export default function AdminSignup() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center space-y-4">
-          <div className="bg-primary rounded-full w-16 h-16 flex items-center justify-center mx-auto">
-            <UserPlus className="text-white text-2xl" />
+          <div className="flex items-center justify-center">
+            <img 
+              src="/logo-192.png" 
+              alt="AIHP CrewTrack Logo" 
+              className="h-20 w-auto"
+            />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Create Admin Account</h1>
-            <p className="text-gray-600 mt-2">Setup your organization</p>
+            <h1 className="text-2xl font-bold text-gray-900">AIHP CrewTrack</h1>
+            <p className="text-gray-600 mt-2">Create Admin Account - Setup Your Organization</p>
           </div>
         </CardHeader>
         
