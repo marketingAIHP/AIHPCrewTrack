@@ -8,7 +8,7 @@
 - **Field Name**: `employeeId`
 - **Status**: ✅ VISIBLE IN FORM
 
-### 2. First Name & Last Name Fields (Lines 526-552)
+### 2. First Name & Last Name Fields  (Lines 526-552)
 - **Layout**: Side by side grid
 - **Labels**: "First Name" & "Last Name"
 - **Placeholders**: "John" & "Doe"

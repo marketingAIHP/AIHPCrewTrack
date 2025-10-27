@@ -245,7 +245,7 @@ export const adminLoginSchema = z.object({
 });
 
 export const employeeLoginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email(), 
   password: z.string().min(6),
 });
 
