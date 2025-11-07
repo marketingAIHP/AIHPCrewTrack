@@ -33,15 +33,21 @@ import express from 'express';
 import { ImageCompressionService } from './imageCompression';
 import { uploadProfileImage, uploadSiteImage, uploadMiddleware, deleteImageFromSupabase, deleteSiteImageFromSupabase } from './uploadController';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable must be set'); // Ensures leaked default secret removed
-}
+const JWT_SECRET = (() => {
+  const value = process.env.JWT_SECRET;
+  if (!value) {
+    throw new Error('JWT_SECRET environment variable must be set'); // Ensures leaked default secret removed
+  }
+  return value;
+})();
 
-const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
-if (!SENDGRID_FROM_EMAIL) {
-  throw new Error('SENDGRID_FROM_EMAIL environment variable must be set'); // Prevents fallback email leaking into repo
-}
+const SENDGRID_FROM_EMAIL = (() => {
+  const value = process.env.SENDGRID_FROM_EMAIL;
+  if (!value) {
+    throw new Error('SENDGRID_FROM_EMAIL environment variable must be set'); // Prevents fallback email leaking into repo
+  }
+  return value;
+})();
 
 // WebSocket connections for real-time notifications
 const adminConnections = new Map<number, WebSocket[]>(); // adminId -> WebSocket[]
@@ -2395,9 +2401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Resending verification email
       
-      const emailSent = await sendEmail({
-        to: email,
-        from: SENDGRID_FROM_EMAIL,
+      
       const emailSent = await sendEmail({
         to: email,
         from: SENDGRID_FROM_EMAIL,

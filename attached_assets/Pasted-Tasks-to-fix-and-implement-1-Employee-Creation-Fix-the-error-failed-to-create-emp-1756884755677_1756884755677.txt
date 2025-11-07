@@ -1,0 +1,48 @@
+Tasks to fix and implement:
+
+1. **Employee Creation**  
+   - Fix the error: "failed to create employee".  
+   - Ensure employee data is correctly validated, saved in MongoDB, and returned in API response.  
+   - Make sure employee creation works only under the correct admin who created them.  
+   - Verify employee appears instantly in that admin’s dashboard after creation.
+
+2. **SendGrid Integration**  
+   - Generate a new SendGrid API key (do **not** commit it to the repo).  
+   - Store the key securely via environment variables (e.g., `SENDGRID_API_KEY`).  
+   - **Removed committed key** – environment variables are now the only source.  
+   - Ensure key handling in code pulls from environment variables only.  
+   - Test email sending across report export and admin verification flows.
+
+3. **Employee Dashboard & Profile**  
+   - Fix employee dashboard so profile picture loads properly after login.  
+   - If no profile picture exists, show a default placeholder image.  
+   - On clicking employee name, open update view.  
+   - Allow employee to update only limited fields (phone, address, profile picture).  
+   - Ensure updated data syncs with database and reflects in UI without page reload.
+
+4. **Export Report**  
+   - Fix "export failed" and "failed to send email" errors.  
+   - Ensure reports are generated, exported, and emailed successfully via SendGrid.  
+   - Add proper error handling and user-friendly error messages.
+
+5. **Geofencing Optimization**  
+   - Fix inaccurate distance detection (showing 130m away even when on site).  
+   - Use accurate GPS/Geolocation API with tolerance levels.  
+   - Ensure geofence radius works properly for attendance logging.
+
+6. **Super Admin Role**  
+   - Implement a Super Admin who controls admin verification.  
+   - When a new admin is created, send confirmation email.  
+   - Only after email verification, allow admin account to be active.  
+   - Super Admin can deactivate or approve admin accounts.
+
+7. **Full System Check**  
+   - Test end-to-end flows: employee creation, profile update, attendance tracking, report export, email sending, admin verification.  
+   - Identify and fix any other hidden issues.  
+   - Provide clear setup instructions for environment variables and configurations.
+
+Requirements:
+- Deliver complete working fixes with updated file structure if needed.  
+- Ensure secure role-based access control (Super Admin > Admin > Employee).  
+- Use React + TypeScript hooks, Node.js best practices, and MongoDB validation.  
+- Add comments explaining fixes and instructions for running the project.  
