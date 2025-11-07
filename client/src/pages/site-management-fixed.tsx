@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -14,12 +14,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import { getAuthToken, getUserType } from '@/lib/auth';
+import { getAuthToken, getUserType, getUser, logout } from '@/lib/auth';
 import GoogleMap from '@/components/google-map';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
-import { ObjectUploader } from '@/components/ObjectUploader';
 import { AuthenticatedImage } from '@/components/AuthenticatedImage';
-import { AdaptiveImage } from '../components/AdaptiveImage';
+import { Slider } from '@/components/ui/slider';
+import NotificationDropdown from '@/components/NotificationDropdown';
+import { CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   ArrowLeft, 
   Plus, 
@@ -29,7 +30,8 @@ import {
   Users,
   Trash2,
   Camera,
-  Image
+  Image,
+  LogOut
 } from 'lucide-react';
 
 const siteSchema = z.object({
@@ -64,9 +66,17 @@ export default function SiteManagement() {
   const [selectedLocation, setSelectedLocation] = useState({ lat: 28.4595, lng: 77.0266 });
   const [siteImageURL, setSiteImageURL] = useState<string>('');
   const [selectedAreaView, setSelectedAreaView] = useState<any>(null);
+  const siteImageInputRef = useRef<HTMLInputElement>(null);
   
   // Check authentication
   const isAuthenticated = Boolean(getAuthToken() && getUserType() === 'admin');
+  const currentUser = getUser();
+  
+  // Get admin profile for header
+  const { data: admin } = useQuery({
+    queryKey: ['/api/admin/profile'],
+    enabled: isAuthenticated,
+  });
 
   // All queries
   const { data: areas = [], isLoading: loadingAreas } = useQuery({
@@ -236,66 +246,84 @@ export default function SiteManagement() {
       });
   }, [isAuthenticated, setLocation, toast]);
 
-  // All useCallback hooks
-  const handleGetUploadParameters = useCallback(async () => {
-    try {
-      const response = await fetch('/api/objects/upload', {
+  // Site image upload mutation
+  const uploadSiteImageMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload/site', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json',
         },
+        body: formData,
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get upload parameters');
-      }
-      
-      const { uploadURL } = await response.json();
-      console.log('Got upload parameters for site image:', { uploadURL });
-      
-      return {
-        method: 'PUT' as const,
-        url: uploadURL,
-      };
-    } catch (error) {
-      console.error('Upload parameters error:', error);
-      throw error;
-    }
-  }, []);
 
-  const handleUploadComplete = useCallback((result: any) => {
-    console.log('Site image upload complete:', result);
-    if (result.successful && result.successful.length > 0) {
-      const uploadedFile = result.successful[0];
-      console.log('Site uploaded file details:', uploadedFile);
-      
-      // Try multiple possible fields for the upload URL
-      const imageURL = uploadedFile.uploadURL || uploadedFile.response?.uploadURL || uploadedFile.url;
-      
-      if (imageURL) {
-        setSiteImageURL(imageURL);
-        toast({
-          title: 'Success',
-          description: 'Site image uploaded successfully',
-        });
-      } else {
-        console.error('No upload URL found in site upload result:', uploadedFile);
-        toast({
-          title: 'Upload Error',
-          description: 'Image uploaded but URL not found. Please try again.',
-          variant: 'destructive',
-        });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.details || 'Failed to upload image');
       }
-    } else {
-      console.error('Site image upload failed:', result);
+
+      const data = await response.json();
+      const imageURL = data.siteImage || data.url || data.uploadURL;
+
+      if (!imageURL) {
+        throw new Error('No image URL returned from server');
+      }
+
+      return imageURL;
+    },
+    onSuccess: (imageURL) => {
+      setSiteImageURL(imageURL);
+      // Invalidate queries to refresh site images everywhere
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/sites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
+      toast({
+        title: 'Success',
+        description: 'Site image uploaded successfully',
+      });
+      // Reset file input
+      if (siteImageInputRef.current) {
+        siteImageInputRef.current.value = '';
+      }
+    },
+    onError: (error: any) => {
       toast({
         title: 'Upload Failed',
-        description: 'Site image upload was not successful. Please try again.',
+        description: error.message || 'Failed to upload site image. Please try again.',
         variant: 'destructive',
       });
+    },
+  });
+
+  // Helper function for file upload
+  const handleSiteImageFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Invalid File',
+          description: 'Please select an image file.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Validate file size (10MB)
+      if (file.size > 10485760) {
+        toast({
+          title: 'File Too Large',
+          description: 'Please select an image smaller than 10MB.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      uploadSiteImageMutation.mutate(file);
     }
-  }, [toast]);
+  }, [toast, uploadSiteImageMutation]);
 
   const handleLocationSelect = useCallback((lat: number, lng: number) => {
     setSelectedLocation({ lat, lng });
@@ -370,34 +398,105 @@ export default function SiteManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 sm:py-4 gap-2 sm:gap-0">
-            <div className="flex items-center">
-              <Link href="/admin/dashboard">
-                <Button variant="ghost" size="sm" className="mr-2 sm:mr-4">
-                  <ArrowLeft className="h-4 w-4 mr-1 sm:mr-0" />
-                  <span className="sm:hidden">Back</span>
-                </Button>
-              </Link>
-              {selectedAreaView && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setSelectedAreaView(null)}
-                  className="flex items-center mr-2 sm:mr-4"
-                >
-                  <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Back to Areas</span>
-                  <span className="sm:hidden">Areas</span>
-                </Button>
-              )}
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
-                {selectedAreaView ? `${selectedAreaView.name} - Sites` : 'Areas & Sites Management'}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Modern Header */}
+      <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/admin/dashboard">
+              <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+                <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50 dark:ring-blue-700/50">
+                  <img 
+                    src="/logo-192.png" 
+                    alt="AIHP CrewTrack" 
+                    className="h-14 w-14 object-contain"
+                  />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">AIHP CrewTrack</h1>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Site Management</p>
+                </div>
+              </div>
+            </Link>
+            {selectedAreaView && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setSelectedAreaView(null)}
+                className="flex items-center"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Areas
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <NotificationDropdown />
+            <Link href="/admin/profile">
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-3 py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <div className="h-8 w-8 rounded-full overflow-hidden">
+                  <AuthenticatedImage
+                    src={admin?.profileImage}
+                    alt="Admin Avatar"
+                    className="h-8 w-8 object-cover"
+                    fallback={
+                      <div className="h-8 w-8 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full font-bold">
+                        {admin?.firstName?.[0] || ''}{admin?.lastName?.[0] || ''}
+                      </div>
+                    }
+                  />
+                </div>
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {admin?.firstName && admin?.lastName
+                      ? `${admin.firstName} ${admin.lastName}`
+                      : 'Administrator'}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Administrator</p>
+                </div>
+              </div>
+            </Link>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                logout();
+                toast({
+                  title: 'Logged out',
+                  description: 'You have been successfully logged out.',
+                });
+                setLocation('/admin/login');
+              }}
+              className="text-red-600 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 border border-red-200 hover:border-red-600 transition-all duration-200 shadow-sm hover:shadow-md"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Page Title and Actions */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Link href="/admin/dashboard">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100">
+                {selectedAreaView ? selectedAreaView.name : 'Areas & Sites'}
               </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                {selectedAreaView 
+                  ? `Manage work sites in ${selectedAreaView.name}` 
+                  : 'Organize your work sites by areas'}
+              </p>
             </div>
+          </div>
 
             {selectedAreaView && (
               <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -460,6 +559,12 @@ export default function SiteManagement() {
                               title: form.watch('name') || 'New Site',
                               type: 'site'
                             }]}
+                            geofences={[{
+                              center: selectedLocation,
+                              radius: parseInt(form.watch('geofenceRadius') || '0') || 0,
+                              color: '#2563eb'
+                            }]}
+                            onMapClick={(lat, lng) => handleLocationSelect(lat, lng)}
                           />
                         </div>
                       </div>
@@ -520,7 +625,18 @@ export default function SiteManagement() {
                         {...form.register('geofenceRadius')}
                         placeholder="200"
                         type="number"
+                        className="mb-3"
                       />
+                      <div className="px-1">
+                        <Slider
+                          value={[parseInt(form.watch('geofenceRadius') || '0') || 0]}
+                          onValueChange={(vals) => form.setValue('geofenceRadius', String(vals[0] ?? 0))}
+                          min={50}
+                          max={1000}
+                          step={10}
+                        />
+                        <div className="mt-2 text-xs text-muted-foreground">Radius: {form.watch('geofenceRadius') || 0}m</div>
+                      </div>
                       {form.formState.errors.geofenceRadius && (
                         <p className="text-error text-sm mt-1">
                           {form.formState.errors.geofenceRadius.message}
@@ -533,23 +649,30 @@ export default function SiteManagement() {
                       {siteImageURL && (
                         <div className="mb-3">
                           <p className="text-sm text-gray-600 mb-2">Current Image:</p>
-                          <img 
-                            src={siteImageURL} 
+                          <AuthenticatedImage
+                            src={siteImageURL}
                             alt="Site preview"
                             className="w-full h-32 object-cover rounded-lg border"
                           />
                         </div>
                       )}
-                      <ObjectUploader
-                        maxNumberOfFiles={1}
-                        maxFileSize={10485760}
-                        allowedFileTypes={['image/*']}
-                        onGetUploadParameters={handleGetUploadParameters}
-                        onComplete={handleUploadComplete}
-                        buttonClassName="w-full"
+                      <input
+                        ref={siteImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSiteImageFileChange}
+                        className="hidden"
+                        id="site-image-upload"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => siteImageInputRef.current?.click()}
+                        className="w-full"
+                        disabled={uploadSiteImageMutation.isPending}
                       >
-                        Upload Site Image
-                      </ObjectUploader>
+                        {uploadSiteImageMutation.isPending ? 'Uploading...' : 'Upload Site Image'}
+                      </Button>
                       {siteImageURL && (
                         <Button
                           type="button"
@@ -578,69 +701,275 @@ export default function SiteManagement() {
               </Dialog>
             )}
           </div>
-        </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {selectedAreaView ? (
           <div>
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-2xl font-semibold text-gray-900">{selectedAreaView.name}</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">{selectedAreaView.name}</h2>
                 {selectedAreaView.description && (
-                  <p className="text-gray-600 mt-1">{selectedAreaView.description}</p>
+                  <p className="text-slate-600 mt-2">{selectedAreaView.description}</p>
                 )}
               </div>
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) {
+                  setEditingSite(null);
+                  form.reset();
+                  setSiteImageURL('');
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Site
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg sm:text-xl">{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <div>
+                      <Label htmlFor="name">Site Name</Label>
+                      <Input
+                        id="name"
+                        {...form.register('name')}
+                        placeholder="Main Office"
+                      />
+                      {form.formState.errors.name && (
+                        <p className="text-error text-sm mt-1">
+                          {form.formState.errors.name.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="address">Address</Label>
+                      <Textarea
+                        id="address"
+                        {...form.register('address')}
+                        placeholder="123 Main St, City, State"
+                        rows={3}
+                      />
+                      {form.formState.errors.address && (
+                        <p className="text-error text-sm mt-1">
+                          {form.formState.errors.address.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {mapLoaded && (
+                      <div>
+                        <Label>Location (Click on map to select)</Label>
+                        <div className="h-64 rounded-lg overflow-hidden border">
+                          <GoogleMap
+                            center={selectedLocation}
+                            zoom={15}
+                            markers={[{
+                              position: selectedLocation,
+                              title: form.watch('name') || 'New Site',
+                              type: 'site'
+                            }]}
+                            geofences={[{
+                              center: selectedLocation,
+                              radius: parseInt(form.watch('geofenceRadius') || '0') || 0,
+                              color: '#2563eb'
+                            }]}
+                            onMapClick={(lat, lng) => handleLocationSelect(lat, lng)}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="latitude">Latitude</Label>
+                        <Input
+                          id="latitude"
+                          {...form.register('latitude')}
+                          placeholder="40.7128"
+                          step="any"
+                        />
+                        {form.formState.errors.latitude && (
+                          <p className="text-error text-sm mt-1">
+                            {form.formState.errors.latitude.message}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="longitude">Longitude</Label>
+                        <Input
+                          id="longitude"
+                          {...form.register('longitude')}
+                          placeholder="-74.0060"
+                          step="any"
+                        />
+                        {form.formState.errors.longitude && (
+                          <p className="text-error text-sm mt-1">
+                            {form.formState.errors.longitude.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="area">Area (Optional)</Label>
+                      <Select value={form.watch('areaId')} onValueChange={(value) => form.setValue('areaId', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an area (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Area</SelectItem>
+                          {Array.isArray(areas) && areas.map((area: any) => (
+                            <SelectItem key={area.id} value={area.id.toString()}>
+                              {area.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="geofenceRadius">Geofence Radius (meters)</Label>
+                      <Input
+                        id="geofenceRadius"
+                        {...form.register('geofenceRadius')}
+                        placeholder="200"
+                        type="number"
+                        className="mb-3"
+                      />
+                      <div className="px-1">
+                        <Slider
+                          value={[parseInt(form.watch('geofenceRadius') || '200')]}
+                          onValueChange={(value) => form.setValue('geofenceRadius', value[0].toString())}
+                          min={50}
+                          max={1000}
+                          step={50}
+                          className="w-full"
+                        />
+                        <div className="mt-2 text-xs text-muted-foreground">Radius: {form.watch('geofenceRadius') || 0}m</div>
+                      </div>
+                      {form.formState.errors.geofenceRadius && (
+                        <p className="text-error text-sm mt-1">
+                          {form.formState.errors.geofenceRadius.message}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <Label>Site Image</Label>
+                      {siteImageURL && (
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-600 mb-2">Current Image:</p>
+                          <AuthenticatedImage
+                            src={siteImageURL}
+                            alt="Site preview"
+                            className="w-full h-32 object-cover rounded-lg border"
+                          />
+                        </div>
+                      )}
+                      <input
+                        ref={siteImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSiteImageFileChange}
+                        className="hidden"
+                        id="site-image-upload"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => siteImageInputRef.current?.click()}
+                        className="w-full"
+                        disabled={uploadSiteImageMutation.isPending}
+                      >
+                        {uploadSiteImageMutation.isPending ? 'Uploading...' : 'Upload Site Image'}
+                      </Button>
+                      {siteImageURL && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setSiteImageURL('')}
+                          className="mt-2 w-full"
+                        >
+                          Remove Image
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                      <Button type="submit" className="flex-1" disabled={createSiteMutation.isPending}>
+                        {createSiteMutation.isPending 
+                          ? (editingSite ? 'Updating...' : 'Creating...') 
+                          : (editingSite ? 'Update Site' : 'Create Site')
+                        }
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredSites.length === 0 ? (
-                <div className="col-span-full text-center py-8">
-                  <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <p className="text-gray-500">No sites in this area yet</p>
-                  <p className="text-sm text-gray-400">Add the first site to get started</p>
-                </div>
+                <Card className="col-span-full border-2 border-dashed border-slate-300 dark:border-slate-600">
+                  <CardContent className="p-12 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
+                      <Building2 className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">No sites in this area</h3>
+                    <p className="text-slate-600 mb-4">Get started by adding your first work site</p>
+                    <Button onClick={() => setIsDialogOpen(true)} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Site
+                    </Button>
+                  </CardContent>
+                </Card>
               ) : (
                 filteredSites.map((site: any) => (
-                  <Card key={site.id} className="overflow-hidden">
-                    <div className="h-48 bg-gray-200 flex items-center justify-center overflow-hidden">
-                      {site.siteImage ? (
-                        <AdaptiveImage
-                          src={site.siteImage}
-                          alt={site.name}
-                          className="w-full h-full object-cover"
-                          sizes="medium"
-                          fallback={
-                            <div className="text-center">
-                              <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                              <p className="text-sm text-gray-600">Work Site</p>
-                            </div>
-                          }
-                        />
-                      ) : (
-                        <div className="text-center">
-                          <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                          <p className="text-sm text-gray-600">Work Site</p>
-                        </div>
-                      )}
-                    </div>
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">{site.name}</h3>
-                        <Badge variant={site.isActive ? "default" : "secondary"}>
+                  <Card key={site.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 border-2 border-slate-300 dark:border-slate-600 shadow-md group">
+                    <div className="h-48 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden relative">
+                      <AuthenticatedImage
+                        src={site.siteImage}
+                        alt={site.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fallback={
+                          <div className="text-center w-full h-full flex flex-col items-center justify-center">
+                            <Building2 className="h-12 w-12 text-slate-400 mb-2" />
+                            <p className="text-sm text-slate-600">Work Site</p>
+                          </div>
+                        }
+                      />
+                      <div className="absolute top-3 right-3">
+                        <Badge variant={site.isActive ? "default" : "secondary"} className="shadow-sm">
                           {site.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </div>
-                      <p className="text-gray-600 text-sm mb-4">{site.address}</p>
-                      <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
+                    </div>
+                    <CardContent className="p-6">
+                      <div className="mb-4">
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">{site.name}</h3>
+                        <p className="text-slate-600 text-sm flex items-start">
+                          <MapPin className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0 text-slate-400" />
+                          <span className="line-clamp-2">{site.address}</span>
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-4 pb-4 border-b-2 border-slate-300 dark:border-slate-600">
                         <span className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-1" />
+                          <MapPin className="h-3 w-3 mr-1" />
                           {Number(site.latitude).toFixed(4)}, {Number(site.longitude).toFixed(4)}
                         </span>
-                        <span>Radius: {site.geofenceRadius}m</span>
+                        <span className="flex items-center">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 mr-1"></span>
+                          {site.geofenceRadius}m radius
+                        </span>
                       </div>
                       <div className="flex space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEditSite(site)} className="flex-1">
+                        <Button variant="outline" size="sm" onClick={() => handleEditSite(site)} className="flex-1 hover:bg-blue-50 hover:border-blue-200">
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
@@ -648,7 +977,7 @@ export default function SiteManagement() {
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleDeleteSite(site)}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -662,7 +991,7 @@ export default function SiteManagement() {
         ) : (
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900">Areas Management</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Areas Management</h2>
               <Dialog open={isAreaDialogOpen} onOpenChange={(open) => {
                 setIsAreaDialogOpen(open);
                 if (!open) {
@@ -726,67 +1055,96 @@ export default function SiteManagement() {
               </Dialog>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {loadingAreas ? (
-                <div className="col-span-full text-center py-4">
-                  <p>Loading areas...</p>
-                </div>
+                <Card className="col-span-full border-2 border-slate-300 dark:border-slate-600">
+                  <CardContent className="p-8 text-center">
+                    <div className="animate-pulse">
+                      <div className="h-8 bg-slate-200 rounded w-1/3 mx-auto mb-4"></div>
+                      <div className="h-4 bg-slate-200 rounded w-1/2 mx-auto"></div>
+                    </div>
+                  </CardContent>
+                </Card>
               ) : !Array.isArray(areas) || areas.length === 0 ? (
-                <div className="col-span-full text-center py-4">
-                  <p className="text-gray-500">No areas created yet</p>
-                  <p className="text-sm text-gray-400">Areas help organize your work sites</p>
-                </div>
+                <Card className="col-span-full border-2 border-dashed border-slate-300 dark:border-slate-600">
+                  <CardContent className="p-12 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-full flex items-center justify-center">
+                      <Building2 className="h-8 w-8 text-purple-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No areas created yet</h3>
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">Areas help organize your work sites into logical groups</p>
+                    <Button onClick={() => setIsAreaDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First Area
+                    </Button>
+                  </CardContent>
+                </Card>
               ) : (
-                Array.isArray(areas) && areas.map((area: any) => (
-                  <Card 
-                    key={area.id} 
-                    className="p-4 cursor-pointer hover:shadow-md hover:bg-gray-50 transition-all duration-200 relative"
-                    onClick={() => setSelectedAreaView(area)}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-medium text-gray-900">{area.name}</h3>
-                      <div 
-                        className="flex space-x-1 relative z-10"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleEditArea(area)}
-                          title="Edit area"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleDeleteArea(area)}
-                          className="text-red-600 hover:text-red-700"
-                          title="Delete area"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    {area.description && (
-                      <p className="text-sm text-gray-600 mb-2">{area.description}</p>
-                    )}
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs text-gray-500">
-                        {Array.isArray(sites) ? sites.filter((site: any) => site.areaId === area.id).length : 0} sites
-                      </p>
-                      <div className="flex items-center text-xs text-blue-600">
-                        <span>Click to view sites</span>
-                        <Building2 className="h-3 w-3 ml-1" />
-                      </div>
-                    </div>
-                  </Card>
-                ))
+                Array.isArray(areas) && areas.map((area: any) => {
+                  const siteCount = Array.isArray(sites) ? sites.filter((site: any) => site.areaId === area.id).length : 0;
+                  return (
+                    <Card 
+                      key={area.id} 
+                      className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 border-slate-300 dark:border-slate-600 shadow-md bg-white dark:bg-slate-800 group overflow-hidden"
+                      onClick={() => setSelectedAreaView(area)}
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 dark:from-blue-500/20 dark:to-purple-500/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+                      <CardContent className="p-6 relative">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{area.name}</h3>
+                            {area.description && (
+                              <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{area.description}</p>
+                            )}
+                          </div>
+                          <div 
+                            className="flex space-x-1 relative z-10 ml-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleEditArea(area)}
+                              title="Edit area"
+                              className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                            >
+                              <Edit className="h-4 w-4 text-slate-700 dark:text-slate-300" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleDeleteArea(area)}
+                              className="h-8 w-8 p-0 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30"
+                              title="Delete area"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-4 border-t-2 border-slate-300 dark:border-slate-600">
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                              <Building2 className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{siteCount}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{siteCount === 1 ? 'site' : 'sites'}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-2 border-slate-300 dark:border-slate-600 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50">
+                            View Sites
+                            <ArrowLeft className="h-3 w-3 ml-1 rotate-180" />
+                          </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </div>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

@@ -35,10 +35,12 @@ export default function LiveTracking() {
   const [mapCenter, setMapCenter] = useState({ lat: 28.44065, lng: 77.08154 }); // Default to Delhi area
   const [mapZoom, setMapZoom] = useState(12);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
+  const [useClustering, setUseClustering] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [profileImageModalOpen, setProfileImageModalOpen] = useState(false);
   const [selectedProfileImage, setSelectedProfileImage] = useState<{url: string, name: string} | null>(null);
   const initializeCalledRef = useRef(false);
+  const hasZoomedToSiteRef = useRef(false);
 
   // Initialize component only once
   React.useEffect(() => {
@@ -101,6 +103,39 @@ export default function LiveTracking() {
     enabled: !!getAuthToken() && getUserType() === 'admin',
   });
 
+  // Get siteId from URL query parameter and zoom to that site
+  React.useEffect(() => {
+    if (!sites || sites.length === 0 || !mapLoaded || hasZoomedToSiteRef.current) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const siteIdParam = urlParams.get('siteId');
+    
+    if (siteIdParam) {
+      const siteId = parseInt(siteIdParam);
+      const selectedSite = Array.isArray(sites) 
+        ? sites.find((site: any) => site.id === siteId) 
+        : null;
+      
+      if (selectedSite) {
+        const lat = parseFloat(selectedSite.latitude);
+        const lng = parseFloat(selectedSite.longitude);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          // Zooming to selected site
+          setMapCenter({ lat, lng });
+          // Zoom to a close level to show the site clearly (zoom level 17 is good for site view)
+          setMapZoom(17);
+          hasZoomedToSiteRef.current = true;
+          
+          toast({
+            title: 'Viewing Site',
+            description: `Centered map on ${selectedSite.name}`,
+          });
+        }
+      }
+    }
+  }, [sites, mapLoaded, toast]);
+
   // WebSocket for real-time updates
   const { isConnected } = useWebSocket({
     onMessage: (data) => {
@@ -146,15 +181,11 @@ export default function LiveTracking() {
   };
 
   const getStatusText = (employee: any, location: any) => {
-    console.log('Employee data:', employee);
-    console.log('Location data:', location);
-    
     if (!location) return 'No Location';
     
     // Check if employee has a siteId (assigned site) - handle both camelCase and snake_case
     const siteId = employee.siteId || employee.site_id;
     if (!siteId) {
-      console.log('No site ID found for employee:', employee.firstName);
       return 'No Assigned Site';
     }
     
@@ -162,7 +193,6 @@ export default function LiveTracking() {
     const assignedSite = Array.isArray(sites) ? sites.find((site: any) => site.id === siteId) : null;
     
     if (!assignedSite) {
-      console.log('No matching site found for site ID:', siteId);
       return 'Unknown Site';
     }
     
@@ -204,6 +234,48 @@ export default function LiveTracking() {
     setMapType(prev => prev === 'roadmap' ? 'satellite' : 'roadmap');
   }, []);
 
+  const fitToBounds = useCallback(() => {
+    const markerPositions: Array<{ lat: number; lng: number }> = [];
+    if (Array.isArray(locations)) {
+      locations.forEach((item: any) => {
+        if (item.location?.latitude && item.location?.longitude) {
+          const lat = parseFloat(item.location.latitude);
+          const lng = parseFloat(item.location.longitude);
+          if (!isNaN(lat) && !isNaN(lng)) markerPositions.push({ lat, lng });
+        }
+      });
+    }
+    if (Array.isArray(sites)) {
+      sites.forEach((site: any) => {
+        const lat = parseFloat(site.latitude);
+        const lng = parseFloat(site.longitude);
+        if (!isNaN(lat) && !isNaN(lng)) markerPositions.push({ lat, lng });
+      });
+    }
+
+    if (markerPositions.length === 0) return;
+
+    // Compute center
+    const avgLat = markerPositions.reduce((sum, p) => sum + p.lat, 0) / markerPositions.length;
+    const avgLng = markerPositions.reduce((sum, p) => sum + p.lng, 0) / markerPositions.length;
+    setMapCenter({ lat: avgLat, lng: avgLng });
+
+    // Compute approximate span and pick a zoom
+    let maxDistance = 0;
+    for (let i = 0; i < markerPositions.length; i++) {
+      maxDistance = Math.max(maxDistance, calculateDistance(avgLat, avgLng, markerPositions[i].lat, markerPositions[i].lng));
+    }
+    // Heuristic zoom mapping
+    let newZoom = 12;
+    if (maxDistance > 50000) newZoom = 8;
+    else if (maxDistance > 20000) newZoom = 10;
+    else if (maxDistance > 5000) newZoom = 12;
+    else if (maxDistance > 2000) newZoom = 13;
+    else if (maxDistance > 1000) newZoom = 14;
+    else newZoom = 15;
+    setMapZoom(newZoom);
+  }, [locations, sites]);
+
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => {
       const newFullscreenState = !prev;
@@ -233,24 +305,52 @@ export default function LiveTracking() {
   const getMapMarkers = () => {
     const markers: any[] = [];
     
-    // Add employee markers (red person icons)
+    // Add employee markers (red person icons) with optional clustering
     if (Array.isArray(locations)) {
-      locations.forEach((item: any) => {
-        if (item.location?.latitude && item.location?.longitude) {
-          const lat = parseFloat(item.location.latitude);
-          const lng = parseFloat(item.location.longitude);
-          
-          if (!isNaN(lat) && !isNaN(lng)) {
-            markers.push({
-              position: { lat, lng },
-              title: `${item.employee.firstName} ${item.employee.lastName}`,
-              color: '#ff0000', // Red color for employees
-              type: 'employee',
-              onClick: () => zoomToEmployee(lat, lng),
-            });
+      if (useClustering) {
+        const clusterMap = new Map<string, { lat: number; lng: number; count: number }>();
+        locations.forEach((item: any) => {
+          if (item.location?.latitude && item.location?.longitude) {
+            const lat = parseFloat(item.location.latitude);
+            const lng = parseFloat(item.location.longitude);
+            if (isNaN(lat) || isNaN(lng)) return;
+            // Simple grid-based clustering (~110m at equator per 0.001 degree)
+            const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+            const existing = clusterMap.get(key);
+            if (existing) {
+              existing.count += 1;
+            } else {
+              clusterMap.set(key, { lat, lng, count: 1 });
+            }
           }
-        }
-      });
+        });
+        clusterMap.forEach(({ lat, lng, count }) => {
+          markers.push({
+            position: { lat, lng },
+            title: count > 1 ? `${count} employees` : `1 employee`,
+            color: '#ff0000',
+            type: 'employee',
+            onClick: () => zoomToEmployee(lat, lng),
+          });
+        });
+      } else {
+        locations.forEach((item: any) => {
+          if (item.location?.latitude && item.location?.longitude) {
+            const lat = parseFloat(item.location.latitude);
+            const lng = parseFloat(item.location.longitude);
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+              markers.push({
+                position: { lat, lng },
+                title: `${item.employee.firstName} ${item.employee.lastName}`,
+                color: '#ff0000',
+                type: 'employee',
+                onClick: () => zoomToEmployee(lat, lng),
+              });
+            }
+          }
+        });
+      }
     }
     
     // Add site markers (green building icons)
@@ -294,22 +394,22 @@ export default function LiveTracking() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
+        {/* Page Title */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button variant="ghost" onClick={() => setLocation('/admin/dashboard')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
             </Button>
-            <h1 className="text-2xl font-bold text-gray-900">Live Employee Tracking</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Live Employee Tracking</h1>
           </div>
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-slate-400">
                 {isConnected ? 'Live Updates' : 'Connecting...'}
               </span>
             </div>
@@ -346,7 +446,6 @@ export default function LiveTracking() {
               <div className="text-2xl font-bold text-green-600">
                 {Array.isArray(locations) ? 
                   locations.filter((item: any) => {
-                    console.log('Employee:', item.employee.firstName, 'isWithinGeofence:', item.location?.isWithinGeofence);
                     return item.location?.isWithinGeofence === true;
                   }).length : 0
                 }
@@ -377,7 +476,7 @@ export default function LiveTracking() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Employee List */}
           <div className="lg:col-span-1 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Employee Status</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Employee Status</h2>
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -387,7 +486,7 @@ export default function LiveTracking() {
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {Array.isArray(locations) && locations.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-gray-500 dark:text-slate-400">
                     No employees currently tracked
                   </div>
                 ) : (
@@ -412,19 +511,19 @@ export default function LiveTracking() {
                                   }}
                                 />
                               ) : (
-                                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                                  <span className="text-gray-600 font-medium text-sm">
+                                <div className="w-10 h-10 bg-gray-200 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                                  <span className="text-gray-600 dark:text-slate-300 font-medium text-sm">
                                     {item.employee.firstName[0]}{item.employee.lastName[0]}
                                   </span>
                                 </div>
                               )}
-                              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(item.employee, item.location)}`}></div>
+                              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${getStatusColor(item.employee, item.location)}`}></div>
                             </div>
                             <div>
-                              <p className="font-medium text-gray-900 hover:text-blue-600">
+                              <p className="font-medium text-gray-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400">
                                 {item.employee.firstName} {item.employee.lastName}
                               </p>
-                              <p className="text-sm text-gray-500">{item.employee.email}</p>
+                              <p className="text-sm text-gray-500 dark:text-slate-400">{item.employee.email}</p>
                             </div>
                           </div>
                           <Badge variant={getStatusColor(item.employee, item.location) === 'bg-green-500' ? 'default' : 'destructive'}>
@@ -433,7 +532,7 @@ export default function LiveTracking() {
                         </div>
                         
                         {item.location && (
-                          <div className="mt-2 text-xs text-gray-500">
+                          <div className="mt-2 text-xs text-gray-500 dark:text-slate-400">
                             Last updated: {new Date(item.location.timestamp).toLocaleTimeString()}
                           </div>
                         )}
@@ -447,11 +546,11 @@ export default function LiveTracking() {
           
           {/* Interactive Map */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Real-time Map</h2>
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-4 text-sm">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Real-time Map</h2>
+              <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-4 text-sm text-gray-700 dark:text-slate-300">
                     <div className="flex items-center space-x-1">
                       <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                       <span>Employees</span>
@@ -465,11 +564,17 @@ export default function LiveTracking() {
                       <span>Site Boundary</span>
                     </div>
                   </div>
+                <div className="hidden md:flex items-center space-x-2 text-sm text-gray-700 dark:text-slate-300">
+                  <label className="flex items-center space-x-2">
+                    <input type="checkbox" className="h-4 w-4" checked={useClustering} onChange={(e) => setUseClustering(e.target.checked)} />
+                    <span>Cluster markers</span>
+                  </label>
+                </div>
                 </div>
               </div>
               
               {/* Interactive Map Container */}
-              <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'h-96 lg:h-[500px]'} relative`}>
+              <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white dark:bg-slate-900' : 'h-96 lg:h-[500px]'} relative`}>
                 {mapLoaded ? (
                   <GoogleMap
                     center={mapCenter}
@@ -480,16 +585,16 @@ export default function LiveTracking() {
                     className="w-full h-full"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-slate-700 rounded-lg">
                     <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                      <p className="text-gray-600">Loading map...</p>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-2"></div>
+                      <p className="text-gray-600 dark:text-slate-300">Loading map...</p>
                     </div>
                   </div>
                 )}
                 
                 {/* Map Controls */}
-                <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2 space-y-2">
+                <div className="absolute top-4 right-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 space-y-2 border border-slate-200 dark:border-slate-700">
                   <Button variant="ghost" size="sm" onClick={() => handleZoom('in')} title="Zoom In">
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -498,6 +603,9 @@ export default function LiveTracking() {
                   </Button>
                   <Button variant="ghost" size="sm" onClick={toggleMapType} title="Toggle Satellite View">
                     {mapType === 'roadmap' ? 'Satellite' : 'Map'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={fitToBounds} title="Fit to bounds">
+                    Fit
                   </Button>
                   <Button variant="ghost" size="sm" onClick={toggleFullscreen} title="Toggle Fullscreen">
                     <Maximize className="h-4 w-4" />

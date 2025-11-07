@@ -1,0 +1,887 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkSite Tracker - Labor Location Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    'inter': ['Inter', 'sans-serif'],
+                },
+                colors: {
+                    primary: '#1976D2',
+                    secondary: '#424242',
+                    success: '#388E3C',
+                    warning: '#F57C00',
+                    error: '#D32F2F'
+                }
+            }
+        }
+    };
+    </script>
+</head>
+<body class="font-inter bg-gray-50 min-h-screen">
+    <!-- Navigation Container -->
+    <div class="fixed top-4 left-4 z-50">
+        <div class="bg-white rounded-lg shadow-lg p-2">
+            <div class="flex flex-col gap-1">
+                <button onclick="showPage('login')" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Login</button>
+                <button onclick="showPage('signup')" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Signup</button>
+                <button onclick="showPage('dashboard')" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Dashboard</button>
+                <button onclick="showPage('employees')" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Employees</button>
+                <button onclick="showPage('sites')" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Sites</button>
+                <button onclick="showPage('tracking')" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Live Tracking</button>
+                <button onclick="showPage('mobile')" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Mobile View</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- @COMPONENT: AdminLoginPage -->
+    <div id="login-page" class="page-container min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-xl shadow-xl p-8">
+            <div class="text-center mb-8">
+                <div class="bg-primary rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-users text-white text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">WorkSite Tracker</h1>
+                <p class="text-gray-600 mt-2">Admin Portal Login</p>
+            </div>
+            
+            <form class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <input type="email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="admin@company.com" data-mock="true">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="••••••••" data-mock="true">
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center">
+                        <input type="checkbox" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                        <span class="ml-2 text-sm text-gray-600">Remember me</span>
+                    </label>
+                </div>
+                
+                <button type="button" class="w-full bg-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors" data-event="click:handleLogin">
+                    Sign In
+                </button>
+                
+                <div class="text-center">
+                    <p class="text-sm text-gray-600">
+                        Don't have an admin account? 
+                        <button type="button" onclick="showPage('signup')" class="text-primary hover:underline font-medium">Create one</button>
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AdminLoginPage -->
+
+    <!-- @COMPONENT: AdminSignupPage -->
+    <div id="signup-page" class="page-container hidden min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-xl shadow-xl p-8">
+            <div class="text-center mb-8">
+                <div class="bg-primary rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-user-plus text-white text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">Create Admin Account</h1>
+                <p class="text-gray-600 mt-2">Setup your organization</p>
+            </div>
+            
+            <form class="space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                        <input type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="John" data-mock="true">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                        <input type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Doe" data-mock="true">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
+                    <input type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="ABC Construction Co." data-mock="true">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <input type="email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="admin@company.com" data-mock="true">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="••••••••" data-mock="true">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                    <input type="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="••••••••" data-mock="true">
+                </div>
+                
+                <button type="button" class="w-full bg-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors" data-event="click:handleSignup">
+                    Create Admin Account
+                </button>
+                
+                <div class="text-center">
+                    <p class="text-sm text-gray-600">
+                        Already have an account? 
+                        <button type="button" onclick="showPage('login')" class="text-primary hover:underline font-medium">Sign in</button>
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AdminSignupPage -->
+
+    <!-- @COMPONENT: AdminDashboard -->
+    <div id="dashboard-page" class="page-container hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center">
+                        <div class="bg-primary rounded-lg w-10 h-10 flex items-center justify-center">
+                            <i class="fas fa-users text-white"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h1 class="text-xl font-semibold text-gray-900">WorkSite Tracker</h1>
+                            <p class="text-sm text-gray-600">Admin Dashboard</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button class="p-2 text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-bell text-xl"></i>
+                        </button>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-gray-300 rounded-full"></div>
+                            <span class="text-sm font-medium text-gray-700" data-bind="admin.name">John Admin</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center">
+                        <div class="bg-success bg-opacity-10 rounded-lg p-3">
+                            <i class="fas fa-user-check text-success text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Active Employees</p>
+                            <p class="text-2xl font-bold text-gray-900" data-bind="stats.activeEmployees">24</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center">
+                        <div class="bg-primary bg-opacity-10 rounded-lg p-3">
+                            <i class="fas fa-map-marker-alt text-primary text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Work Sites</p>
+                            <p class="text-2xl font-bold text-gray-900" data-bind="stats.workSites">8</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center">
+                        <div class="bg-warning bg-opacity-10 rounded-lg p-3">
+                            <i class="fas fa-clock text-warning text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">On Site Now</p>
+                            <p class="text-2xl font-bold text-gray-900" data-bind="stats.onSiteNow">18</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center">
+                        <div class="bg-error bg-opacity-10 rounded-lg p-3">
+                            <i class="fas fa-exclamation-triangle text-error text-xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Alerts</p>
+                            <p class="text-2xl font-bold text-gray-900" data-bind="stats.alerts">3</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity & Live Map -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Recent Activity -->
+                <div class="bg-white rounded-xl shadow-sm">
+                    <div class="p-6 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">Recent Activity</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-4">
+                            <!-- @MAP: recentActivity.map(activity => ( -->
+                            <div class="flex items-start space-x-4" data-mock="true">
+                                <div class="w-2 h-2 bg-success rounded-full mt-2"></div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">Mike Johnson checked in</p>
+                                    <p class="text-xs text-gray-600">Downtown Construction Site • 2 minutes ago</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-4" data-mock="true">
+                                <div class="w-2 h-2 bg-error rounded-full mt-2"></div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">Sarah Davis checked out</p>
+                                    <p class="text-xs text-gray-600">Harbor Bridge Project • 15 minutes ago</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-4" data-mock="true">
+                                <div class="w-2 h-2 bg-warning rounded-full mt-2"></div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">Alert: Employee outside boundary</p>
+                                    <p class="text-xs text-gray-600">Alex Wilson at Riverside Mall Site • 1 hour ago</p>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Map Preview -->
+                <div class="bg-white rounded-xl shadow-sm">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-900">Live Locations</h3>
+                            <button onclick="showPage('tracking')" class="text-primary hover:text-blue-700 text-sm font-medium">View Full Map</button>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <!-- Placeholder for interactive map -->
+                        <!-- A modern construction site aerial view showing multiple work areas and equipment -->
+                        <div class="h-64 bg-gray-100 rounded-lg flex items-center justify-center" style="background-image: url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400'); background-size: cover; background-position: center;">
+                            <div class="bg-white bg-opacity-90 rounded-lg p-4 text-center">
+                                <i class="fas fa-map text-primary text-2xl mb-2"></i>
+                                <p class="text-sm font-medium text-gray-900">Interactive Map</p>
+                                <p class="text-xs text-gray-600">18 employees currently tracked</p>
+                            </div>
+                        </div>
+                        <!-- @FUNCTIONALITY: This should integrate with Google Maps API for real-time location display -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <button onclick="showPage('employees')" class="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <i class="fas fa-user-plus text-primary text-xl mr-3"></i>
+                        <span class="font-medium text-gray-900">Add Employee</span>
+                    </button>
+                    <button onclick="showPage('sites')" class="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <i class="fas fa-map-marker-plus text-primary text-xl mr-3"></i>
+                        <span class="font-medium text-gray-900">Add Work Site</span>
+                    </button>
+                    <button class="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <i class="fas fa-file-export text-primary text-xl mr-3"></i>
+                        <span class="font-medium text-gray-900">Export Report</span>
+                    </button>
+                    <button class="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <i class="fas fa-cog text-primary text-xl mr-3"></i>
+                        <span class="font-medium text-gray-900">Settings</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- @END_COMPONENT: AdminDashboard -->
+
+    <!-- @COMPONENT: EmployeeManagement -->
+    <div id="employees-page" class="page-container hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center">
+                        <button onclick="showPage('dashboard')" class="mr-4 p-2 text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h1 class="text-xl font-semibold text-gray-900">Employee Management</h1>
+                    </div>
+                    <button class="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors" data-event="click:openAddEmployeeModal">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add Employee
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Search and Filters -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-1">
+                        <input type="text" placeholder="Search employees..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                    </div>
+                    <select class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <option>All Sites</option>
+                        <option>Downtown Construction</option>
+                        <option>Harbor Bridge Project</option>
+                        <option>Riverside Mall</option>
+                    </select>
+                    <select class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <option>All Status</option>
+                        <option>Active</option>
+                        <option>On Site</option>
+                        <option>Off Site</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Employee Table -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Site</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Check-in</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <!-- @MAP: employees.map(employee => ( -->
+                            <tr data-mock="true">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-10 h-10 bg-gray-300 rounded-full mr-4"></div>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">Mike Johnson</div>
+                                            <div class="text-sm text-gray-500">ID: EMP001</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">+1 (555) 123-4567</div>
+                                    <div class="text-sm text-gray-500">mike.johnson@company.com</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">Downtown Construction</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-success bg-opacity-10 text-success">
+                                        On Site
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    Today, 8:15 AM
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button class="text-primary hover:text-blue-700"><i class="fas fa-edit"></i></button>
+                                        <button class="text-gray-400 hover:text-gray-600"><i class="fas fa-map-marker-alt"></i></button>
+                                        <button class="text-error hover:text-red-700"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr data-mock="true">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-10 h-10 bg-gray-300 rounded-full mr-4"></div>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">Sarah Davis</div>
+                                            <div class="text-sm text-gray-500">ID: EMP002</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">+1 (555) 987-6543</div>
+                                    <div class="text-sm text-gray-500">sarah.davis@company.com</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">Harbor Bridge Project</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        Off Site
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    Today, 5:30 PM
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button class="text-primary hover:text-blue-700"><i class="fas fa-edit"></i></button>
+                                        <button class="text-gray-400 hover:text-gray-600"><i class="fas fa-map-marker-alt"></i></button>
+                                        <button class="text-error hover:text-red-700"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <!-- @END_MAP )) -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- @END_COMPONENT: EmployeeManagement -->
+
+    <!-- @COMPONENT: SiteManagement -->
+    <div id="sites-page" class="page-container hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center">
+                        <button onclick="showPage('dashboard')" class="mr-4 p-2 text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h1 class="text-xl font-semibold text-gray-900">Work Site Management</h1>
+                    </div>
+                    <button class="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors" data-event="click:openAddSiteModal">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add Site
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Site Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- @MAP: workSites.map(site => ( -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden" data-mock="true">
+                    <!-- A busy construction site with cranes and workers during daytime -->
+                    <div class="h-48 bg-gray-200" style="background-image: url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400'); background-size: cover; background-position: center;"></div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Downtown Construction</h3>
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-success bg-opacity-10 text-success">
+                                Active
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-4">123 Main Street, Downtown District</p>
+                        
+                        <div class="space-y-3 mb-6">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Assigned Workers</span>
+                                <span class="font-medium text-gray-900">12</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Currently On Site</span>
+                                <span class="font-medium text-success">8</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Geofence Radius</span>
+                                <span class="font-medium text-gray-900">200m</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex space-x-2">
+                            <button class="flex-1 bg-primary text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-map-marker-alt mr-2"></i>
+                                View Map
+                            </button>
+                            <button class="p-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden" data-mock="true">
+                    <!-- A large bridge construction project over water with engineering equipment -->
+                    <div class="h-48 bg-gray-200" style="background-image: url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400'); background-size: cover; background-position: center;"></div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Harbor Bridge Project</h3>
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-success bg-opacity-10 text-success">
+                                Active
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-4">Harbor Bay, Industrial Zone</p>
+                        
+                        <div class="space-y-3 mb-6">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Assigned Workers</span>
+                                <span class="font-medium text-gray-900">18</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Currently On Site</span>
+                                <span class="font-medium text-success">14</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Geofence Radius</span>
+                                <span class="font-medium text-gray-900">500m</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex space-x-2">
+                            <button class="flex-1 bg-primary text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-map-marker-alt mr-2"></i>
+                                View Map
+                            </button>
+                            <button class="p-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden" data-mock="true">
+                    <!-- A modern shopping mall construction site with scaffolding and architectural framework -->
+                    <div class="h-48 bg-gray-200" style="background-image: url('https://images.unsplash.com/photo-1503387762-592deb58ef4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400'); background-size: cover; background-position: center;"></div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Riverside Mall</h3>
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-warning bg-opacity-10 text-warning">
+                                Paused
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-4">456 Riverside Drive, West End</p>
+                        
+                        <div class="space-y-3 mb-6">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Assigned Workers</span>
+                                <span class="font-medium text-gray-900">8</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Currently On Site</span>
+                                <span class="font-medium text-gray-400">0</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Geofence Radius</span>
+                                <span class="font-medium text-gray-900">300m</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex space-x-2">
+                            <button class="flex-1 bg-primary text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                                <i class="fas fa-map-marker-alt mr-2"></i>
+                                View Map
+                            </button>
+                            <button class="p-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+        </main>
+    </div>
+    <!-- @END_COMPONENT: SiteManagement -->
+
+    <!-- @COMPONENT: LiveTracking -->
+    <div id="tracking-page" class="page-container hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center">
+                        <button onclick="showPage('dashboard')" class="mr-4 p-2 text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h1 class="text-xl font-semibold text-gray-900">Live Employee Tracking</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-success rounded-full animate-pulse"></div>
+                            <span class="text-sm text-gray-600">Live Updates</span>
+                        </div>
+                        <button class="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-download mr-2"></i>
+                            Export Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <!-- Employee List Sidebar -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-xl shadow-sm">
+                        <div class="p-4 border-b border-gray-200">
+                            <h3 class="font-semibold text-gray-900">Active Employees</h3>
+                            <p class="text-sm text-gray-600">18 currently tracked</p>
+                        </div>
+                        <div class="p-4 space-y-3 max-h-96 overflow-y-auto">
+                            <!-- @MAP: activeEmployees.map(employee => ( -->
+                            <div class="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg" data-mock="true">
+                                <div class="w-8 h-8 bg-gray-300 rounded-full"></div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">Mike Johnson</p>
+                                    <p class="text-xs text-gray-600">Downtown Site</p>
+                                </div>
+                                <div class="w-2 h-2 bg-success rounded-full"></div>
+                            </div>
+                            <div class="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg" data-mock="true">
+                                <div class="w-8 h-8 bg-gray-300 rounded-full"></div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">Sarah Davis</p>
+                                    <p class="text-xs text-gray-600">Harbor Bridge</p>
+                                </div>
+                                <div class="w-2 h-2 bg-success rounded-full"></div>
+                            </div>
+                            <div class="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg" data-mock="true">
+                                <div class="w-8 h-8 bg-gray-300 rounded-full"></div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">Alex Wilson</p>
+                                    <p class="text-xs text-gray-600">Riverside Mall</p>
+                                </div>
+                                <div class="w-2 h-2 bg-warning rounded-full"></div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Map Area -->
+                <div class="lg:col-span-3">
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <div class="p-4 border-b border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <h3 class="font-semibold text-gray-900">Real-Time Location Map</h3>
+                                <div class="flex space-x-2">
+                                    <button class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200">Satellite</button>
+                                    <button class="px-3 py-1 text-sm bg-primary text-white rounded-md">Map</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Interactive Map Container -->
+                        <!-- An aerial view of a city with multiple construction sites and urban development -->
+                        <div class="h-96 lg:h-[500px] relative" style="background-image: url('https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=600'); background-size: cover; background-position: center;">
+                            <!-- Map Controls -->
+                            <div class="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2 space-y-2">
+                                <button class="block p-2 text-gray-600 hover:bg-gray-100 rounded"><i class="fas fa-plus"></i></button>
+                                <button class="block p-2 text-gray-600 hover:bg-gray-100 rounded"><i class="fas fa-minus"></i></button>
+                                <button class="block p-2 text-gray-600 hover:bg-gray-100 rounded"><i class="fas fa-expand-arrows-alt"></i></button>
+                            </div>
+                            
+                            <!-- Location Markers (Mock) -->
+                            <div class="absolute top-1/4 left-1/4 transform -translate-x-1/2 -translate-y-1/2">
+                                <div class="w-4 h-4 bg-success rounded-full border-2 border-white shadow-lg animate-pulse"></div>
+                                <div class="mt-1 bg-white text-xs px-2 py-1 rounded shadow">Mike J.</div>
+                            </div>
+                            <div class="absolute top-1/3 right-1/3 transform translate-x-1/2 -translate-y-1/2">
+                                <div class="w-4 h-4 bg-success rounded-full border-2 border-white shadow-lg animate-pulse"></div>
+                                <div class="mt-1 bg-white text-xs px-2 py-1 rounded shadow">Sarah D.</div>
+                            </div>
+                            <div class="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 translate-y-1/2">
+                                <div class="w-4 h-4 bg-warning rounded-full border-2 border-white shadow-lg animate-pulse"></div>
+                                <div class="mt-1 bg-white text-xs px-2 py-1 rounded shadow">Alex W.</div>
+                            </div>
+                            
+                            <!-- Site Boundaries (Mock) -->
+                            <div class="absolute top-1/4 left-1/4 w-20 h-20 border-2 border-dashed border-primary rounded-full opacity-50 transform -translate-x-1/2 -translate-y-1/2"></div>
+                            
+                            <!-- @FUNCTIONALITY: This should integrate with Google Maps API for real-time location display and geofencing -->
+                        </div>
+                        
+                        <!-- Map Legend -->
+                        <div class="p-4 border-t border-gray-200 bg-gray-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex space-x-6">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-3 h-3 bg-success rounded-full"></div>
+                                        <span class="text-sm text-gray-600">On Site</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-3 h-3 bg-warning rounded-full"></div>
+                                        <span class="text-sm text-gray-600">Outside Boundary</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-3 h-3 border-2 border-dashed border-primary rounded-full"></div>
+                                        <span class="text-sm text-gray-600">Site Boundary</span>
+                                    </div>
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    Last updated: <span class="font-medium">2 seconds ago</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- @END_COMPONENT: LiveTracking -->
+
+    <!-- @COMPONENT: MobileWorkerView -->
+    <div id="mobile-page" class="page-container hidden">
+        <!-- Mobile Header -->
+        <div class="bg-primary text-white p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-hammer text-white text-sm"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-semibold">WorkSite Tracker</h1>
+                        <p class="text-sm opacity-90" data-bind="worker.name">Mike Johnson</p>
+                    </div>
+                </div>
+                <button class="p-2 hover:bg-white hover:bg-opacity-10 rounded-lg">
+                    <i class="fas fa-cog text-white"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Status Card -->
+        <div class="p-4">
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-success bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-map-marker-alt text-success text-2xl"></i>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-900 mb-2">On Site</h2>
+                    <p class="text-gray-600 mb-1" data-bind="currentSite.name">Downtown Construction Site</p>
+                    <p class="text-sm text-gray-500">Checked in at 8:15 AM</p>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <button class="bg-success text-white p-4 rounded-xl font-medium" data-event="click:checkIn">
+                    <i class="fas fa-sign-in-alt text-xl mb-2 block"></i>
+                    Check In
+                </button>
+                <button class="bg-error text-white p-4 rounded-xl font-medium" data-event="click:checkOut">
+                    <i class="fas fa-sign-out-alt text-xl mb-2 block"></i>
+                    Check Out
+                </button>
+            </div>
+
+            <!-- Today's Activity -->
+            <div class="bg-white rounded-xl shadow-sm mb-6">
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="font-semibold text-gray-900">Today's Activity</h3>
+                </div>
+                <div class="p-4 space-y-4">
+                    <!-- @MAP: todayActivity.map(activity => ( -->
+                    <div class="flex items-center space-x-4" data-mock="true">
+                        <div class="w-2 h-2 bg-success rounded-full"></div>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900">Checked In</p>
+                            <p class="text-xs text-gray-600">8:15 AM • Downtown Construction</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4" data-mock="true">
+                        <div class="w-2 h-2 bg-warning rounded-full"></div>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900">Break Started</p>
+                            <p class="text-xs text-gray-600">12:00 PM • 30 minutes</p>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+            </div>
+
+            <!-- Current Location -->
+            <div class="bg-white rounded-xl shadow-sm">
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-semibold text-gray-900">Current Location</h3>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                            <span class="text-xs text-gray-600">Live</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <!-- Worker's current location map view showing construction site -->
+                    <div class="h-40 bg-gray-100 rounded-lg mb-4" style="background-image: url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=300'); background-size: cover; background-position: center;">
+                        <div class="h-full flex items-center justify-center">
+                            <div class="w-4 h-4 bg-success rounded-full border-2 border-white shadow-lg animate-pulse"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Coordinates</span>
+                        <span class="font-medium text-gray-900" data-bind="location.coordinates">40.7128, -74.0060</span>
+                    </div>
+                    <div class="flex justify-between text-sm mt-2">
+                        <span class="text-gray-600">Last Updated</span>
+                        <span class="font-medium text-gray-900">Just now</span>
+                    </div>
+                    <!-- @FUNCTIONALITY: This should show real GPS location and update every 30 seconds -->
+                </div>
+            </div>
+
+            <!-- Emergency Contact -->
+            <div class="mt-6">
+                <button class="w-full bg-error text-white py-3 px-4 rounded-xl font-medium" data-event="click:emergencyContact">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Emergency Contact
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: MobileWorkerView -->
+
+    <script>
+    (function() {
+        // Page navigation functionality
+        function showPage(pageId) {
+            // Hide all pages
+            const pages = document.querySelectorAll('.page-container');
+            pages.forEach(page => page.classList.add('hidden'));
+            
+            // Show selected page
+            const targetPage = document.getElementById(pageId + '-page');
+            if (targetPage) {
+                targetPage.classList.remove('hidden');
+            }
+        }
+        
+        // Make showPage globally available
+        window.showPage = showPage;
+        
+        // Show login page by default
+        showPage('login');
+        
+        // Mock data for demonstration
+        const mockData = {
+            stats: {
+                activeEmployees: 24,
+                workSites: 8,
+                onSiteNow: 18,
+                alerts: 3
+            },
+            recentActivity: [
+                { type: 'checkin', employee: 'Mike Johnson', site: 'Downtown Construction Site', time: '2 minutes ago' },
+                { type: 'checkout', employee: 'Sarah Davis', site: 'Harbor Bridge Project', time: '15 minutes ago' },
+                { type: 'alert', employee: 'Alex Wilson', site: 'Riverside Mall Site', time: '1 hour ago' }
+            ]
+        };
+        
+        // TODO: Implement WebSocket connections for real-time updates
+        // TODO: Implement geolocation API for tracking
+        // TODO: Implement push notification system
+        // TODO: Implement Google Maps integration
+        // TODO: Implement secure authentication system
+        // TODO: Implement database operations for employee/site management
+        
+        console.log('WorkSite Tracker mockup loaded');
+    })();
+    </script>
+</body>
+</html>

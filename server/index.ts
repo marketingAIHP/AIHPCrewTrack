@@ -1,12 +1,20 @@
+// MUST be first import - loads .env from project root before any other imports
+import 'dotenv/config';
+
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+
 
 const app = express();
 app.use(compression()); // Enable gzip compression
 app.use(express.json({ limit: '10mb' })); // Increase limit for file uploads
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Publicly serve uploaded images
+app.use('/uploads', express.static(path.join(process.cwd(), 'server', 'public', 'uploads')));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -43,10 +51,41 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    
+    // Don't throw database connection errors - just log them
+    if (err.code === 'XX000' || err.message?.includes('db_termination') || err.message?.includes('shutdown')) {
+      console.error('Database connection error (non-fatal)');
+      res.status(503).json({ message: 'Database temporarily unavailable. Please try again.' });
+      return;
+    }
 
-    res.status(status).json({ message });
-    throw err;
+    // Log full error details on server only (for debugging)
+    console.error('Server error:', {
+      message: err.message,
+      code: err.code,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+
+    // Hide sensitive error details from client
+    const isSensitiveError = 
+      err.message?.includes('password') ||
+      err.message?.includes('token') ||
+      err.message?.includes('secret') ||
+      err.message?.includes('key') ||
+      err.message?.includes('SQL') ||
+      err.message?.includes('database') ||
+      err.stack;
+
+    const safeMessage = isSensitiveError 
+      ? (status === 500 ? 'Internal Server Error' : 'An error occurred')
+      : (err.message || "Internal Server Error");
+
+    res.status(status).json({ message: safeMessage });
+    
+    // Only throw non-database errors
+    if (!err.message?.includes('database') && !err.message?.includes('db_termination')) {
+      throw err;
+    }
   });
 
   // importantly only setup vite in development and after

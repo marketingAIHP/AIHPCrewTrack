@@ -25,7 +25,13 @@ import * as XLSX from 'xlsx';
 import { createObjectCsvWriter } from 'csv-writer';
 import PDFDocument from 'pdfkit';
 import { ObjectStorageService, ObjectNotFoundError } from './objectStorage';
+import path from 'path';
+import fs from 'fs';
+import sharp from 'sharp';
+import { randomUUID } from 'crypto';
+import express from 'express';
 import { ImageCompressionService } from './imageCompression';
+import { uploadProfileImage, uploadSiteImage, uploadMiddleware, deleteImageFromSupabase, deleteSiteImageFromSupabase } from './uploadController';
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -51,14 +57,14 @@ function notifyAdmin(adminId: number, notification: any) {
   addToNotificationStack(adminId, notification);
   
   const connections = adminConnections.get(adminId) || [];
-  console.log(`Attempting to notify admin ${adminId}, found ${connections.length} connections`);
+      // Attempting to notify admin
   
   // Clean up closed connections first
   const activeConnections = connections.filter(ws => ws.readyState === WebSocket.OPEN);
   adminConnections.set(adminId, activeConnections);
   
   if (activeConnections.length === 0) {
-    console.log(`No active connections for admin ${adminId}`);
+    // No active connections for admin
     return;
   }
   
@@ -71,7 +77,7 @@ function notifyAdmin(adminId: number, notification: any) {
   const ws = activeConnections[0];
   try {
     ws.send(message);
-    console.log(`Notification sent to admin ${adminId} (using 1 connection out of ${activeConnections.length})`);
+    // Notification sent successfully
   } catch (error) {
     console.error(`Failed to send notification to admin ${adminId}:`, error);
   }
@@ -126,7 +132,168 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c; // Distance in meters
 }
 
+// GPS accuracy buffer to account for mobile GPS inaccuracies (typically 3-10m)
+// Using a 50m buffer to reduce false negatives when employees are on site
+// This accounts for GPS drift, device accuracy variations, and signal issues
+const GPS_ACCURACY_BUFFER = 50; // meters - increased from 15m for better reliability
+
+// Helper function to safely parse coordinate values
+function parseCoordinate(value: number | string | null | undefined): number {
+  if (value === null || value === undefined) {
+    return NaN;
+  }
+  
+  if (typeof value === 'number') {
+    return isNaN(value) ? NaN : value;
+  }
+  
+  if (typeof value === 'string') {
+    // Remove any whitespace and parse
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') {
+      return NaN;
+    }
+    const parsed = parseFloat(trimmed);
+    return isNaN(parsed) ? NaN : parsed;
+  }
+  
+  return NaN;
+}
+
+// Helper function to check if coordinates might be swapped and auto-correct
+function validateAndCorrectCoordinates(
+  lat: number,
+  lon: number,
+  context: 'employee' | 'site'
+): { lat: number; lon: number; swapped: boolean } {
+  // Latitude should be between -90 and 90
+  // Longitude should be between -180 and 180
+  // If lat is outside [-90, 90] but within [-180, 180], and lon is within [-90, 90], they're likely swapped
+  
+  let finalLat = lat;
+  let finalLon = lon;
+  let swapped = false;
+  
+  // Check if coordinates might be swapped
+  if ((lat < -90 || lat > 90) && (lon >= -90 && lon <= 90) && (lat >= -180 && lat <= 180)) {
+    // Lat is invalid but could be a valid lon, and lon could be a valid lat - likely swapped
+    console.warn(`Possible coordinate swap detected for ${context}. Original: lat=${lat}, lon=${lon}`);
+    finalLat = lon;
+    finalLon = lat;
+    swapped = true;
+    console.warn(`Swapped coordinates for ${context}. New: lat=${finalLat}, lon=${finalLon}`);
+  }
+  
+  // Ensure final values are within valid ranges
+  if (finalLat < -90 || finalLat > 90 || finalLon < -180 || finalLon > 180) {
+    console.error(`Invalid coordinates for ${context} after correction: lat=${finalLat}, lon=${finalLon}`);
+  }
+  
+  return { lat: finalLat, lon: finalLon, swapped };
+}
+
+// Helper function to check if employee is within geofence with GPS accuracy buffer
+function isWithinGeofence(
+  employeeLat: number | string | null | undefined,
+  employeeLon: number | string | null | undefined,
+  siteLat: number | string | null | undefined,
+  siteLon: number | string | null | undefined,
+  geofenceRadius: number
+): { isWithin: boolean; distance: number; effectiveRadius: number } {
+  const rawEmpLat = parseCoordinate(employeeLat);
+  const rawEmpLon = parseCoordinate(employeeLon);
+  const rawSiteLat = parseCoordinate(siteLat);
+  const rawSiteLon = parseCoordinate(siteLon);
+  
+  // Validate and correct coordinates for both employee and site
+  const empCoords = validateAndCorrectCoordinates(rawEmpLat, rawEmpLon, 'employee');
+  const siteCoords = validateAndCorrectCoordinates(rawSiteLat, rawSiteLon, 'site');
+  
+  const empLat = empCoords.lat;
+  const empLon = empCoords.lon;
+  const sLat = siteCoords.lat;
+  const sLon = siteCoords.lon;
+  
+  // Validate coordinates are within valid ranges
+  const isValidLat = !isNaN(empLat) && empLat >= -90 && empLat <= 90;
+  const isValidLon = !isNaN(empLon) && empLon >= -180 && empLon <= 180;
+  const isValidSiteLat = !isNaN(sLat) && sLat >= -90 && sLat <= 90;
+  const isValidSiteLon = !isNaN(sLon) && sLon >= -180 && sLon <= 180;
+  
+  if (!isValidLat || !isValidLon || !isValidSiteLat || !isValidSiteLon) {
+    console.error('Invalid coordinates for geofence check:', { 
+      raw: {
+        employeeLat: employeeLat, 
+        employeeLon: employeeLon, 
+        siteLat: siteLat, 
+        siteLon: siteLon
+      },
+      parsed: { empLat, empLon, sLat, sLon },
+      employeeSwapped: empCoords.swapped,
+      siteSwapped: siteCoords.swapped,
+      valid: { isValidLat, isValidLon, isValidSiteLat, isValidSiteLon }
+    });
+    return { isWithin: false, distance: Infinity, effectiveRadius: geofenceRadius + GPS_ACCURACY_BUFFER };
+  }
+  
+  // Calculate distance
+  const distance = calculateDistance(empLat, empLon, sLat, sLon);
+  const effectiveRadius = geofenceRadius + GPS_ACCURACY_BUFFER;
+  const isWithin = distance <= effectiveRadius;
+  
+  // FIX: Improved logging with clear success/failure messages
+  const logMessage = isWithin 
+    ? `✅ You are within site range (${Math.round(distance)}m from site, radius: ${geofenceRadius}m)`
+    : `❌ You are ${Math.round(distance)}m away from site (radius: ${geofenceRadius}m)`;
+  
+  console.log('📍 Geofence calculation:', {
+    employeeCoords: { 
+      lat: empLat.toFixed(6), 
+      lon: empLon.toFixed(6), 
+      original: { lat: rawEmpLat, lon: rawEmpLon }, 
+      swapped: empCoords.swapped 
+    },
+    siteCoords: { 
+      lat: sLat.toFixed(6), 
+      lon: sLon.toFixed(6), 
+      original: { lat: rawSiteLat, lon: rawSiteLon }, 
+      swapped: siteCoords.swapped 
+    },
+    distance: Math.round(distance),
+    geofenceRadius,
+    buffer: GPS_ACCURACY_BUFFER,
+    effectiveRadius: Math.round(effectiveRadius),
+    isWithin,
+    message: logMessage
+  });
+  
+  // Log if distance is suspiciously large (more than geofence radius + 100m buffer)
+  if (distance > geofenceRadius + 100) {
+    console.warn('⚠️ Large distance calculated - possible coordinate issue:', {
+      employeeCoords: { lat: empLat.toFixed(6), lon: empLon.toFixed(6) },
+      siteCoords: { lat: sLat.toFixed(6), lon: sLon.toFixed(6) },
+      distance: Math.round(distance),
+      geofenceRadius,
+      effectiveRadius: Math.round(effectiveRadius),
+      difference: Math.round(distance - effectiveRadius),
+      employeeSwapped: empCoords.swapped,
+      siteSwapped: siteCoords.swapped
+    });
+  }
+  
+  return { isWithin, distance, effectiveRadius };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Ensure local upload dir exists
+  const uploadDir = path.join(process.cwd(), 'server', 'public', 'uploads');
+  try {
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+  } catch (e) {
+    console.error('Failed to ensure upload directory:', uploadDir, e);
+  }
   // Configuration endpoint
   app.get('/api/config', (req, res) => {
     res.json({
@@ -180,17 +347,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!employee) {
         return res.status(404).json({ message: 'Employee not found' });
       }
-
-      res.json({
-        id: employee.id,
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        email: employee.email,
-        phone: employee.phone,
-        address: employee.address,
-        siteId: employee.siteId,
-        profileImage: employee.profileImage,
-      });
+      const { password, ...employeeData } = employee;
+      res.json(employeeData);
     } catch (error) {
       console.error('Error fetching employee profile:', error);
       res.status(500).json({ message: 'Failed to fetch profile' });
@@ -254,7 +412,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/employee/attendance/checkin', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
     try {
+      // FIX: Ensure coordinates are numeric, not strings
       const { latitude, longitude } = req.body;
+      
+      // FIX: Parse coordinates to ensure they're numbers
+      const empLat = typeof latitude === 'string' ? parseFloat(latitude) : Number(latitude);
+      const empLon = typeof longitude === 'string' ? parseFloat(longitude) : Number(longitude);
+      
+      // Validate coordinates
+      if (isNaN(empLat) || isNaN(empLon) || !isFinite(empLat) || !isFinite(empLon)) {
+        console.error('❌ Invalid coordinates for check-in:', { latitude, longitude, empLat, empLon });
+        return res.status(400).json({ message: 'Invalid coordinates provided' });
+      }
+      
       const employeeId = req.user!.id;
 
       // Get employee and assigned work site
@@ -268,24 +438,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Work site not found' });
       }
 
-      // Check if employee is within geofence with improved accuracy
-      const distance = calculateDistance(
-        latitude,
-        longitude,
-        parseFloat(site.latitude),
-        parseFloat(site.longitude)
+      // FIX: Check if employee is within geofence with GPS accuracy buffer
+      // Use parsed numeric values for accurate calculation
+      const geofenceCheck = isWithinGeofence(
+        empLat, // Use parsed numeric values
+        empLon, // Use parsed numeric values
+        site.latitude,
+        site.longitude,
+        site.geofenceRadius
       );
 
-      // Add buffer for GPS accuracy issues (typically 3-5m accuracy for mobile GPS)
-      const gpsAccuracyBuffer = 10; // meters
-      const effectiveRadius = site.geofenceRadius + gpsAccuracyBuffer;
+      // FIX: Log check-in attempt with clear message
+      const logMessage = geofenceCheck.isWithin
+        ? `✅ Check-in allowed: Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(geofenceCheck.distance)}m from site)`
+        : `❌ Check-in denied: Employee ${employee.firstName} ${employee.lastName} is ${Math.round(geofenceCheck.distance)}m away from site (required: within ${site.geofenceRadius}m)`;
+      console.log('📍 Check-in geofence check:', logMessage);
 
-      console.log(`Geofence check: Distance=${Math.round(distance)}m, Radius=${site.geofenceRadius}m, EffectiveRadius=${effectiveRadius}m`);
-
-      if (distance > effectiveRadius) {
+      if (!geofenceCheck.isWithin) {
         return res.status(400).json({ 
-          message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(distance)}m away.`,
-          distance: Math.round(distance),
+          message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(geofenceCheck.distance)}m away.`,
+          distance: Math.round(geofenceCheck.distance),
           requiredRadius: site.geofenceRadius
         });
       }
@@ -296,26 +468,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Already checked in' });
       }
 
-      // Create attendance record
+      // FIX: Create attendance record with parsed numeric coordinates
       const attendance = await storage.createAttendance({
         employeeId,
         siteId: employee.siteId,
-        checkInLatitude: latitude.toString(),
-        checkInLongitude: longitude.toString(),
+        checkInLatitude: empLat.toString(), // Store as string in DB
+        checkInLongitude: empLon.toString(), // Store as string in DB
       });
 
-      // Create location tracking record
+      // FIX: Create location tracking record with parsed numeric coordinates
       await storage.createLocationTracking({
         employeeId,
-        latitude: latitude.toString(),
-        longitude: longitude.toString(),
+        latitude: empLat.toString(), // Store as string in DB
+        longitude: empLon.toString(), // Store as string in DB
         isOnSite: true,
       });
 
       // Send real-time notification to admin
-      console.log(`Sending check-in notification for employee ${employee.firstName} ${employee.lastName} to admin ${employee.adminId}`);
-      console.log(`Admin connections available:`, Array.from(adminConnections.keys()));
-      console.log(`Admin ${employee.adminId} connections count:`, adminConnections.get(employee.adminId)?.length || 0);
+      // Sending check-in notification
       notifyAdmin(employee.adminId, {
         type: 'employee_checkin',
         message: `${employee.firstName} ${employee.lastName} checked in at ${site.name}`,
@@ -407,20 +577,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const url = new URL(req.url!, `http://${req.headers.host}`);
     const token = url.searchParams.get('token');
     
+    console.log(`WebSocket connection attempt from ${req.socket.remoteAddress}`);
+    
     if (!token) {
+      // WebSocket connection rejected: No token provided
       ws.close(1008, 'Token required');
       return;
     }
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
+      // Token verified successfully
       
       if (decoded.type === 'admin') {
         // Add admin connection to notifications map
         const connections = adminConnections.get(decoded.id) || [];
         connections.push(ws);
         adminConnections.set(decoded.id, connections);
-        console.log(`Admin ${decoded.id} connected to WebSocket. Total connections: ${connections.length}`);
+        // Admin connected to WebSocket
         
         // Send initial connection confirmation
         ws.send(JSON.stringify({
@@ -445,7 +619,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         employeeConnections.set(decoded.id, ws);
       }
 
-      ws.on('close', () => {
+      // Add error handler with detailed logging
+      ws.on('error', (error) => {
+        console.error(`WebSocket error for ${decoded.type} ${decoded.id}:`, error.message);
+      });
+
+      // Heartbeat mechanism - send ping every 30 seconds
+      const heartbeatInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.ping();
+        } else {
+          clearInterval(heartbeatInterval);
+        }
+      }, 30000);
+
+      // Handle pong responses to keep connection alive
+      ws.on('pong', () => {
+        // Connection is alive
+      });
+
+      ws.on('close', (code, reason) => {
+        clearInterval(heartbeatInterval);
+        
         if (decoded.type === 'admin') {
           const connections = adminConnections.get(decoded.id) || [];
           const updatedConnections = connections.filter(conn => conn !== ws);
@@ -454,9 +649,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             adminConnections.delete(decoded.id);
           }
-          console.log(`Admin ${decoded.id} disconnected. Remaining connections: ${updatedConnections.length}`);
+          // Admin disconnected from WebSocket
         } else if (decoded.type === 'employee') {
           employeeConnections.delete(decoded.id);
+          // Employee disconnected from WebSocket
         }
       });
 
@@ -472,21 +668,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const site = await storage.getWorkSite(employee.siteId);
               
               if (site) {
-                const distance = calculateDistance(
-                  parseFloat(latitude),
-                  parseFloat(longitude),
-                  parseFloat(site.latitude),
-                  parseFloat(site.longitude)
+                const geofenceCheck = isWithinGeofence(
+                  latitude,
+                  longitude,
+                  site.latitude,
+                  site.longitude,
+                  site.geofenceRadius
                 );
-                
-                const isOnSite = distance <= site.geofenceRadius;
                 
                 // Save location tracking
                 await storage.createLocationTracking({
                   employeeId: decoded.id,
                   latitude,
                   longitude,
-                  isOnSite,
+                  isOnSite: geofenceCheck.isWithin,
                 });
 
                 // Broadcast to admin
@@ -499,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     employeeId: decoded.id,
                     latitude,
                     longitude,
-                    isOnSite,
+                    isOnSite: geofenceCheck.isWithin,
                         timestamp: new Date().toISOString(),
                       }));
                     }
@@ -513,7 +708,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-    } catch (error) {
+    } catch (error: any) {
+      console.error('WebSocket authentication failed:', error.message);
       ws.close(1008, 'Invalid token');
     }
   });
@@ -527,6 +723,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching recent notifications:', error);
       res.status(500).json({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  // Alerts endpoint
+  app.get('/api/admin/alerts', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const adminId = req.user!.id;
+      const alerts = await storage.getAlerts(adminId);
+      res.json(alerts);
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+      res.status(500).json({ message: 'Failed to fetch alerts' });
     }
   });
 
@@ -670,13 +878,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (location) {
             const assignedSite = await storage.getWorkSite(employee.siteId);
             if (assignedSite) {
-              const distance = calculateDistance(
-                parseFloat(location.latitude),
-                parseFloat(location.longitude),
-                parseFloat(assignedSite.latitude),
-                parseFloat(assignedSite.longitude)
+              const geofenceCheck = isWithinGeofence(
+                location.latitude,
+                location.longitude,
+                assignedSite.latitude,
+                assignedSite.longitude,
+                assignedSite.geofenceRadius
               );
-              if (distance <= assignedSite.geofenceRadius) {
+              if (geofenceCheck.isWithin) {
                 onSiteCount++;
               }
             }
@@ -800,7 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const preferences = req.body;
       
       // For now, we'll just return success. In a real app, you'd save these to the database
-      console.log('Notification preferences updated for admin:', req.user!.id, preferences);
+      // Notification preferences updated
       
       res.json({ message: 'Notification preferences updated successfully' });
     } catch (error) {
@@ -812,14 +1021,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Object storage endpoints for profile images
   app.post('/api/objects/upload', authenticateToken(['admin', 'employee']), async (req: AuthenticatedRequest, res) => {
     try {
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const id = randomUUID();
+      
+      // Use SERVER_URL from env for production, otherwise construct from request
+      const baseURL = process.env.SERVER_URL || `${req.protocol}://${req.get('host')}`;
+      const uploadURL = `${baseURL}/api/uploads/${id}`;
+      
+      // Upload URL generated
       res.json({ uploadURL });
     } catch (error) {
       console.error('Error getting upload URL:', error);
       res.status(500).json({ message: 'Failed to get upload URL' });
     }
   });
+
+  // Receive raw PUT uploads and save to /uploads as webp
+  app.put('/api/uploads/:id', authenticateToken(['admin', 'employee']), express.raw({ type: '*/*', limit: '15mb' }), async (req: AuthenticatedRequest, res) => {
+    try {
+      const id = req.params.id;
+      // Upload started
+      if (!Buffer.isBuffer(req.body) || (req.body as Buffer).length === 0) {
+        return res.status(400).json({ message: 'Empty upload' });
+      }
+      const outPath = path.join(uploadDir, `${id}.webp`);
+      await sharp(req.body as Buffer)
+        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toFile(outPath);
+      
+      // Use SERVER_URL from env for production, otherwise construct from request
+      const baseURL = process.env.SERVER_URL || `${req.protocol}://${req.get('host')}`;
+      const publicUrl = `${baseURL}/uploads/${id}.webp`;
+      
+      // Upload completed
+      return res.json({ url: publicUrl, uploadURL: publicUrl });
+    } catch (error) {
+      console.error('Upload write error:', error);
+      return res.status(500).json({ message: 'Upload failed' });
+    }
+  });
+
+  // NEW: Supabase Storage Upload Endpoint
+  app.post('/api/upload', authenticateToken(['admin', 'employee']), uploadMiddleware, uploadProfileImage);
+  
+  // NEW: Supabase Storage Site Image Upload Endpoint
+  app.post('/api/upload/site', authenticateToken(['admin', 'employee']), uploadMiddleware, uploadSiteImage);
 
   // Serve object storage images with adaptive compression
   app.get('/objects/*', async (req, res) => {
@@ -932,6 +1178,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Image URL is required' });
       }
 
+      // Get current admin to find old profile image
+      const currentAdmin = await storage.getAdmin(req.user!.id);
+      const oldImageUrl = currentAdmin?.profileImage;
+
+      // Delete old image from Supabase storage if it exists
+      if (oldImageUrl) {
+        await deleteImageFromSupabase(oldImageUrl);
+      }
+
       const objectStorageService = new ObjectStorageService();
       const objectPath = await objectStorageService.trySetObjectEntityPath(imageURL);
 
@@ -953,6 +1208,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Remove admin profile image
   app.delete('/api/admin/profile-image', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
+      // Get current admin to find old profile image
+      const currentAdmin = await storage.getAdmin(req.user!.id);
+      const oldImageUrl = currentAdmin?.profileImage;
+
+      // Delete old image from Supabase storage if it exists
+      if (oldImageUrl) {
+        await deleteImageFromSupabase(oldImageUrl);
+      }
+
       await storage.updateAdmin(req.user!.id, {
         profileImage: null
       });
@@ -971,6 +1235,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!imageURL) {
         return res.status(400).json({ message: 'Image URL is required' });
+      }
+
+      // Get current employee to find old profile image
+      const currentEmployee = await storage.getEmployee(req.user!.id);
+      const oldImageUrl = currentEmployee?.profileImage;
+
+      // Delete old image from Supabase storage if it exists
+      if (oldImageUrl) {
+        await deleteImageFromSupabase(oldImageUrl);
       }
 
       const objectStorageService = new ObjectStorageService();
@@ -994,6 +1267,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Remove employee profile image
   app.delete('/api/employee/profile-image', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
     try {
+      // Get current employee to find old profile image
+      const currentEmployee = await storage.getEmployee(req.user!.id);
+      const oldImageUrl = currentEmployee?.profileImage;
+
+      // Delete old image from Supabase storage if it exists
+      if (oldImageUrl) {
+        await deleteImageFromSupabase(oldImageUrl);
+      }
+
       await storage.updateEmployee(req.user!.id, {
         profileImage: null
       });
@@ -1019,6 +1301,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminEmployees = await storage.getEmployeesByAdmin(req.user!.id);
       if (!adminEmployees.find(emp => emp.id === employeeId)) {
         return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Get current employee to find old profile image
+      const currentEmployee = await storage.getEmployee(employeeId);
+      const oldImageUrl = currentEmployee?.profileImage;
+
+      // Delete old image from Supabase storage if it exists
+      if (oldImageUrl) {
+        await deleteImageFromSupabase(oldImageUrl);
       }
 
       const objectStorageService = new ObjectStorageService();
@@ -1047,6 +1338,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminEmployees = await storage.getEmployeesByAdmin(req.user!.id);
       if (!adminEmployees.find(emp => emp.id === employeeId)) {
         return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Get current employee to find old profile image
+      const currentEmployee = await storage.getEmployee(employeeId);
+      const oldImageUrl = currentEmployee?.profileImage;
+
+      // Delete old image from Supabase storage if it exists
+      if (oldImageUrl) {
+        await deleteImageFromSupabase(oldImageUrl);
       }
 
       await storage.updateEmployee(employeeId, {
@@ -1164,7 +1464,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      res.json(employee);
+      const { password, ...employeeData } = employee;
+      res.json(employeeData);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch employee' });
     }
@@ -1192,7 +1493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/employees', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
-      console.log('Employee creation request body:', JSON.stringify(req.body, null, 2));
+      // Log employee creation attempt (sensitive data removed)
       
       // Pre-process data before validation
       const processedData = { ...req.body };
@@ -1222,7 +1523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Remove adminId from validation since we set it manually
       const validatedData = insertEmployeeSchema.omit({ adminId: true }).parse(processedData);
       
-      console.log('Validated data:', JSON.stringify(validatedData, null, 2));
+      // Employee data validated successfully
       
       // Check if email already exists across both admin and employee tables
       const emailExists = await storage.checkEmailExists(validatedData.email);
@@ -1317,7 +1618,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         ...(hashedPassword && { password: hashedPassword })
       });
-      res.json(employee);
+      const { password, ...employeeData } = employee;
+      res.json(employeeData);
     } catch (error) {
       console.error('Employee update error:', error);
       if (error instanceof z.ZodError) {
@@ -1350,21 +1652,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/sites', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
-      console.log('Site creation request body:', JSON.stringify(req.body, null, 2));
       const validatedData = insertWorkSiteSchema.omit({ adminId: true }).parse(req.body);
-      console.log('Validated site data:', JSON.stringify(validatedData, null, 2));
       
       // Process site image URL if provided
       let processedData = validatedData;
       if (validatedData.siteImage) {
         try {
-          const objectStorageService = new ObjectStorageService();
-          const objectPath = await objectStorageService.trySetObjectEntityPath(validatedData.siteImage);
-          processedData = {
-            ...validatedData,
-            siteImage: objectPath
-          };
-          console.log('Processed site image URL:', objectPath);
+          // If siteImage is a Supabase URL, use it directly; otherwise process it
+          if (validatedData.siteImage.includes('supabase.co/storage/v1/object/public') && 
+              validatedData.siteImage.includes('Work%20Site%20Images')) {
+            // Already a Supabase URL, use as is
+            processedData = {
+              ...validatedData,
+              siteImage: validatedData.siteImage
+            };
+          } else {
+            // Process through ObjectStorageService
+            const objectStorageService = new ObjectStorageService();
+            const objectPath = await objectStorageService.trySetObjectEntityPath(validatedData.siteImage);
+            processedData = {
+              ...validatedData,
+              siteImage: objectPath
+            };
+          }
         } catch (error) {
           console.error('Error processing site image URL:', error);
           // Continue without image rather than failing entire site creation
@@ -1393,22 +1703,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/admin/sites/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log('Site update request body:', JSON.stringify(req.body, null, 2));
+      // Get current site to check for old image
+      const currentSite = await storage.getWorkSite(id);
       
       const validatedData = insertWorkSiteSchema.partial().parse(req.body);
-      console.log('Validated site update data:', JSON.stringify(validatedData, null, 2));
       
       // Process site image URL if provided
       let processedData = validatedData;
       if (validatedData.siteImage) {
         try {
-          const objectStorageService = new ObjectStorageService();
-          const objectPath = await objectStorageService.trySetObjectEntityPath(validatedData.siteImage);
-          processedData = {
-            ...validatedData,
-            siteImage: objectPath
-          };
-          console.log('Processed updated site image URL:', objectPath);
+          // If siteImage is a Supabase URL, use it directly; otherwise process it
+          if (validatedData.siteImage.includes('supabase.co/storage/v1/object/public') && 
+              validatedData.siteImage.includes('Work%20Site%20Images')) {
+            // Already a Supabase URL, use as is
+            // If new image URL is different and old one exists in Supabase, delete old image
+            if (currentSite?.siteImage && currentSite.siteImage !== validatedData.siteImage) {
+              // Check if old image is from Supabase "Work Site Images" bucket
+              if (currentSite.siteImage.includes('supabase.co/storage/v1/object/public') && 
+                  currentSite.siteImage.includes('Work%20Site%20Images')) {
+                await deleteSiteImageFromSupabase(currentSite.siteImage);
+              }
+            }
+            
+            processedData = {
+              ...validatedData,
+              siteImage: validatedData.siteImage
+            };
+          } else {
+            // Process through ObjectStorageService
+            const objectStorageService = new ObjectStorageService();
+            const objectPath = await objectStorageService.trySetObjectEntityPath(validatedData.siteImage);
+            
+            // If new image URL is different and old one exists in Supabase, delete old image
+            if (currentSite?.siteImage && currentSite.siteImage !== objectPath) {
+              // Check if old image is from Supabase "Work Site Images" bucket
+              if (currentSite.siteImage.includes('supabase.co/storage/v1/object/public') && 
+                  currentSite.siteImage.includes('Work%20Site%20Images')) {
+                await deleteSiteImageFromSupabase(currentSite.siteImage);
+              }
+            }
+            
+            processedData = {
+              ...validatedData,
+              siteImage: objectPath
+            };
+            console.log('Processed updated site image URL:', objectPath);
+          }
         } catch (error) {
           console.error('Error processing updated site image URL:', error);
           // Continue with original data on image processing error
@@ -1429,6 +1769,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/admin/sites/:id', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // Get site before deleting to check for image
+      const site = await storage.getWorkSite(id);
+      
+      // Delete the site image from Supabase storage if it exists
+      if (site?.siteImage && site.siteImage.includes('supabase.co/storage/v1/object/public') && 
+          site.siteImage.includes('Work%20Site%20Images')) {
+        await deleteSiteImageFromSupabase(site.siteImage);
+      }
+      
       await storage.deleteWorkSite(id);
       res.status(204).send();
     } catch (error) {
@@ -1448,16 +1798,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if this site belongs to the admin
       const adminSites = await storage.getWorkSitesByAdmin(req.user!.id);
-      if (!adminSites.find(site => site.id === siteId)) {
+      const site = adminSites.find(site => site.id === siteId);
+      if (!site) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      const objectStorageService = new ObjectStorageService();
-      const objectPath = await objectStorageService.trySetObjectEntityPath(siteImageURL);
+      // Check if siteImageURL is already a Supabase URL
+      let finalImagePath: string;
+      if (siteImageURL.includes('supabase.co/storage/v1/object/public') && 
+          siteImageURL.includes('Work%20Site%20Images')) {
+        // Already a Supabase URL, use as is
+        finalImagePath = siteImageURL;
+      } else {
+        // Process through ObjectStorageService
+        const objectStorageService = new ObjectStorageService();
+        finalImagePath = await objectStorageService.trySetObjectEntityPath(siteImageURL);
+      }
+
+      // Delete old site image from Supabase if it exists and is different from new one
+      if (site.siteImage && site.siteImage !== finalImagePath) {
+        // Check if old image is from Supabase "Work Site Images" bucket
+        if (site.siteImage.includes('supabase.co/storage/v1/object/public') && 
+            site.siteImage.includes('Work%20Site%20Images')) {
+          await deleteSiteImageFromSupabase(site.siteImage);
+        }
+      }
 
       // Update work site with object path
       const updatedSite = await storage.updateWorkSite(siteId, {
-        siteImage: objectPath
+        siteImage: finalImagePath
       });
 
       res.json({
@@ -1477,8 +1846,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if this site belongs to the admin
       const adminSites = await storage.getWorkSitesByAdmin(req.user!.id);
-      if (!adminSites.find(site => site.id === siteId)) {
+      const site = adminSites.find(site => site.id === siteId);
+      if (!site) {
         return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Delete the site image from Supabase storage before removing from database
+      if (site.siteImage && site.siteImage.includes('supabase.co/storage/v1/object/public') && 
+          site.siteImage.includes('Work%20Site%20Images')) {
+        await deleteSiteImageFromSupabase(site.siteImage);
       }
 
       await storage.updateWorkSite(siteId, {
@@ -1623,20 +1999,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (currentAttendance) {
             const location = await storage.getLatestEmployeeLocation(employee.id);
             
-            // Calculate if employee is within geofence
+            // Calculate if employee is within geofence with GPS accuracy buffer
             let isWithinGeofence = false;
             const siteId = employee.siteId;
             if (location && siteId) {
               const assignedSite = await storage.getWorkSite(siteId);
               if (assignedSite) {
-                const distance = calculateDistance(
-                  parseFloat(location.latitude),
-                  parseFloat(location.longitude),
-                  parseFloat(assignedSite.latitude),
-                  parseFloat(assignedSite.longitude)
+                const geofenceCheck = isWithinGeofence(
+                  location.latitude,
+                  location.longitude,
+                  assignedSite.latitude,
+                  assignedSite.longitude,
+                  assignedSite.geofenceRadius
                 );
-                isWithinGeofence = distance <= assignedSite.geofenceRadius;
-                console.log(`Employee ${employee.firstName} distance: ${distance}m, geofence: ${assignedSite.geofenceRadius}m, within: ${isWithinGeofence}`);
+                isWithinGeofence = geofenceCheck.isWithin;
+                // Geofence check completed
               }
             }
             
@@ -1666,37 +2043,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/employee/location', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
     try {
+      // FIX: Ensure coordinates are numeric, not strings
       const { latitude, longitude } = req.body;
+      
+      // FIX: Parse coordinates to ensure they're numbers
+      const empLat = typeof latitude === 'string' ? parseFloat(latitude) : Number(latitude);
+      const empLon = typeof longitude === 'string' ? parseFloat(longitude) : Number(longitude);
+      
+      // Validate coordinates
+      if (isNaN(empLat) || isNaN(empLon) || !isFinite(empLat) || !isFinite(empLon)) {
+        console.error('❌ Invalid coordinates received:', { latitude, longitude, empLat, empLon });
+        return res.status(400).json({ message: 'Invalid coordinates provided' });
+      }
+      
       const employee = await storage.getEmployee(req.user!.id);
       
       if (!employee) {
         return res.status(404).json({ message: 'Employee not found' });
       }
 
-      // Calculate if employee is on site
+      // Calculate if employee is on site with GPS accuracy buffer
       const assignedSite = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
       let isOnSite = false;
+      let distance = 0;
       
       if (assignedSite) {
-        const distance = calculateDistance(
-          parseFloat(latitude),
-          parseFloat(longitude),
-          parseFloat(assignedSite.latitude),
-          parseFloat(assignedSite.longitude)
+        const geofenceCheck = isWithinGeofence(
+          empLat, // Use parsed numeric values
+          empLon, // Use parsed numeric values
+          assignedSite.latitude,
+          assignedSite.longitude,
+          assignedSite.geofenceRadius
         );
-        isOnSite = distance <= assignedSite.geofenceRadius;
+        isOnSite = geofenceCheck.isWithin;
+        distance = geofenceCheck.distance;
+        
+        // FIX: Log location update with clear message
+        const logMessage = isOnSite 
+          ? `✅ Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(distance)}m from site)`
+          : `❌ Employee ${employee.firstName} ${employee.lastName} is ${Math.round(distance)}m away from site`;
+        console.log('📍 Location update:', logMessage);
       }
 
-      // Save location tracking
+      // FIX: Save location tracking with parsed numeric coordinates
       await storage.createLocationTracking({
         employeeId: employee.id,
-        latitude,
-        longitude,
+        latitude: empLat.toString(), // Store as string in DB
+        longitude: empLon.toString(), // Store as string in DB
         isOnSite,
       });
 
-      res.json({ success: true, isOnSite });
+      res.json({ success: true, isOnSite, distance: Math.round(distance) });
     } catch (error) {
+      console.error('❌ Error updating location:', error);
       res.status(500).json({ message: 'Failed to update location' });
     }
   });
@@ -1731,69 +2130,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid format. Must be one of: html, pdf, excel, csv' });
       }
 
+      // Check if SendGrid API key is configured
+      if (!process.env.SENDGRID_API_KEY) {
+        console.error('SENDGRID_API_KEY is not configured');
+        return res.status(500).json({ 
+          message: 'Email service is not configured. Please contact the administrator.',
+          error: 'SENDGRID_API_KEY missing'
+        });
+      }
+
       // Get all employees for this admin
-      const employees = await storage.getEmployeesByAdmin(req.user!.id);
+      let employees;
+      try {
+        employees = await storage.getEmployeesByAdmin(req.user!.id);
+      } catch (dbError) {
+        console.error('Failed to fetch employees:', dbError);
+        return res.status(500).json({ 
+          message: 'Failed to fetch employee data',
+          error: dbError instanceof Error ? dbError.message : 'Database error'
+        });
+      }
       
       // Get 30-day attendance data for all employees
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      const attendanceData = await Promise.all(
-        employees.map(async (employee) => {
-          const history = await storage.getEmployeeAttendanceHistory(employee.id, thirtyDaysAgo);
-          const site = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
-          
-          return {
-            employee,
-            site,
-            attendance: history
-          };
-        })
-      );
+      let attendanceData;
+      try {
+        attendanceData = await Promise.all(
+          employees.map(async (employee) => {
+            const history = await storage.getEmployeeAttendanceHistory(employee.id, thirtyDaysAgo);
+            const site = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
+            
+            return {
+              employee,
+              site,
+              attendance: history
+            };
+          })
+        );
+      } catch (dataError) {
+        console.error('Failed to fetch attendance data:', dataError);
+        return res.status(500).json({ 
+          message: 'Failed to fetch attendance data',
+          error: dataError instanceof Error ? dataError.message : 'Data fetch error'
+        });
+      }
 
       // Generate report based on format
       let reportContent: string | Buffer;
       let attachments: any[] = [];
       let emailHtml = '';
 
-      if (format === 'html') {
-        reportContent = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
-        emailHtml = reportContent;
-      } else if (format === 'pdf') {
-        try {
-          reportContent = await generatePdfReport(attendanceData, thirtyDaysAgo);
-          emailHtml = 'Please find the attendance report attached as a PDF file.';
-          attachments = [{
-            content: reportContent.toString('base64'),
-            filename: `attendance-report-${new Date().toISOString().split('T')[0]}.pdf`,
-            type: 'application/pdf',
-            disposition: 'attachment'
-          }];
-        } catch (pdfError) {
-          console.error('PDF generation failed, falling back to HTML:', pdfError);
-          // Fallback to HTML format if PDF generation fails
+      try {
+        if (format === 'html') {
           reportContent = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
           emailHtml = reportContent;
-          attachments = [];
+        } else if (format === 'pdf') {
+          try {
+            reportContent = await generatePdfReport(attendanceData, thirtyDaysAgo);
+            emailHtml = 'Please find the attendance report attached as a PDF file.';
+            attachments = [{
+              content: reportContent.toString('base64'),
+              filename: `attendance-report-${new Date().toISOString().split('T')[0]}.pdf`,
+              type: 'application/pdf',
+              disposition: 'attachment'
+            }];
+          } catch (pdfError) {
+            console.error('PDF generation failed, falling back to HTML:', pdfError);
+            // Fallback to HTML format if PDF generation fails
+            reportContent = generateAttendanceReportHtml(attendanceData, thirtyDaysAgo);
+            emailHtml = reportContent;
+            attachments = [];
+          }
+        } else if (format === 'excel') {
+          reportContent = await generateExcelReport(attendanceData, thirtyDaysAgo);
+          emailHtml = 'Please find the attendance report attached as an Excel file.';
+          attachments = [{
+            content: reportContent.toString('base64'),
+            filename: `attendance-report-${new Date().toISOString().split('T')[0]}.xlsx`,
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            disposition: 'attachment'
+          }];
+        } else if (format === 'csv') {
+          reportContent = await generateCsvReport(attendanceData, thirtyDaysAgo);
+          emailHtml = 'Please find the attendance report attached as a CSV file.';
+          attachments = [{
+            content: Buffer.from(reportContent).toString('base64'),
+            filename: `attendance-report-${new Date().toISOString().split('T')[0]}.csv`,
+            type: 'text/csv',
+            disposition: 'attachment'
+          }];
         }
-      } else if (format === 'excel') {
-        reportContent = await generateExcelReport(attendanceData, thirtyDaysAgo);
-        emailHtml = 'Please find the attendance report attached as an Excel file.';
-        attachments = [{
-          content: reportContent.toString('base64'),
-          filename: `attendance-report-${new Date().toISOString().split('T')[0]}.xlsx`,
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          disposition: 'attachment'
-        }];
-      } else if (format === 'csv') {
-        reportContent = await generateCsvReport(attendanceData, thirtyDaysAgo);
-        emailHtml = 'Please find the attendance report attached as a CSV file.';
-        attachments = [{
-          content: Buffer.from(reportContent).toString('base64'),
-          filename: `attendance-report-${new Date().toISOString().split('T')[0]}.csv`,
-          type: 'text/csv',
-          disposition: 'attachment'
-        }];
+      } catch (reportError) {
+        console.error('Report generation failed:', reportError);
+        return res.status(500).json({ 
+          message: `Failed to generate ${format.toUpperCase()} report`,
+          error: reportError instanceof Error ? reportError.message : 'Report generation error'
+        });
       }
       
       // Validate email addresses
@@ -1802,8 +2236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid email address format' });
       }
 
-      console.log(`Sending attendance report (${format.toUpperCase()}) from ${fromEmail} to ${email}`);
-      console.log(`Report contains ${attendanceData.length} employees`);
+      // Sending attendance report
 
       // For SendGrid to work properly, the 'from' email should be verified
       // We'll use a safer approach with a verified sender
@@ -1815,23 +2248,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send email
-      const emailSent = await sendEmail({
-        to: email,
-        from: actualFromEmail,
-        subject: subject,
-        html: emailHtml,
-        text: 'Please view this email in HTML format to see the attendance report.',
-        attachments: attachments
-      });
+      try {
+        const emailSent = await sendEmail({
+          to: email,
+          from: actualFromEmail,
+          subject: subject,
+          html: emailHtml,
+          text: 'Please view this email in HTML format to see the attendance report.',
+          attachments: attachments
+        });
 
-      if (emailSent) {
-        res.json({ message: 'Report sent successfully' });
-      } else {
-        res.status(500).json({ message: 'Failed to send email (export failed)' });
+        if (emailSent) {
+          res.json({ message: 'Report sent successfully' });
+        } else {
+          res.status(500).json({ 
+            message: 'Failed to send email. Please check SendGrid configuration and verify the sender email is verified in SendGrid.',
+            error: 'Email sending failed'
+          });
+        }
+      } catch (emailError) {
+        console.error('Email sending error:', emailError);
+        const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown email error';
+        res.status(500).json({ 
+          message: 'Failed to send email. Please check SendGrid configuration.',
+          error: errorMessage
+        });
       }
     } catch (error) {
       console.error('Export report error:', error);
-      res.status(500).json({ message: 'Failed to generate and send report (export failed)' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ 
+        message: 'Failed to generate and send report',
+        error: errorMessage
+      });
     }
   });
 
@@ -1936,8 +2385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send verification email
       const verificationLink = `${req.protocol}://${req.get('host')}/admin/verify-email?token=${verificationToken}`;
       
-      console.log('Resending verification email to:', email);
-      console.log('New verification link:', verificationLink);
+      // Resending verification email
       
       const emailSent = await sendEmail({
         to: email,
@@ -2008,8 +2456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send verification email
       const verificationLink = `${req.protocol}://${req.get('host')}/admin/verify-email?token=${verificationToken}`;
       
-      console.log('Sending verification email to:', validatedData.email);
-      console.log('Verification link:', verificationLink);
+      // Sending verification email
       
       const emailSent = await sendEmail({
         to: validatedData.email,
@@ -2031,7 +2478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         text: `Welcome to LabourTrackr! Please verify your email by visiting: ${verificationLink}. This link expires in 24 hours.`
       });
 
-      console.log('Email sent result:', emailSent);
+      // Verification email sent
 
       if (emailSent) {
         res.status(201).json({ 

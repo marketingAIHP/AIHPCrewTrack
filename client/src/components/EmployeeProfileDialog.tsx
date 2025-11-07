@@ -12,9 +12,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Camera, Upload, X } from 'lucide-react';
-import { ObjectUploader } from '@/components/ObjectUploader';
 import { AuthenticatedImage } from '@/components/AuthenticatedImage';
-// import type { UploadResult } from '@uppy/core';
+import { useRef } from 'react';
 
 interface EmployeeData {
   id: number;
@@ -41,6 +40,7 @@ export function EmployeeProfileDialog({ employee, isOpen, onClose }: EmployeePro
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<z.infer<typeof updateProfileSchema>>({
     resolver: zodResolver(updateProfileSchema),
@@ -72,10 +72,34 @@ export function EmployeeProfileDialog({ employee, isOpen, onClose }: EmployeePro
     },
   });
 
-  // Profile image mutations
+  // Profile image upload to Supabase
   const uploadImageMutation = useMutation({
-    mutationFn: async (imageURL: string) => {
-      const response = await fetch('/api/employee/profile-image', {
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload image');
+      }
+
+      const data = await response.json();
+      const imageURL = data.profileImage || data.url || data.uploadURL;
+
+      if (!imageURL) {
+        throw new Error('No image URL returned from server');
+      }
+
+      // Update profile image in database
+      const updateResponse = await fetch('/api/employee/profile-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
@@ -83,16 +107,27 @@ export function EmployeeProfileDialog({ employee, isOpen, onClose }: EmployeePro
         },
         body: JSON.stringify({ imageURL }),
       });
-      if (!response.ok) throw new Error('Failed to upload image');
-      return response.json();
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update profile image');
+      }
+
+      return updateResponse.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Image Uploaded",
         description: "Profile image has been updated successfully.",
       });
+      // Invalidate all queries that might show this employee's profile
       queryClient.invalidateQueries({ queryKey: ['/api/employee/profile'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/locations'] });
       setIsImageDialogOpen(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     },
     onError: (error: any) => {
       toast({
@@ -131,29 +166,30 @@ export function EmployeeProfileDialog({ employee, isOpen, onClose }: EmployeePro
     },
   });
 
-  const handleGetUploadParameters = async () => {
-    const response = await fetch('/api/objects/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        path: `profile-images/${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        contentType: 'image/*',
-      }),
-    });
-    
-    if (!response.ok) throw new Error('Failed to get upload parameters');
-    return response.json();
-  };
-
-  const handleUploadComplete = (result: any) => {
-    if (result && result.length > 0 && result[0].successful) {
-      const uploadedFile = result[0];
-      if (uploadedFile.uploadURL) {
-        uploadImageMutation.mutate(uploadedFile.uploadURL);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
+        return;
       }
+
+      // Validate file size (5MB)
+      if (file.size > 5242880) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      uploadImageMutation.mutate(file);
     }
   };
 
@@ -176,26 +212,16 @@ export function EmployeeProfileDialog({ employee, isOpen, onClose }: EmployeePro
             {/* Profile Image Section */}
             <div className="flex items-center justify-center">
               <div className="relative">
-                {employee.profileImage ? (
-                  <AuthenticatedImage
-                    src={employee.profileImage}
-                    alt="Profile"
-                    className="w-20 h-20 rounded-full object-cover"
-                    fallback={
-                      <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center">
-                        <span className="text-2xl font-medium text-gray-700">
-                          {employee.firstName[0]}{employee.lastName[0]}
-                        </span>
-                      </div>
-                    }
-                  />
-                ) : (
-                  <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center">
-                    <span className="text-2xl font-medium text-gray-700">
-                      {employee.firstName[0]}{employee.lastName[0]}
-                    </span>
-                  </div>
-                )}
+                <AuthenticatedImage
+                  src={employee.profileImage}
+                  alt="Profile"
+                  className="w-20 h-20 rounded-full object-cover border-2 border-white shadow-sm"
+                  fallback={
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                      <span className="text-white font-bold text-2xl">{employee.firstName[0]}{employee.lastName[0]}</span>
+                    </div>
+                  }
+                />
                 <Button
                   size="sm"
                   className="absolute -bottom-1 -right-1 rounded-full w-6 h-6 p-0"
@@ -277,22 +303,33 @@ export function EmployeeProfileDialog({ employee, isOpen, onClose }: EmployeePro
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <ObjectUploader
-              maxNumberOfFiles={1}
-              maxFileSize={5242880} // 5MB
-              allowedFileTypes={["image/*"]}
-              onGetUploadParameters={handleGetUploadParameters}
-              onComplete={handleUploadComplete}
-              buttonClassName="w-full"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {uploadImageMutation.isPending ? 'Processing...' : 'Upload New Image'}
-            </ObjectUploader>
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              id="profile-image-upload"
+              disabled={uploadImageMutation.isPending}
+            />
+            <label htmlFor="profile-image-upload">
+              <Button
+                variant="outline"
+                className="w-full cursor-pointer"
+                disabled={uploadImageMutation.isPending}
+                asChild
+              >
+                <span>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploadImageMutation.isPending ? 'Uploading...' : 'Upload New Image'}
+                </span>
+              </Button>
+            </label>
             {employee.profileImage && (
               <Button
                 variant="destructive"
                 onClick={() => removeImageMutation.mutate()}
-                disabled={removeImageMutation.isPending}
+                disabled={removeImageMutation.isPending || uploadImageMutation.isPending}
                 className="w-full"
               >
                 <X className="h-4 w-4 mr-2" />

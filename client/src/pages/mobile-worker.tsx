@@ -71,9 +71,11 @@ export default function MobileWorker() {
   // Location tracking mutation
   const updateLocationMutation = useMutation({
     mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
+      // FIX: Send coordinates as numbers, not strings, for consistent parsing
+      // This ensures the server receives numeric values and avoids type conversion issues
       const response = await apiRequest('POST', '/api/employee/location', {
-        latitude: latitude.toString(),
-        longitude: longitude.toString(),
+        latitude: latitude, // Send as number, not string
+        longitude: longitude, // Send as number, not string
       });
       return response.json();
     },
@@ -257,17 +259,17 @@ export default function MobileWorker() {
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-white hover:bg-white hover:bg-opacity-10"
+            className="text-red-300 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 border border-red-400/30 hover:border-red-500 transition-all duration-200 shadow-sm hover:shadow-md"
             onClick={handleLogout}
           >
-            <Settings className="text-white" />
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       <div className="p-4">
         {/* Status Card */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-2 border-slate-300 dark:border-slate-600">
           <CardContent className="p-6">
             <div className="text-center">
               <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
@@ -297,7 +299,7 @@ export default function MobileWorker() {
 
         {/* Location Permission Warning */}
         {locationError && (
-          <Card className="mb-6 border-warning">
+          <Card className="mb-6 border-2 border-slate-300 dark:border-slate-600">
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <AlertTriangle className="text-warning" />
@@ -346,8 +348,8 @@ export default function MobileWorker() {
         </div>
 
         {/* Today's Activity */}
-        <Card className="mb-6">
-          <div className="p-4 border-b border-gray-200">
+        <Card className="mb-6 border-2 border-slate-300 dark:border-slate-600">
+          <div className="p-4 border-b-2 border-slate-300 dark:border-slate-600">
             <h3 className="font-semibold text-gray-900">Today's Activity</h3>
           </div>
           <CardContent className="p-4">
@@ -387,8 +389,8 @@ export default function MobileWorker() {
         </Card>
 
         {/* Current Location */}
-        <Card className="mb-6">
-          <div className="p-4 border-b border-gray-200">
+        <Card className="mb-6 border-2 border-slate-300 dark:border-slate-600">
+          <div className="p-4 border-b-2 border-slate-300 dark:border-slate-600">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-gray-900">Current Location</h3>
               <div className="flex items-center space-x-2">

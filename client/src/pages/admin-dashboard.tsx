@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken, getUser, logout, getUserType } from '@/lib/auth';
+import { loadGoogleMapsAPI } from '@/lib/google-maps';
+import GoogleMap from '@/components/google-map';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 import { 
   Users, 
@@ -12,17 +16,16 @@ import {
   Clock, 
   AlertTriangle, 
   UserCheck, 
-  UserPlus, 
   Plus,
-  FileText,
   Settings,
-  Bell,
   Download,
   LogOut
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import { AuthenticatedImage } from '@/components/AuthenticatedImage';
+import { AlertsDialog } from '@/components/AlertsDialog';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { format, isToday, isYesterday, differenceInDays } from 'date-fns';
 
 
@@ -68,6 +71,11 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const user = getUser();
   const userType = getUserType();
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapCenter, setMapCenter] = useState({ lat: 28.44065, lng: 77.08154 });
+  const [mapZoom] = useState(12);
+  const initializeCalledRef = useRef(false);
+  const [alertsDialogOpen, setAlertsDialogOpen] = useState(false);
 
 
   useEffect(() => {
@@ -78,21 +86,17 @@ export default function AdminDashboard() {
         variant: 'destructive',
       });
       setLocation('/admin/login');
+      return;
     }
+
+    if (initializeCalledRef.current) return;
+    initializeCalledRef.current = true;
+
+    loadGoogleMapsAPI()
+      .then(() => setMapLoaded(true))
+      .catch(() => setMapLoaded(false));
   }, []);
 
-  const { data: adminProfile } = useQuery({
-    queryKey: ['/api/admin/profile'],
-    queryFn: async () => {
-      const response = await fetch('/api/admin/profile', {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch profile');
-      return response.json();
-    },
-  });
 
   const { data: recentActivities = [], isLoading: activitiesLoading } = useQuery({
     queryKey: ['/api/admin/recent-activities'],
@@ -122,6 +126,32 @@ export default function AdminDashboard() {
     enabled: !!getAuthToken() && userType === 'admin',
   });
 
+  const { data: locations = [], isLoading: isLocationsLoading } = useQuery({
+    queryKey: ['/api/admin/locations'],
+    enabled: !!getAuthToken() && userType === 'admin',
+    refetchInterval: 60000,
+  });
+
+  const { data: sites = [], isLoading: isSitesLoading } = useQuery({
+    queryKey: ['/api/admin/sites'],
+    enabled: !!getAuthToken() && userType === 'admin',
+  });
+
+  useWebSocket({});
+
+  const { data: adminProfile } = useQuery({
+    queryKey: ['/api/admin/profile'],
+    queryFn: async () => {
+      const response = await fetch('/api/admin/profile', {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch profile');
+      return response.json();
+    },
+  });
+
   const handleLogout = () => {
     logout();
     toast({
@@ -135,194 +165,193 @@ export default function AdminDashboard() {
     return null;
   }
 
+  // Styled metric card with colored gradient icon container
+  function StatCard({
+    title,
+    value,
+    subtitle,
+    icon: Icon,
+    iconBgColor,
+    iconColor,
+    cardBg,
+    href,
+    onClick,
+  }: {
+    title: string;
+    value: string | number;
+    subtitle: string;
+    icon: React.ComponentType<{ className?: string }>;
+    iconBgColor: string;
+    iconColor: string;
+    cardBg: string;
+    href?: string;
+    onClick?: () => void;
+  }) {
+    const CardInner = (
+      <div className={`${cardBg} rounded-xl group transition-all duration-200 cursor-pointer`} onClick={onClick}>
+        <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur border-2 border-slate-300 dark:border-slate-600 rounded-xl shadow-sm group-hover:shadow-lg group-hover:scale-[1.02] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">{title}</p>
+                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-1">{value}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+              </div>
+              <div className={`${iconBgColor} rounded-2xl p-4 flex items-center justify-center`}>
+                <Icon className={`h-6 w-6 ${iconColor}`} />
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+
+    if (href) {
+      return (
+        <Link href={href} className="block" onClick={onClick}>
+          {CardInner}
+        </Link>
+      );
+    }
+    return CardInner;
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-xl shadow-lg border-b border-white/20">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4 lg:py-6">
-            <Link href="/admin/dashboard">
-              <div className="flex items-center cursor-pointer hover:opacity-80 transition-all duration-300 hover:scale-105">
-                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-2 shadow-md">
-                  <img 
-                    src="/logo-192.png" 
-                    alt="AIHP CrewTrack" 
-                    className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+      <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-4 flex items-center justify-between">
+          {/* Clickable Logo and Text - Navigates to Dashboard */}
+          <Link href="/admin/dashboard">
+            <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+              <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50">
+                <img 
+                  src="/logo-192.png" 
+                  alt="AIHP CrewTrack" 
+                  className="h-14 w-14 object-contain"
+                />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">AIHP CrewTrack</h1>
+                <p className="text-sm bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">Admin Dashboard</p>
+              </div>
+            </div>
+          </Link>
+          <div className="flex items-center gap-3">
+            <NotificationDropdown />
+            <ThemeToggle />
+            <Link href="/admin/profile">
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-3 py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <div className="h-8 w-8 rounded-full overflow-hidden">
+                  <AuthenticatedImage
+                    src={adminProfile?.profileImage}
+                    alt="Admin Avatar"
+                    className="h-8 w-8 object-cover"
+                    fallback={
+                      <div className="h-8 w-8 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full font-bold">
+                        {adminProfile?.firstName?.[0] || ''}{adminProfile?.lastName?.[0] || ''}
+                      </div>
+                    }
                   />
                 </div>
-                <div className="ml-3 sm:ml-4 hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                    AIHP CrewTrack
-                  </h1>
-                  <p className="text-xs sm:text-sm text-gray-600 font-medium">Admin Dashboard</p>
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {adminProfile?.firstName && adminProfile?.lastName
+                      ? `${adminProfile.firstName} ${adminProfile.lastName}`
+                      : 'Administrator'}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Administrator</p>
                 </div>
               </div>
             </Link>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <NotificationDropdown />
-              
-              <Link href="/admin/profile">
-                <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer hover:opacity-80 transition-all duration-300 bg-gradient-to-r from-white/60 to-white/40 backdrop-blur-sm rounded-lg px-2 sm:px-4 py-1 sm:py-2 border border-white/20">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-md">
-                    <AuthenticatedImage
-                      src={adminProfile?.profileImage}
-                      alt={`${user?.firstName} ${user?.lastName}`}
-                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover"
-                      fallback={
-                        <span className="text-xs sm:text-sm font-bold text-white">
-                          {user?.firstName?.[0]}{user?.lastName?.[0]}
-                        </span>
-                      }
-                    />
-                  </div>
-                  <div className="hidden sm:block">
-                    <span className="text-sm font-semibold text-gray-800 block">
-                      {user?.firstName} {user?.lastName}
-                    </span>
-                    <span className="text-xs text-gray-600">Administrator</span>
-                  </div>
-                </div>
-              </Link>
-              
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleLogout}
-                className="bg-gradient-to-r from-red-50 to-pink-50 border-red-200 text-red-700 hover:from-red-100 hover:to-pink-100 hover:border-red-300 hover:text-red-800 font-medium shadow-sm transition-all duration-300 px-2 sm:px-3"
-              >
-                <LogOut className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Logout</span>
-              </Button>
-            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleLogout}
+              className="text-red-600 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 border border-red-200 hover:border-red-600 transition-all duration-200 shadow-sm hover:shadow-md"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Dashboard Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <main className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-6 lg:py-8">
 
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Link href="/admin/work-sites">
-            <Card className="hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer bg-gradient-to-br from-white to-blue-50 border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-600 mb-1">Work Sites</p>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                      {isLoading ? '...' : stats?.workSites || 0}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Active locations</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 shadow-lg">
-                    <MapPin className="text-white w-6 h-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link href="/admin/on-site-now">
-            <Card className="hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer bg-gradient-to-br from-white to-orange-50 border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-600 mb-1">On Site Now</p>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-orange-800 bg-clip-text text-transparent">
-                      {isLoading ? '...' : stats?.onSiteNow || 0}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Currently active</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-3 shadow-lg">
-                    <Clock className="text-white w-6 h-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link href="/admin/employee-management">
-            <Card className="hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer bg-gradient-to-br from-white to-green-50 border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-600 mb-1">Active Employees</p>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-green-800 bg-clip-text text-transparent">
-                      {isLoading ? '...' : stats?.activeEmployees || 0}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Total workforce</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-3 shadow-lg">
-                    <UserCheck className="text-white w-6 h-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Card className="hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer bg-gradient-to-br from-white to-purple-50 border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 mb-1">Alerts</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
-                    {isLoading ? '...' : stats?.alerts || 0}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Pending issues</p>
-                </div>
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-3 shadow-lg">
-                  <AlertTriangle className="text-white w-6 h-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard href="/admin/work-sites" title="Work Sites" value={isLoading ? '...' : (stats?.workSites || 0)} subtitle="Active locations" icon={MapPin} iconBgColor="bg-gradient-to-br from-blue-500 to-blue-600" iconColor="text-white" cardBg="bg-blue-100" />
+          <StatCard href="/admin/on-site-now" title="On Site Now" value={isLoading ? '...' : (stats?.onSiteNow || 0)} subtitle="Currently active" icon={Clock} iconBgColor="bg-gradient-to-br from-orange-500 to-orange-600" iconColor="text-white" cardBg="bg-orange-100" />
+          <StatCard href="/admin/employee-management" title="Active Employees" value={isLoading ? '...' : (stats?.activeEmployees || 0)} subtitle="Total workforce" icon={UserCheck} iconBgColor="bg-gradient-to-br from-green-500 to-green-600" iconColor="text-white" cardBg="bg-green-100" />
+          <StatCard 
+            title="Alerts" 
+            value={isLoading ? '...' : (stats?.alerts || 0)} 
+            subtitle="Pending issues" 
+            icon={AlertTriangle} 
+            iconBgColor="bg-gradient-to-br from-purple-500 to-purple-600" 
+            iconColor="text-white" 
+            cardBg="bg-purple-100"
+            onClick={() => setAlertsDialogOpen(true)}
+          />
         </div>
 
         {/* Quick Actions */}
-        <Card className="mb-6 sm:mb-8 bg-gradient-to-r from-white to-slate-50 border-0 shadow-lg">
-          <CardContent className="p-4 sm:p-6 lg:p-8">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Quick Actions</h3>
-              <div className="w-8 sm:w-12 h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></div>
+        <Card className="mb-6 sm:mb-8 bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-xl shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Quick Actions</h3>
+              <div className="w-12 h-1 bg-blue-600 rounded-full"></div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-              <a href="/admin/employee-management" onClick={(e) => { e.preventDefault(); window.location.href = '/admin/employee-management'; }}>
-                <Button variant="outline" className="w-full flex items-center p-3 sm:p-4 lg:p-6 h-auto bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all duration-300 hover:scale-105 shadow-md">
-                  <Users className="text-blue-600 w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900 text-sm sm:text-base">Employee Management</div>
-                    <div className="text-xs text-gray-600">Manage workforce</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <button onClick={() => (window.location.href = '/admin/employee-management')} className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-6 text-left hover:shadow-md transition-all group">
+                <div className="flex items-start gap-4">
+                  <div className="bg-blue-500 dark:bg-blue-600 rounded-2xl p-3 group-hover:scale-110 transition-transform">
+                    <Users className="h-5 w-5 text-white" />
                   </div>
-                </Button>
-              </a>
-              <Link href="/admin/sites">
-                <Button variant="outline" className="w-full flex items-center p-6 h-auto bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 hover:border-green-300 transition-all duration-300 hover:scale-105 shadow-md">
-                  <Plus className="text-green-600 w-6 h-6 mr-3" />
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900">Add Work Site</div>
-                    <div className="text-xs text-gray-600">Create locations</div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Employee Management</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Manage workforce</p>
                   </div>
-                </Button>
-              </Link>
+                </div>
+              </button>
+              <button onClick={() => (window.location.href = '/admin/sites')} className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 border-2 border-green-200 dark:border-green-700 rounded-xl p-6 text-left hover:shadow-md transition-all group">
+                <div className="flex items-start gap-4">
+                  <div className="bg-green-500 dark:bg-green-600 rounded-2xl p-3 group-hover:scale-110 transition-transform">
+                    <Plus className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Add Work Site</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Create locations</p>
+                  </div>
+                </div>
+              </button>
               <ExportReportDialog>
-                <Button variant="outline" className="w-full flex items-center p-6 h-auto bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:from-orange-100 hover:to-orange-200 hover:border-orange-300 transition-all duration-300 hover:scale-105 shadow-md">
-                  <Download className="text-orange-600 w-6 h-6 mr-3" />
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900">Export Report</div>
-                    <div className="text-xs text-gray-600">Download data</div>
+                <button className="w-full bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 border-2 border-orange-200 dark:border-orange-700 rounded-xl p-6 text-left hover:shadow-md transition-all group">
+                  <div className="flex items-start gap-4">
+                    <div className="bg-orange-500 dark:bg-orange-600 rounded-2xl p-3 group-hover:scale-110 transition-transform">
+                      <Download className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Export Report</h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Download data</p>
+                    </div>
                   </div>
-                </Button>
+                </button>
               </ExportReportDialog>
-              <Link href="/admin/profile">
-                <Button variant="outline" className="w-full flex items-center p-6 h-auto bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:from-purple-100 hover:to-purple-200 hover:border-purple-300 transition-all duration-300 hover:scale-105 shadow-md">
-                  <Settings className="text-purple-600 w-6 h-6 mr-3" />
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900">Settings</div>
-                    <div className="text-xs text-gray-600">Configure system</div>
+              <button onClick={() => (window.location.href = '/admin/profile')} className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 border-2 border-purple-200 dark:border-purple-700 rounded-xl p-6 text-left hover:shadow-md transition-all group">
+                <div className="flex items-start gap-4">
+                  <div className="bg-purple-500 dark:bg-purple-600 rounded-2xl p-3 group-hover:scale-110 transition-transform">
+                    <Settings className="h-5 w-5 text-white" />
                   </div>
-                </Button>
-              </Link>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Settings</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Configure system</p>
+                  </div>
+                </div>
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -330,20 +359,20 @@ export default function AdminDashboard() {
         {/* Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
           {/* Recent Activity */}
-          <Card className="bg-gradient-to-br from-white to-slate-50 border-0 shadow-lg">
-            <div className="p-4 sm:p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
-              <h3 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Recent Activity</h3>
+          <Card className="bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-sm">
+            <div className="p-6 border-b-2 border-slate-300 dark:border-slate-600">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Recent Activity</h3>
             </div>
-            <CardContent className="p-4 sm:p-6">
+            <CardContent className="p-6">
               <div className="space-y-4">
                 {activitiesLoading ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4 animate-spin" />
+                  <div className="text-center text-gray-500 dark:text-slate-400 py-8">
+                    <Clock className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500 mb-4 animate-spin" />
                     <p>Loading recent activity...</p>
                   </div>
                 ) : recentActivities.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <div className="text-center text-gray-500 dark:text-slate-400 py-8">
+                    <Clock className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500 mb-4" />
                     <p>No recent activity</p>
                     <p className="text-sm">Employee check-ins/check-outs will appear here</p>
                   </div>
@@ -354,52 +383,55 @@ export default function AdminDashboard() {
                       return (
                         <div key={dateKey} className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <div className="h-px bg-gray-200 flex-1" />
-                            <span className="text-xs font-medium text-gray-500 px-2 bg-gray-50 rounded-full">
+                            <div className="h-px bg-gray-200 dark:bg-slate-700 flex-1" />
+                            <span className="text-xs font-medium text-gray-500 dark:text-slate-400 px-2 bg-gray-50 dark:bg-slate-800 rounded-full">
                               {formatDateLabel(date)}
                             </span>
-                            <div className="h-px bg-gray-200 flex-1" />
+                            <div className="h-px bg-gray-200 dark:bg-slate-700 flex-1" />
                           </div>
                           
                           <div className="space-y-2">
                             {dayActivities.map((activity) => (
                               <div
                                 key={activity.id}
-                                className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-slate-100 rounded-lg border border-gray-200 hover:shadow-sm transition-all"
+                                className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 rounded-lg border border-gray-200 dark:border-slate-600 hover:shadow-sm transition-all"
                               >
-                                <AuthenticatedImage
-                                  src={activity.employee.profileImage}
-                                  alt={`${activity.employee.firstName} ${activity.employee.lastName}`}
-                                  className="w-8 h-8 rounded-full object-cover"
-                                  fallback={
-                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                                      <span className="text-xs font-bold text-white">
-                                        {activity.employee.firstName?.[0]}{activity.employee.lastName?.[0]}
-                                      </span>
-                                    </div>
-                                  }
-                                />
+                                {activity.employee.profileImage ? (
+                                  <img
+                                    src={activity.employee.profileImage}
+                                    alt={`${activity.employee.firstName} ${activity.employee.lastName}`}
+                                    className="w-8 h-8 rounded-full object-cover border-2 border-white dark:border-slate-700 shadow-sm"
+                                    onError={(e) => {
+                                      console.error('Image failed to load:', activity.employee.profileImage);
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-700 shadow-sm">
+                                    <span className="text-white font-bold text-xs">{activity.employee.firstName?.[0]}{activity.employee.lastName?.[0]}</span>
+                                  </div>
+                                )}
                                 
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-gray-900">
+                                    <span className="text-sm font-medium text-gray-900 dark:text-slate-100">
                                       {activity.employee.firstName} {activity.employee.lastName}
                                     </span>
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                                       activity.type === 'check-in' 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : 'bg-red-100 text-red-800'
+                                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' 
+                                        : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
                                     }`}>
                                       {activity.type === 'check-in' ? 'Check In' : 'Check Out'}
                                     </span>
                                   </div>
                                   
                                   <div className="flex items-center gap-4 mt-1">
-                                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                                    <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-slate-400">
                                       <MapPin className="h-3 w-3" />
                                       <span>{activity.site.name}</span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-500">
                                       <Clock className="h-3 w-3" />
                                       <span>{formatActivityTime(new Date(activity.timestamp))}</span>
                                     </div>
@@ -418,53 +450,64 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Live Locations */}
-          <Card className="bg-gradient-to-br from-white to-slate-50 border-0 shadow-lg">
-            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
+          <Card className="bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-sm">
+            <div className="p-6 border-b-2 border-slate-300 dark:border-slate-600">
               <div className="flex justify-between items-center">
-                <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Live Locations</h3>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Live Locations</h3>
                 <Link href="/admin/tracking">
-                  <Button variant="link" className="text-blue-600 hover:text-blue-800 text-sm font-semibold">
+                  <Button variant="link" className="text-blue-600 hover:text-blue-700 text-sm font-semibold">
                     View Full Map →
                   </Button>
                 </Link>
               </div>
             </div>
             <CardContent className="p-6">
-              <div className="text-center text-gray-500 py-8">
-                <MapPin className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <p className="font-medium text-gray-900 mb-2">Real-time Location Tracking</p>
-                <p className="text-sm text-gray-600 mb-4">
-                  Monitor employee locations and work site attendance
-                </p>
-                <div className="bg-gradient-to-r from-gray-50 to-slate-100 rounded-xl p-6 mb-4 border border-slate-200">
-                  <div className="grid grid-cols-2 gap-6 text-sm">
-                    <div className="text-center">
-                      <div className="bg-blue-100 rounded-lg p-3 inline-block mb-2">
-                        <MapPin className="text-blue-600 w-5 h-5" />
-                      </div>
-                      <p className="font-semibold text-gray-700">Work Sites</p>
-                      <p className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">{stats?.workSites || 0}</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="bg-green-100 rounded-lg p-3 inline-block mb-2">
-                        <UserCheck className="text-green-600 w-5 h-5" />
-                      </div>
-                      <p className="font-semibold text-gray-700">Active Employees</p>
-                      <p className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-800 bg-clip-text text-transparent">{stats?.activeEmployees || 0}</p>
+              <div className="h-80 lg:h-[420px]">
+                {!mapLoaded || isLocationsLoading || isSitesLoading ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="space-y-2 w-full">
+                      <Skeleton className="h-8 w-40 mx-auto" />
+                      <Skeleton className="h-full w-full" />
                     </div>
                   </div>
-                </div>
-                <Link href="/admin/tracking">
-                  <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                    <MapPin className="w-5 h-5 mr-2" />
-                    Open Live Tracking Map
-                  </Button>
-                </Link>
+                ) : (
+                  <GoogleMap
+                    center={mapCenter}
+                    zoom={mapZoom}
+                    markers={[
+                      ...(Array.isArray(locations) ? locations.flatMap((item: any) => {
+                        const lat = parseFloat(item.location?.latitude);
+                        const lng = parseFloat(item.location?.longitude);
+                        return !isNaN(lat) && !isNaN(lng)
+                          ? [{ position: { lat, lng }, title: `${item.employee.firstName} ${item.employee.lastName}`, color: '#ef4444', type: 'employee' as const }]
+                          : [];
+                      }) : []),
+                      ...(Array.isArray(sites) ? sites.flatMap((site: any) => {
+                        const lat = parseFloat(site.latitude);
+                        const lng = parseFloat(site.longitude);
+                        return !isNaN(lat) && !isNaN(lng)
+                          ? [{ position: { lat, lng }, title: `Work Site: ${site.name}`, color: '#22c55e', type: 'site' as const }]
+                          : [];
+                      }) : []),
+                    ]}
+                    geofences={(Array.isArray(sites) ? sites.flatMap((site: any) => {
+                      const lat = parseFloat(site.latitude);
+                      const lng = parseFloat(site.longitude);
+                      const radius = parseFloat(site.geofenceRadius);
+                      return !isNaN(lat) && !isNaN(lng) && !isNaN(radius)
+                        ? [{ center: { lat, lng }, radius, color: '#2563eb' }]
+                        : [];
+                    }) : [])}
+                    className="w-full h-full"
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
       </main>
-    </div>
-  );
-}
+        
+        <AlertsDialog open={alertsDialogOpen} onOpenChange={setAlertsDialogOpen} />
+      </div>
+    );
+  }

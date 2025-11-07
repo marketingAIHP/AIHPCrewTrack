@@ -91,6 +91,9 @@ export interface IStorage {
     onSiteNow: number;
     alerts: number;
   }>;
+  
+  // Alerts
+  getAlerts(adminId: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -598,12 +601,130 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
+    // Calculate alerts count
+    const alerts = await this.getAlerts(adminId);
+    
     return {
       activeEmployees: activeEmployeesResult.count,
       workSites: workSitesResult.count,
       onSiteNow: onSiteResult.count,
-      alerts: 0, // Placeholder for alert system
+      alerts: alerts.length,
     };
+  }
+  
+  async getAlerts(adminId: number): Promise<any[]> {
+    const alerts: any[] = [];
+    
+    // Helper function to calculate distance
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371000; // Earth radius in meters
+      const phi1 = lat1 * Math.PI / 180;
+      const phi2 = lat2 * Math.PI / 180;
+      const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+      const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+      
+      const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+                Math.cos(phi1) * Math.cos(phi2) *
+                Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      
+      return R * c; // Distance in meters
+    };
+    
+    // GPS accuracy buffer to account for mobile GPS inaccuracies
+    // FIX: Increased to 50m to match server-side buffer for consistency
+    const GPS_ACCURACY_BUFFER = 50; // meters - increased from 15m for better reliability
+    
+    // Helper function to check if within geofence with GPS buffer
+    const isWithinGeofenceWithBuffer = (distance: number, geofenceRadius: number): boolean => {
+      return distance <= (geofenceRadius + GPS_ACCURACY_BUFFER);
+    };
+    
+    // Get all employees for this admin
+    const employees = await this.getEmployeesByAdmin(adminId);
+    
+    // Check for employees who are checked in but out of range
+    for (const employee of employees) {
+      if (!employee.siteId || !employee.isActive) continue;
+      
+      const currentAttendance = await this.getCurrentAttendance(employee.id);
+      if (!currentAttendance || currentAttendance.checkOutTime) continue;
+      
+      // Get the latest location
+      const latestLocation = await this.getLatestEmployeeLocation(employee.id);
+      if (!latestLocation) continue;
+      
+      const site = await this.getWorkSite(employee.siteId);
+      if (!site) continue;
+      
+      // Check if employee is out of range
+      const distance = calculateDistance(
+        parseFloat(latestLocation.latitude),
+        parseFloat(latestLocation.longitude),
+        parseFloat(site.latitude),
+        parseFloat(site.longitude)
+      );
+      
+      // Check if employee is out of range using GPS accuracy buffer
+      const effectiveRadius = site.geofenceRadius + GPS_ACCURACY_BUFFER;
+      if (distance > effectiveRadius) {
+        alerts.push({
+          id: `out-of-range-${employee.id}`,
+          type: 'out_of_range',
+          title: 'Employee Out of Range',
+          message: `${employee.firstName} ${employee.lastName} is ${Math.round(distance)}m away from ${site.name} (radius: ${site.geofenceRadius}m)`,
+          employee: {
+            id: employee.id,
+            name: `${employee.firstName} ${employee.lastName}`,
+            email: employee.email
+          },
+          site: {
+            id: site.id,
+            name: site.name,
+            address: site.address
+          },
+          timestamp: latestLocation.timestamp,
+          distance: Math.round(distance),
+          geofenceRadius: site.geofenceRadius
+        });
+      }
+      
+      // Check for employees who left without checkout (checked in more than 8 hours ago without checkout)
+      const checkInTime = new Date(currentAttendance.checkInTime);
+      const hoursSinceCheckIn = (Date.now() - checkInTime.getTime()) / (1000 * 60 * 60);
+      
+      // If checked in more than 8 hours ago and no checkout, flag as alert
+      if (hoursSinceCheckIn > 8) {
+        // Check if there's a recent location (within last hour) but no checkout
+        const locationAge = latestLocation ? (Date.now() - new Date(latestLocation.timestamp).getTime()) / (1000 * 60 * 60) : 24;
+        
+        if (locationAge > 1) { // No location update in last hour
+          alerts.push({
+            id: `no-checkout-${employee.id}`,
+            type: 'no_checkout',
+            title: 'Employee Left Without Checkout',
+            message: `${employee.firstName} ${employee.lastName} checked in ${Math.round(hoursSinceCheckIn)} hours ago but hasn't checked out`,
+            employee: {
+              id: employee.id,
+              name: `${employee.firstName} ${employee.lastName}`,
+              email: employee.email
+            },
+            site: {
+              id: site.id,
+              name: site.name,
+              address: site.address
+            },
+            timestamp: checkInTime.toISOString(),
+            hoursSinceCheckIn: Math.round(hoursSinceCheckIn)
+          });
+        }
+      }
+    }
+    
+    // Sort by timestamp (newest first)
+    alerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    return alerts;
   }
 }
 

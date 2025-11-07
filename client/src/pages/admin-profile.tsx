@@ -9,11 +9,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, User, Mail, Calendar, Settings, Shield, Eye, EyeOff, Camera, Upload, X } from 'lucide-react';
-import { ObjectUploader } from '@/components/ObjectUploader';
+import { ArrowLeft, User, Mail, Calendar, Settings, Shield, Eye, EyeOff, Camera, Upload, X, LogOut } from 'lucide-react';
 import { AuthenticatedImage } from '@/components/AuthenticatedImage';
-import type { UploadResult } from '@uppy/core';
-import { getAuthToken, getUser } from '@/lib/auth';
+import NotificationDropdown from '@/components/NotificationDropdown';
+import { useRef } from 'react';
+import { getAuthToken, getUser, logout } from '@/lib/auth';
+import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -66,6 +67,7 @@ export default function AdminProfile() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [profileImageModalOpen, setProfileImageModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: admin, isLoading: adminLoading } = useQuery({
     queryKey: ['/api/admin/profile'],
@@ -214,10 +216,34 @@ export default function AdminProfile() {
     },
   });
 
-  // Profile image mutations
+  // Profile image upload to Supabase
   const uploadImageMutation = useMutation({
-    mutationFn: async (imageURL: string) => {
-      const response = await fetch('/api/admin/profile-image', {
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload image');
+      }
+
+      const data = await response.json();
+      const imageURL = data.profileImage || data.url || data.uploadURL;
+
+      if (!imageURL) {
+        throw new Error('No image URL returned from server');
+      }
+
+      // Update profile image in database
+      const updateResponse = await fetch('/api/admin/profile-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
@@ -225,16 +251,27 @@ export default function AdminProfile() {
         },
         body: JSON.stringify({ imageURL }),
       });
-      if (!response.ok) throw new Error('Failed to upload image');
-      return response.json();
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update profile image');
+      }
+
+      return updateResponse.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Image Uploaded",
         description: "Your profile image has been updated successfully.",
       });
+      // Invalidate all queries that might show admin profile
       queryClient.invalidateQueries({ queryKey: ['/api/admin/profile'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/locations'] });
       setIsImageDialogOpen(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     },
     onError: (error: any) => {
       toast({
@@ -272,28 +309,31 @@ export default function AdminProfile() {
     },
   });
 
-  // Helper functions for image handling
-  const handleGetUploadParameters = async () => {
-    const response = await fetch('/api/objects/upload', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to get upload parameters');
-    const { uploadURL } = await response.json();
-    return {
-      method: 'PUT' as const,
-      url: uploadURL,
-    };
-  };
-
-  const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful.length > 0) {
-      const uploadedFile = result.successful[0];
-      if (uploadedFile.uploadURL) {
-        uploadImageMutation.mutate(uploadedFile.uploadURL);
+  // Helper function for file upload
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
+        return;
       }
+
+      // Validate file size (5MB)
+      if (file.size > 5242880) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      uploadImageMutation.mutate(file);
     }
   };
 
@@ -308,30 +348,94 @@ export default function AdminProfile() {
     return (
       <div className="container mx-auto p-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
-          <div className="h-64 bg-gray-200 rounded mb-4"></div>
+          <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded w-1/3 mb-6"></div>
+          <div className="h-64 bg-gray-200 dark:bg-slate-700 rounded mb-4"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center mb-6">
-        <Link href="/admin/dashboard">
-          <Button variant="ghost" size="sm" className="mr-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold">Admin Profile</h1>
-      </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-4 flex items-center justify-between">
+          <Link href="/admin/dashboard">
+            <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+              <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50 dark:ring-blue-700/50">
+                <img 
+                  src="/logo-192.png" 
+                  alt="AIHP CrewTrack" 
+                  className="h-14 w-14 object-contain"
+                />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">AIHP CrewTrack</h1>
+                <p className="text-sm bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">Admin Dashboard</p>
+              </div>
+            </div>
+          </Link>
+          <div className="flex items-center gap-3">
+            <NotificationDropdown />
+            <Link href="/admin/profile">
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-3 py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <div className="h-8 w-8 rounded-full overflow-hidden">
+                  <AuthenticatedImage
+                    src={admin?.profileImage}
+                    alt="Admin Avatar"
+                    className="h-8 w-8 object-cover"
+                    fallback={
+                      <div className="h-8 w-8 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full font-bold">
+                        {admin?.firstName?.[0] || ''}{admin?.lastName?.[0] || ''}
+                      </div>
+                    }
+                  />
+                </div>
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {admin?.firstName && admin?.lastName
+                      ? `${admin.firstName} ${admin.lastName}`
+                      : 'Administrator'}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Administrator</p>
+                </div>
+              </div>
+            </Link>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                logout();
+                toast({
+                  title: 'Logged out',
+                  description: 'You have been successfully logged out.',
+                });
+                setLocation('/admin/login');
+              }}
+              className="text-red-600 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 border border-red-200 hover:border-red-600 transition-all duration-200 shadow-sm hover:shadow-md"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+      </header>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center mb-6">
+          <Link href="/admin/dashboard">
+            <Button variant="ghost" size="sm" className="mr-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Admin Profile</h1>
+        </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Overview */}
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-1 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
           <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="flex items-center text-slate-900 dark:text-slate-100">
               <User className="h-5 w-5 mr-2" />
               Profile Information
             </CardTitle>
@@ -348,13 +452,13 @@ export default function AdminProfile() {
                       setProfileImageModalOpen(true);
                     }
                   }}
-                  fallback={
-                    <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 font-bold text-2xl">
-                        {admin.firstName[0]}{admin.lastName[0]}
-                      </span>
-                    </div>
-                  }
+                    fallback={
+                      <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold text-2xl">
+                          {admin.firstName[0]}{admin.lastName[0]}
+                        </span>
+                      </div>
+                    }
                 />
                 <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
                   <DialogTrigger asChild>
@@ -373,22 +477,33 @@ export default function AdminProfile() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <ObjectUploader
-                        maxNumberOfFiles={1}
-                        maxFileSize={5242880} // 5MB
-                        allowedFileTypes={["image/*"]}
-                        onGetUploadParameters={handleGetUploadParameters}
-                        onComplete={handleUploadComplete}
-                        buttonClassName="w-full"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        {uploadImageMutation.isPending ? 'Processing...' : 'Upload New Image'}
-                      </ObjectUploader>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        className="hidden"
+                        id="admin-profile-image-upload"
+                        disabled={uploadImageMutation.isPending}
+                      />
+                      <label htmlFor="admin-profile-image-upload">
+                        <Button
+                          variant="outline"
+                          className="w-full cursor-pointer"
+                          disabled={uploadImageMutation.isPending}
+                          asChild
+                        >
+                          <span>
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadImageMutation.isPending ? 'Uploading...' : 'Upload New Image'}
+                          </span>
+                        </Button>
+                      </label>
                       {admin.profileImage && (
                         <Button
                           variant="destructive"
                           onClick={() => removeImageMutation.mutate()}
-                          disabled={removeImageMutation.isPending}
+                          disabled={removeImageMutation.isPending || uploadImageMutation.isPending}
                           className="w-full"
                         >
                           <X className="h-4 w-4 mr-2" />
@@ -399,21 +514,21 @@ export default function AdminProfile() {
                   </DialogContent>
                 </Dialog>
               </div>
-              <h3 className="text-xl font-semibold">{admin.firstName} {admin.lastName}</h3>
-              <Badge className="bg-blue-100 text-blue-800 mt-2">
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{admin.firstName} {admin.lastName}</h3>
+              <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 mt-2">
                 <Shield className="h-3 w-3 mr-1" />
                 Administrator
               </Badge>
             </div>
             
-            <div className="space-y-3 pt-4 border-t">
+            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
               <div className="flex items-center">
-                <Mail className="h-4 w-4 mr-3 text-gray-500" />
-                <span className="text-sm">{admin.email}</span>
+                <Mail className="h-4 w-4 mr-3 text-gray-500 dark:text-slate-400" />
+                <span className="text-sm text-slate-900 dark:text-slate-100">{admin.email}</span>
               </div>
               <div className="flex items-center">
-                <Calendar className="h-4 w-4 mr-3 text-gray-500" />
-                <span className="text-sm">
+                <Calendar className="h-4 w-4 mr-3 text-gray-500 dark:text-slate-400" />
+                <span className="text-sm text-slate-900 dark:text-slate-100">
                   Admin since {new Date(admin.createdAt).toLocaleDateString()}
                 </span>
               </div>
@@ -422,72 +537,72 @@ export default function AdminProfile() {
         </Card>
 
         {/* Admin Statistics */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
           <CardContent className="p-6">
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-2 bg-slate-100 dark:bg-slate-700">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="mt-6">
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">System Overview</h3>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">System Overview</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <Card className="p-4">
+                    <Card className="p-4 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {stats?.activeEmployees || 0}
                         </div>
-                        <div className="text-sm text-gray-600">Active Employees</div>
+                        <div className="text-sm text-gray-600 dark:text-slate-400">Active Employees</div>
                       </div>
                     </Card>
-                    <Card className="p-4">
+                    <Card className="p-4 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                           {stats?.workSites || 0}
                         </div>
-                        <div className="text-sm text-gray-600">Work Sites</div>
+                        <div className="text-sm text-gray-600 dark:text-slate-400">Work Sites</div>
                       </div>
                     </Card>
-                    <Card className="p-4">
+                    <Card className="p-4 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-orange-600">
+                        <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                           {stats?.onSiteNow || 0}
                         </div>
-                        <div className="text-sm text-gray-600">On Site Now</div>
+                        <div className="text-sm text-gray-600 dark:text-slate-400">On Site Now</div>
                       </div>
                     </Card>
-                    <Card className="p-4">
+                    <Card className="p-4 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">
+                        <div className="text-2xl font-bold text-red-600 dark:text-red-400">
                           {stats?.alerts || 0}
                         </div>
-                        <div className="text-sm text-gray-600">Active Alerts</div>
+                        <div className="text-sm text-gray-600 dark:text-slate-400">Active Alerts</div>
                       </div>
                     </Card>
                   </div>
 
-                  <div className="pt-4 border-t">
-                    <h4 className="font-medium mb-3">Quick Actions</h4>
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <h4 className="font-medium mb-3 text-slate-900 dark:text-slate-100">Quick Actions</h4>
                     <div className="grid grid-cols-2 gap-3">
                       <Link href="/admin/employees">
-                        <Button variant="outline" className="w-full justify-start">
+                        <Button variant="outline" className="w-full justify-start bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700">
                           Manage Employees
                         </Button>
                       </Link>
                       <Link href="/admin/sites">
-                        <Button variant="outline" className="w-full justify-start">
+                        <Button variant="outline" className="w-full justify-start bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700">
                           Manage Sites
                         </Button>
                       </Link>
                       <Link href="/admin/live-tracking">
-                        <Button variant="outline" className="w-full justify-start">
+                        <Button variant="outline" className="w-full justify-start bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700">
                           Live Tracking
                         </Button>
                       </Link>
                       <Link href="/admin/active-employees">
-                        <Button variant="outline" className="w-full justify-start">
+                        <Button variant="outline" className="w-full justify-start bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700">
                           View Employees
                         </Button>
                       </Link>
@@ -498,16 +613,16 @@ export default function AdminProfile() {
 
               <TabsContent value="settings" className="mt-6">
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center">
+                  <h3 className="text-lg font-semibold flex items-center text-slate-900 dark:text-slate-100">
                     <Settings className="h-5 w-5 mr-2" />
                     Account Settings
                   </h3>
                   <div className="space-y-3">
-                    <Card className="p-4">
+                    <Card className="p-4 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                       <div className="flex justify-between items-center">
                         <div>
-                          <h4 className="font-medium">Account Information</h4>
-                          <p className="text-sm text-gray-600">Update your profile details</p>
+                          <h4 className="font-medium text-slate-900 dark:text-slate-100">Account Information</h4>
+                          <p className="text-sm text-gray-600 dark:text-slate-400">Update your profile details</p>
                         </div>
                         <Dialog>
                           <DialogTrigger asChild>
@@ -578,11 +693,11 @@ export default function AdminProfile() {
                       </div>
                     </Card>
                     
-                    <Card className="p-4">
+                    <Card className="p-4 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                       <div className="flex justify-between items-center">
                         <div>
-                          <h4 className="font-medium">Security Settings</h4>
-                          <p className="text-sm text-gray-600">Change password and security preferences</p>
+                          <h4 className="font-medium text-slate-900 dark:text-slate-100">Security Settings</h4>
+                          <p className="text-sm text-gray-600 dark:text-slate-400">Change password and security preferences</p>
                         </div>
                         <Dialog>
                           <DialogTrigger asChild>
@@ -698,11 +813,11 @@ export default function AdminProfile() {
                       </div>
                     </Card>
 
-                    <Card className="p-4">
+                    <Card className="p-4 border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                       <div className="flex justify-between items-center">
                         <div>
-                          <h4 className="font-medium">Notification Preferences</h4>
-                          <p className="text-sm text-gray-600">Manage alerts and notifications</p>
+                          <h4 className="font-medium text-slate-900 dark:text-slate-100">Notification Preferences</h4>
+                          <p className="text-sm text-gray-600 dark:text-slate-400">Manage alerts and notifications</p>
                         </div>
                         <Dialog>
                           <DialogTrigger asChild>
@@ -864,6 +979,7 @@ export default function AdminProfile() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

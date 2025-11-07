@@ -253,9 +253,15 @@ export default function EmployeeManagementSimple() {
     });
     if (!response.ok) throw new Error('Failed to get upload URL');
     const data = await response.json();
+    
+    // Ensure URL is absolute (add base URL if relative)
+    const fullURL = data.uploadURL.startsWith('http') 
+      ? data.uploadURL 
+      : `${window.location.origin}${data.uploadURL}`;
+    
     return {
       method: 'PUT' as const,
-      url: data.uploadURL,
+      url: fullURL,
     };
   };
 

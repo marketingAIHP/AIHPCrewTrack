@@ -103,7 +103,7 @@ export default function ActiveEmployees() {
           </Card>
         ) : (
           activeEmployees.map((employee: Employee) => (
-            <Card key={employee.id} className="hover:shadow-md transition-shadow">
+            <Card key={employee.id} className="hover:shadow-md transition-shadow border-2 border-slate-300 dark:border-slate-600">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">

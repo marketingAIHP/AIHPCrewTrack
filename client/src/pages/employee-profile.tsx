@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken, getUserType } from '@/lib/auth';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 import { 
   ArrowLeft,
   User, 
@@ -103,27 +104,62 @@ export default function EmployeeProfile() {
     enabled: !!getAuthToken() && getUserType() === 'admin' && !!employeeId,
   });
 
-  // Profile image mutations (for admin to update employee profile)
+  // Profile image upload to Supabase (for admin to update employee profile)
   const uploadImageMutation = useMutation({
-    mutationFn: async (imageData: string) => {
-      const response = await fetch(`/api/admin/employees/${employeeId}/profile-image`, {
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload image');
+      }
+
+      const data = await response.json();
+      const imageURL = data.profileImage || data.url || data.uploadURL;
+
+      if (!imageURL) {
+        throw new Error('No image URL returned from server');
+      }
+
+      // Update employee profile image in database
+      const updateResponse = await fetch(`/api/admin/employees/${employeeId}/profile-image`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ imageData }),
+        body: JSON.stringify({ imageURL }),
       });
-      if (!response.ok) throw new Error('Failed to upload image');
-      return response.json();
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update employee profile image');
+      }
+
+      return updateResponse.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Image Uploaded",
         description: "Employee profile image has been updated successfully.",
       });
+      // Invalidate all queries that might show this employee
       queryClient.invalidateQueries({ queryKey: [`/api/admin/employees/${employeeId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/locations'] });
       setIsImageDialogOpen(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     },
     onError: (error: any) => {
       toast({
@@ -161,16 +197,33 @@ export default function EmployeeProfile() {
     },
   });
 
-  // Helper functions for image handling
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper function for image upload
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageData = e.target?.result as string;
-        uploadImageMutation.mutate(imageData);
-      };
-      reader.readAsDataURL(file);
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file size (5MB)
+      if (file.size > 5242880) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      uploadImageMutation.mutate(file);
     }
   };
 
@@ -250,19 +303,18 @@ export default function EmployeeProfile() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-center mb-4">
                 <div className="relative">
-                  {employee.profileImage ? (
-                    <img 
-                      src={employee.profileImage} 
-                      alt="Employee Profile" 
-                      className="w-20 h-20 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center">
-                      <span className="text-2xl font-medium text-gray-700">
-                        {employee.firstName[0]}{employee.lastName[0]}
-                      </span>
-                    </div>
-                  )}
+                  <AuthenticatedImage
+                    src={employee.profileImage}
+                    alt="Employee Profile"
+                    className="w-20 h-20 rounded-full object-cover"
+                    fallback={
+                      <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center">
+                        <span className="text-2xl font-medium text-gray-700">
+                          {employee.firstName[0]}{employee.lastName[0]}
+                        </span>
+                      </div>
+                    }
+                  />
                   <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
                     <DialogTrigger asChild>
                       <Button
@@ -284,18 +336,23 @@ export default function EmployeeProfile() {
                           <input
                             type="file"
                             accept="image/*"
+                            ref={fileInputRef}
                             onChange={handleImageUpload}
                             className="hidden"
                             id="employee-image-upload"
+                            disabled={uploadImageMutation.isPending}
                           />
                           <label htmlFor="employee-image-upload">
                             <Button 
                               variant="outline" 
                               className="w-full cursor-pointer"
                               disabled={uploadImageMutation.isPending}
+                              asChild
                             >
-                              <Upload className="h-4 w-4 mr-2" />
-                              {uploadImageMutation.isPending ? 'Uploading...' : 'Upload New Image'}
+                              <span>
+                                <Upload className="h-4 w-4 mr-2" />
+                                {uploadImageMutation.isPending ? 'Uploading...' : 'Upload New Image'}
+                              </span>
                             </Button>
                           </label>
                         </div>
@@ -303,7 +360,7 @@ export default function EmployeeProfile() {
                           <Button
                             variant="destructive"
                             onClick={() => removeImageMutation.mutate()}
-                            disabled={removeImageMutation.isPending}
+                            disabled={removeImageMutation.isPending || uploadImageMutation.isPending}
                             className="w-full"
                           >
                             <X className="h-4 w-4 mr-2" />
@@ -451,7 +508,7 @@ export default function EmployeeProfile() {
         </div>
 
         {/* Location History */}
-        <Card className="mt-8">
+        <Card className="mt-8 border-2 border-slate-300 dark:border-slate-600">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Navigation className="h-5 w-5" />

@@ -9,8 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Users, Plus, MapPin, Clock, Edit, Trash2, Camera, Upload, X, Eye, EyeOff } from 'lucide-react';
-import { AdaptiveImage } from '../components/AdaptiveImage';
-import { CompressedImagePreview } from '../components/CompressedImagePreview';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 
 import { getAuthToken } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
@@ -18,8 +17,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
-import { ObjectUploader } from '@/components/ObjectUploader';
-import type { UploadResult } from '@uppy/core';
+// Supabase Storage upload - using direct FormData instead of Uppy
 
 interface Employee {
   id: number;
@@ -161,7 +159,7 @@ export default function EmployeeManagement() {
         phone: data.phone || undefined,
         employeeId: data.employeeId || undefined,
       };
-      console.log('Sending employee creation payload:', payload);
+      // Sending employee creation request
       return await apiRequest('POST', '/api/admin/employees', payload);
     },
     onSuccess: () => {
@@ -190,7 +188,7 @@ export default function EmployeeManagement() {
         siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
         phone: data.phone || undefined,
       };
-      console.log('Sending employee update payload:', payload);
+      // Sending employee update request
       return await apiRequest('PUT', `/api/admin/employees/${id}`, payload);
     },
     onSuccess: () => {
@@ -280,23 +278,27 @@ export default function EmployeeManagement() {
   // Profile image mutations
   const uploadEmployeeImageMutation = useMutation({
     mutationFn: async ({ employeeId, imageURL }: { employeeId: number; imageURL: string }) => {
-      const response = await fetch(`/api/admin/employees/${employeeId}/profile-image`, {
-        method: 'POST',
+      // Update employee record with Supabase image URL
+      const response = await fetch(`/api/admin/employees/${employeeId}`, {
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ imageURL }),
+        body: JSON.stringify({ profileImage: imageURL }),
       });
-      if (!response.ok) throw new Error('Failed to upload image');
+      if (!response.ok) throw new Error('Failed to update employee profile image');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      // Profile image updated successfully
       toast({
-        title: "Image Uploaded",
-        description: "Employee profile image has been updated successfully.",
+        title: "Success",
+        description: "Profile image uploaded successfully.",
       });
+      // Invalidate all employee queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/employees', variables.employeeId] });
       setImageDialogEmployee(null);
     },
     onError: (error: any) => {
@@ -348,16 +350,27 @@ export default function EmployeeManagement() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to get upload parameters' }));
+        const text = await response.text();
+        console.error('Get upload params failed:', response.status, text);
+        let errorData: any = { message: 'Failed to get upload parameters' };
+        try { errorData = JSON.parse(text); } catch {}
         throw new Error(errorData.message || 'Failed to get upload parameters');
       }
       
       const { uploadURL } = await response.json();
-      console.log('Got upload parameters:', { uploadURL });
+      // Upload parameters received
+      
+      // Ensure URL is absolute (add base URL if relative)
+      const fullURL = uploadURL.startsWith('http') 
+        ? uploadURL 
+        : `${window.location.origin}${uploadURL}`;
       
       return {
         method: 'PUT' as const,
-        url: uploadURL,
+        url: fullURL,
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        }
       };
     } catch (error) {
       console.error('Upload parameters error:', error);
@@ -365,22 +378,24 @@ export default function EmployeeManagement() {
     }
   };
 
-  const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    console.log('Upload complete result:', result);
+  const handleUploadComplete = (result: any) => {
     if (result.successful && result.successful.length > 0 && imageDialogEmployee) {
       const uploadedFile = result.successful[0];
-      console.log('Uploaded file details:', uploadedFile);
       
-      // Try multiple possible fields for the upload URL
-      const imageURL = uploadedFile.uploadURL || (uploadedFile.response as any)?.uploadURL || (uploadedFile as any).url;
+      // Extract imageURL from multiple possible locations
+      const imageURL = uploadedFile.uploadURL || 
+                       (uploadedFile.response as any)?.body?.uploadURL || 
+                       (uploadedFile.response as any)?.body?.url ||
+                       (uploadedFile.response as any)?.uploadURL || 
+                       (uploadedFile as any).url;
       
-      if (imageURL) {
-        uploadEmployeeImageMutation.mutate({
-          employeeId: imageDialogEmployee.id,
-          imageURL: imageURL,
+      if (imageURL && imageDialogEmployee) {
+        uploadEmployeeImageMutation.mutate({ 
+          employeeId: imageDialogEmployee.id, 
+          imageURL 
         });
       } else {
-        console.error('No upload URL found in result:', uploadedFile);
+        console.error('❌ No upload URL found in result:', uploadedFile);
         toast({
           title: "Upload Error",
           description: "Image uploaded but URL not found. Please try again.",
@@ -392,6 +407,47 @@ export default function EmployeeManagement() {
       toast({
         title: "Upload Failed",
         description: "Image upload was not successful. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // NEW: Direct FormData upload to Supabase Storage
+  const handleProfileImageUpload = async (file: File) => {
+    try {
+      // Uploading to Supabase Storage
+      
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch('/api/upload', {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload image to Supabase');
+      }
+
+      const data = await response.json();
+      // Image uploaded successfully
+
+      if (data.profileImage && imageDialogEmployee) {
+        uploadEmployeeImageMutation.mutate({
+          employeeId: imageDialogEmployee.id,
+          imageURL: data.profileImage,
+        });
+      } else {
+        throw new Error('No profile image URL returned from upload');
+      }
+    } catch (error: any) {
+      console.error('❌ Upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload image. Please try again.",
         variant: "destructive",
       });
     }
@@ -421,12 +477,12 @@ export default function EmployeeManagement() {
 
   if (employeesLoading || departmentsLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-6 bg-slate-50 dark:bg-slate-900 min-h-screen">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
+          <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded w-1/3 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-48 bg-gray-200 rounded"></div>
+              <div key={i} className="h-48 bg-gray-200 dark:bg-slate-800 rounded border-2 border-slate-300 dark:border-slate-600"></div>
             ))}
           </div>
         </div>
@@ -435,34 +491,41 @@ export default function EmployeeManagement() {
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-4 lg:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-4">
-        <div className="flex items-center">
-          <Link href="/admin/dashboard">
-            <Button variant="ghost" size="sm" className="mr-2 sm:mr-4">
-              <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Back to Dashboard</span>
-              <span className="sm:hidden">Back</span>
-            </Button>
-          </Link>
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center">
-            <Users className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
-            <span className="hidden sm:inline">Employee Management</span>
-            <span className="sm:hidden">Employees</span>
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <Dialog open={isCreateDepartmentOpen} onOpenChange={setIsCreateDepartmentOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Department
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+          <div className="flex items-center gap-4">
+            <Link href="/admin/dashboard">
+              <Button variant="ghost" size="sm" className="hover:bg-slate-100 dark:hover:bg-slate-800">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Department</DialogTitle>
-                <DialogDescription>
+            </Link>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
+                <Users className="h-6 w-6 sm:h-7 sm:w-7 mr-3 text-blue-600 dark:text-blue-400" />
+                Employee Management
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 ml-9">Manage your workforce and departments</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Dialog open={isCreateDepartmentOpen} onOpenChange={setIsCreateDepartmentOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-200 dark:hover:border-blue-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Department
+                </Button>
+              </DialogTrigger>
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-gradient-to-br from-blue-50/30 via-white to-purple-50/30 border-blue-200">
+              <DialogHeader className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200">
+                <DialogTitle className="text-blue-900 font-bold flex items-center gap-2">
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-2">
+                    <Users className="h-5 w-5 text-white" />
+                  </div>
+                  Create New Department
+                </DialogTitle>
+                <DialogDescription className="text-blue-700 mt-1">
                   Add a new department to organize your employees.
                 </DialogDescription>
               </DialogHeader>
@@ -494,8 +557,12 @@ export default function EmployeeManagement() {
                       </FormItem>
                     )}
                   />
-                  <DialogFooter>
-                    <Button type="submit" disabled={createDepartmentMutation.isPending}>
+                  <DialogFooter className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mb-4 border-t border-blue-200 mt-4">
+                    <Button 
+                      type="submit" 
+                      disabled={createDepartmentMutation.isPending}
+                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md"
+                    >
                       {createDepartmentMutation.isPending ? 'Creating...' : 'Create Department'}
                     </Button>
                   </DialogFooter>
@@ -515,10 +582,15 @@ export default function EmployeeManagement() {
                 Add Employee
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Employee</DialogTitle>
-                <DialogDescription>
+            <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-gradient-to-br from-green-50/30 via-white to-blue-50/30 border-green-200">
+              <DialogHeader className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-green-200">
+                <DialogTitle className="text-green-900 font-bold flex items-center gap-2">
+                  <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-2">
+                    <Plus className="h-5 w-5 text-white" />
+                  </div>
+                  Create New Employee
+                </DialogTitle>
+                <DialogDescription className="text-green-700 mt-1">
                   Add a new employee to your workforce.
                 </DialogDescription>
               </DialogHeader>
@@ -690,14 +762,23 @@ export default function EmployeeManagement() {
                     />
                   </div>
 
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => {
-                      setIsCreateEmployeeOpen(false);
-                      createEmployeeForm.reset();
-                    }}>
+                  <DialogFooter className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mb-4 border-t border-green-200 mt-4">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsCreateEmployeeOpen(false);
+                        createEmployeeForm.reset();
+                      }}
+                      className="hover:bg-slate-50"
+                    >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={createEmployeeMutation.isPending}>
+                    <Button 
+                      type="submit" 
+                      disabled={createEmployeeMutation.isPending}
+                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-md"
+                    >
                       {createEmployeeMutation.isPending ? 'Creating...' : 'Create Employee'}
                     </Button>
                   </DialogFooter>
@@ -710,17 +791,25 @@ export default function EmployeeManagement() {
 
       {/* Departments Section */}
       {departments.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Departments ({departments.length})</CardTitle>
+        <Card className="mb-6 border-2 border-slate-300 dark:border-slate-600 shadow-md bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 border-b-2 border-slate-300 dark:border-slate-600">
+            <CardTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center">
+              <Users className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+              Departments ({departments.length})
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
+          <CardContent className="p-6">
+            <div className="flex flex-wrap gap-3">
               {departments.map((dept: Department) => (
-                <Badge key={dept.id} variant="outline" className="text-sm">
-                  {dept.name}
+                <Badge 
+                  key={dept.id} 
+                  variant="outline" 
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 border-2 border-slate-300 dark:border-slate-600 text-blue-900 dark:text-blue-300 hover:from-blue-100 hover:to-purple-100 dark:hover:from-blue-900/50 dark:hover:to-purple-900/50 transition-all cursor-default shadow-sm"
+                >
+                  <Users className="h-3 w-3 mr-2" />
+                  <span className="font-semibold">{dept.name}</span>
                   {dept.description && (
-                    <span className="ml-1 text-gray-500">- {dept.description}</span>
+                    <span className="ml-2 text-blue-700 dark:text-blue-400">- {dept.description}</span>
                   )}
                 </Badge>
               ))}
@@ -735,84 +824,88 @@ export default function EmployeeManagement() {
       {/* Employees Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {employees.map((employee: Employee) => (
-          <Card key={employee.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
+          <Card key={employee.id} className="hover:shadow-xl transition-all duration-200 border-2 border-slate-300 dark:border-slate-600 shadow-md overflow-hidden group bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+            <CardHeader className="pb-4 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-900/30 dark:to-purple-900/30 border-b-2 border-slate-300 dark:border-slate-600">
               <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-4 flex-1">
                   <div className="relative">
-                    {employee.profileImage ? (
-                      <AdaptiveImage
-                        src={employee.profileImage}
-                        alt={`${employee.firstName} ${employee.lastName}`}
-                        className="w-12 h-12 rounded-full object-cover"
-                        sizes="thumbnail"
-                        fallback={
-                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                            <span className="text-blue-600 font-bold">
-                              {employee.firstName[0]}{employee.lastName[0]}
-                            </span>
-                          </div>
-                        }
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-bold">
-                          {employee.firstName[0]}{employee.lastName[0]}
-                        </span>
-                      </div>
-                    )}
+                    <AuthenticatedImage
+                      src={employee.profileImage}
+                      alt={`${employee.firstName} ${employee.lastName}`}
+                      className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-lg ring-2 ring-blue-200 group-hover:ring-blue-400 transition-all"
+                      fallback={
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-white shadow-lg ring-2 ring-blue-200 group-hover:ring-blue-400 transition-all">
+                          <span className="text-white font-bold text-xl">{employee.firstName[0]}{employee.lastName[0]}</span>
+                        </div>
+                      }
+                    />
                     <Dialog open={imageDialogEmployee?.id === employee.id} onOpenChange={(open) => !open && setImageDialogEmployee(null)}>
                       <DialogTrigger asChild>
                         <Button
                           size="sm"
-                          className="absolute -bottom-1 -right-1 rounded-full w-6 h-6 p-0"
+                          className="absolute -bottom-1 -right-1 rounded-full w-7 h-7 p-0 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-md border-2 border-white"
                           onClick={() => setImageDialogEmployee(employee)}
                         >
-                          <Camera className="h-3 w-3" />
+                          <Camera className="h-3.5 w-3.5 text-white" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Employee Profile Image</DialogTitle>
-                          <DialogDescription>
+                      <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50/30 via-white to-purple-50/30 border-blue-200">
+                        <DialogHeader className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200">
+                          <DialogTitle className="text-blue-900 font-bold flex items-center gap-2">
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-2">
+                              <Camera className="h-5 w-5 text-white" />
+                            </div>
+                            Employee Profile Image
+                          </DialogTitle>
+                          <DialogDescription className="text-blue-700 mt-1">
                             Upload a new profile image for {employee.firstName} {employee.lastName} or remove the current one.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           {employee.profileImage && (
                             <div className="flex justify-center mb-4">
-                              <AdaptiveImage
-                                src={employee.profileImage}
-                                alt={`${employee.firstName} ${employee.lastName}`}
-                                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
-                                sizes="thumbnail"
-                                fallback={
-                                  <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <span className="text-blue-600 font-bold text-lg">
-                                      {employee.firstName[0]}{employee.lastName[0]}
-                                    </span>
-                                  </div>
-                                }
-                              />
+                              <div className="relative">
+                                <AuthenticatedImage
+                                  src={employee.profileImage}
+                                  alt={`${employee.firstName} ${employee.lastName}`}
+                                  className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-blue-200"
+                                  fallback={
+                                    <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-white shadow-xl ring-4 ring-blue-200">
+                                      <span className="text-white font-bold text-2xl">
+                                        {employee.firstName[0]}{employee.lastName[0]}
+                                      </span>
+                                    </div>
+                                  }
+                                />
+                              </div>
                             </div>
                           )}
-                          <ObjectUploader
-                            maxNumberOfFiles={1}
-                            maxFileSize={5242880} // 5MB
-                            allowedFileTypes={["image/*"]}
-                            onGetUploadParameters={handleGetUploadParameters}
-                            onComplete={handleUploadComplete}
-                            buttonClassName="w-full"
+                          <Button
+                            variant="default"
+                            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = async (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                  await handleProfileImageUpload(file);
+                                }
+                              };
+                              input.click();
+                            }}
+                            disabled={uploadEmployeeImageMutation.isPending}
                           >
                             <Upload className="h-4 w-4 mr-2" />
-                            {uploadEmployeeImageMutation.isPending ? 'Processing...' : 'Upload New Image'}
-                          </ObjectUploader>
+                            {uploadEmployeeImageMutation.isPending ? 'Uploading...' : 'Upload New Image'}
+                          </Button>
                           {employee.profileImage && (
                             <Button
                               variant="destructive"
                               onClick={() => removeEmployeeImageMutation.mutate(employee.id)}
                               disabled={removeEmployeeImageMutation.isPending}
-                              className="w-full"
+                              className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-md"
                             >
                               <X className="h-4 w-4 mr-2" />
                               {removeEmployeeImageMutation.isPending ? 'Removing...' : 'Remove Image'}
@@ -822,34 +915,49 @@ export default function EmployeeManagement() {
                       </DialogContent>
                     </Dialog>
                   </div>
-                  <div>
-                    <CardTitle className="text-lg">{employee.firstName} {employee.lastName}</CardTitle>
-                    <p className="text-sm text-gray-600">{employee.email}</p>
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {employee.firstName} {employee.lastName}
+                    </CardTitle>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 truncate">{employee.email}</p>
                   </div>
                 </div>
-                <Badge variant={employee.isActive ? "default" : "secondary"}>
+                <Badge 
+                  variant={employee.isActive ? "default" : "secondary"}
+                  className={employee.isActive 
+                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-sm" 
+                    : "bg-slate-200 text-slate-700 border-0"
+                  }
+                >
                   {employee.isActive ? "Active" : "Inactive"}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center text-sm text-gray-600">
-                <Users className="h-4 w-4 mr-2" />
-                {getDepartmentName(employee.departmentId)}
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center text-sm text-slate-700 dark:text-slate-300 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg px-3 py-2 border-2 border-slate-300 dark:border-slate-600">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mr-3">
+                  <Users className="h-4 w-4 text-white" />
+                </div>
+                <span className="font-medium">{getDepartmentName(employee.departmentId)}</span>
               </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <MapPin className="h-4 w-4 mr-2" />
-                {getSiteName(employee.siteId)}
+              <div className="flex items-center text-sm text-slate-700 dark:text-slate-300 bg-purple-50/50 dark:bg-purple-900/20 rounded-lg px-3 py-2 border-2 border-slate-300 dark:border-slate-600">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mr-3">
+                  <MapPin className="h-4 w-4 text-white" />
+                </div>
+                <span className="font-medium truncate">{getSiteName(employee.siteId)}</span>
               </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <Clock className="h-4 w-4 mr-2" />
-                Joined {new Date(employee.createdAt).toLocaleDateString()}
+              <div className="flex items-center text-sm text-slate-700 dark:text-slate-300 bg-orange-50/50 dark:bg-orange-900/20 rounded-lg px-3 py-2 border-2 border-slate-300 dark:border-slate-600">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center mr-3">
+                  <Clock className="h-4 w-4 text-white" />
+                </div>
+                <span className="font-medium">Joined {new Date(employee.createdAt).toLocaleDateString()}</span>
               </div>
-              <div className="flex justify-end space-x-2 pt-2">
+              <div className="flex justify-end space-x-2 pt-2 border-t-2 border-slate-300 dark:border-slate-600">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleEditEmployee(employee)}
+                  className="hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-700 dark:hover:text-blue-300 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-all"
                 >
                   <Edit className="h-4 w-4 mr-1" />
                   Edit
@@ -859,6 +967,7 @@ export default function EmployeeManagement() {
                   size="sm"
                   onClick={() => deleteEmployeeMutation.mutate(employee.id)}
                   disabled={deleteEmployeeMutation.isPending}
+                  className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-700 border-slate-200 dark:border-slate-700 transition-all"
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   Delete
@@ -870,12 +979,17 @@ export default function EmployeeManagement() {
       </div>
 
       {employees.length === 0 && (
-        <Card className="text-center py-12">
+        <Card className="text-center py-12 border-2 border-dashed border-slate-300 dark:border-slate-600 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
           <CardContent>
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Employees Yet</h3>
-            <p className="text-gray-600 mb-4">Get started by adding your first employee to the system.</p>
-            <Button onClick={() => setIsCreateEmployeeOpen(true)}>
+            <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-blue-50 to-purple-100 rounded-full flex items-center justify-center">
+              <Users className="h-10 w-10 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">No Employees Yet</h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-6">Get started by adding your first employee to the system.</p>
+            <Button 
+              onClick={() => setIsCreateEmployeeOpen(true)}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add First Employee
             </Button>
@@ -885,10 +999,15 @@ export default function EmployeeManagement() {
 
       {/* Edit Employee Dialog */}
       <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Employee</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-gradient-to-br from-blue-50/30 via-white to-purple-50/30 border-blue-200">
+          <DialogHeader className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200">
+            <DialogTitle className="text-blue-900 font-bold flex items-center gap-2">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-2">
+                <Edit className="h-5 w-5 text-white" />
+              </div>
+              Edit Employee
+            </DialogTitle>
+            <DialogDescription className="text-blue-700 mt-1">
               Update employee information.
             </DialogDescription>
           </DialogHeader>
@@ -1011,11 +1130,20 @@ export default function EmployeeManagement() {
                 />
               </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setEditingEmployee(null)}>
+              <DialogFooter className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mb-4 border-t border-blue-200 mt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setEditingEmployee(null)}
+                  className="hover:bg-slate-50"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateEmployeeMutation.isPending}>
+                <Button 
+                  type="submit" 
+                  disabled={updateEmployeeMutation.isPending}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md"
+                >
                   {updateEmployeeMutation.isPending ? 'Updating...' : 'Update Employee'}
                 </Button>
               </DialogFooter>
@@ -1023,6 +1151,7 @@ export default function EmployeeManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

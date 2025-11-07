@@ -65,65 +65,75 @@ export default function OnSiteNow() {
 
   if (locationsLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center mb-6">
-          <Link href="/admin/dashboard">
-            <Button variant="ghost" size="sm" className="mr-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">Employees On Site Now</h1>
-        </div>
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+        <div className="container mx-auto p-6">
+          <div className="flex items-center mb-6">
+            <Link href="/admin/dashboard">
+              <Button variant="ghost" size="sm" className="mr-4">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Employees On Site Now</h1>
+          </div>
+          <div className="grid gap-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="animate-pulse border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                <CardContent className="p-6">
+                  <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/3 mb-2"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded w-1/2"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Link href="/admin/dashboard">
-            <Button variant="ghost" size="sm" className="mr-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">Employees On Site Now</h1>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Link href="/admin/dashboard">
+              <Button variant="ghost" size="sm" className="mr-4">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Employees On Site Now</h1>
+          </div>
+          <Badge variant="secondary" className="text-lg px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">
+            {onSiteEmployees.length} On Site
+          </Badge>
         </div>
-        <Badge variant="secondary" className="text-lg px-3 py-1 bg-orange-100 text-orange-800">
-          {onSiteEmployees.length} On Site
-        </Badge>
-      </div>
 
-      <div className="grid gap-4">
-        {onSiteEmployees.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No employees are currently on site</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Employees will appear here when they are within their work site geofence
-              </p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4">
+          {onSiteEmployees.length === 0 ? (
+            <Card className="border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+              <CardContent className="p-8 text-center">
+                <MapPin className="h-12 w-12 text-gray-400 dark:text-slate-400 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-slate-400">No employees are currently on site</p>
+                <p className="text-sm text-gray-400 dark:text-slate-500 mt-1">
+                  Employees will appear here when they are within their work site geofence
+                </p>
+                <div className="mt-6">
+                  <Link href="/admin/live-tracking">
+                    <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+                      View All on Live Map
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
         ) : (
           onSiteEmployees.map((item: any) => (
-            <Card key={item.location?.id || item.employee.id} className="hover:shadow-md transition-shadow">
+            <Card key={item.location?.id || item.employee.id} className="hover:shadow-md transition-shadow border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
                       {item.employee.profileImage ? (
                         <img
                           src={item.employee.profileImage}
@@ -131,19 +141,19 @@ export default function OnSiteNow() {
                           className="w-12 h-12 rounded-full object-cover"
                         />
                       ) : (
-                        <span className="text-orange-600 font-semibold text-lg">
+                        <span className="text-orange-600 dark:text-orange-400 font-semibold text-lg">
                           {item.employee.firstName[0]}{item.employee.lastName[0]}
                         </span>
                       )}
                     </div>
                     <div>
                       <Link href={`/admin/employees/${item.employee.id}/profile`}>
-                        <h3 className="font-semibold text-lg hover:text-blue-600 cursor-pointer">
+                        <h3 className="font-semibold text-lg hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer text-slate-900 dark:text-slate-100">
                           {item.employee.firstName} {item.employee.lastName}
                         </h3>
                       </Link>
-                      <p className="text-gray-600">{item.employee.email}</p>
-                      <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                      <p className="text-gray-600 dark:text-slate-400">{item.employee.email}</p>
+                      <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-slate-400 mt-1">
                         <div className="flex items-center">
                           <MapPin className="h-4 w-4 mr-1" />
                           <span>{getSiteName(item.employee.siteId)}</span>
@@ -159,19 +169,19 @@ export default function OnSiteNow() {
                   </div>
                   
                   <div className="text-right space-y-2">
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+                    <Badge className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50">
                       <User className="h-3 w-3 mr-1" />
                       On Site
                     </Badge>
                     {item.location && (
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 dark:text-slate-400">
                         <div>Lat: {parseFloat(item.location.latitude).toFixed(4)}</div>
                         <div>Lng: {parseFloat(item.location.longitude).toFixed(4)}</div>
                       </div>
                     )}
                     <div className="space-x-2">
                       <Link href={`/admin/live-tracking?employeeId=${item.employee.id}`}>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700">
                           Track Live
                         </Button>
                       </Link>
@@ -184,12 +194,15 @@ export default function OnSiteNow() {
         )}
       </div>
 
-      <div className="mt-6 text-center">
-        <Link href="/admin/live-tracking">
-          <Button>
-            View All on Live Map
-          </Button>
-        </Link>
+        {onSiteEmployees.length > 0 && (
+          <div className="mt-6 text-center">
+            <Link href="/admin/live-tracking">
+              <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+                View All on Live Map
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

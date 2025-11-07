@@ -79,11 +79,11 @@ export default function AdminSignup() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center space-y-4">
           <div className="flex items-center justify-center">
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 shadow-lg">
+            <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50">
               <img 
                 src="/logo-192.png" 
                 alt="AIHP CrewTrack Logo" 
-                className="h-16 w-auto"
+                className="h-12 w-12 object-contain"
               />
             </div>
           </div>

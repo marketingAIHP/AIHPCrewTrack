@@ -109,13 +109,13 @@ export default function ExportReportDialog({ children }: ExportReportDialogProps
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
             <Mail className="h-5 w-5" />
             Export Attendance Report
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-slate-600 dark:text-slate-400">
             Send a comprehensive 30-day attendance report via email. The report will include 
             check-in/out times, work sites, and attendance summaries for all employees.
           </DialogDescription>

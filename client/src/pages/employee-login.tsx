@@ -71,31 +71,31 @@ export default function EmployeeLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 dark:from-slate-900 dark:via-slate-800/50 dark:to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center space-x-2">
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 shadow-lg">
+            <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50 dark:ring-blue-500/30">
               <img 
                 src="/logo-192.png" 
                 alt="AIHP CrewTrack Logo" 
-                className="h-14 w-auto"
+                className="h-12 w-12 object-contain"
               />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">AIHP CrewTrack</h1>
-          <p className="text-gray-600">Employee Portal</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">AIHP CrewTrack</h1>
+          <p className="text-slate-600 dark:text-slate-400">Employee Portal</p>
         </div>
 
         {/* Login Card */}
-        <Card className="w-full shadow-lg">
+        <Card className="w-full shadow-lg bg-white dark:bg-slate-800/90 dark:border-slate-700">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center flex items-center justify-center space-x-2">
+            <CardTitle className="text-2xl text-center flex items-center justify-center space-x-2 text-slate-900 dark:text-slate-100">
               <Users className="h-5 w-5" />
               <span>Employee Sign In</span>
             </CardTitle>
-            <CardDescription className="text-center">
+            <CardDescription className="text-center text-slate-600 dark:text-slate-400">
               Enter your credentials to access your work dashboard
             </CardDescription>
           </CardHeader>
@@ -113,15 +113,15 @@ export default function EmployeeLogin() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel className="text-slate-700 dark:text-slate-300">Email</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                          <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                           <Input 
                             {...field} 
                             type="email" 
                             placeholder="your.email@company.com"
-                            className="pl-10"
+                            className="pl-10 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-400"
                             disabled={loginMutation.isPending}
                           />
                         </div>
@@ -136,15 +136,15 @@ export default function EmployeeLogin() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel className="text-slate-700 dark:text-slate-300">Password</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                          <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                           <Input 
                             {...field} 
                             type="password" 
                             placeholder="Enter your password"
-                            className="pl-10"
+                            className="pl-10 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-400"
                             disabled={loginMutation.isPending}
                           />
                         </div>
@@ -156,7 +156,7 @@ export default function EmployeeLogin() {
 
                 <Button 
                   type="submit" 
-                  className="w-full" 
+                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-sm" 
                   disabled={loginMutation.isPending}
                 >
                   {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
@@ -164,16 +164,16 @@ export default function EmployeeLogin() {
               </form>
             </Form>
 
-            <Separator />
+            <Separator className="dark:bg-slate-700" />
 
             <div className="text-center space-y-2">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 Are you an administrator?
               </p>
               <Button 
                 variant="outline" 
                 onClick={() => setLocation('/admin/login')}
-                className="w-full"
+                className="w-full border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300"
               >
                 Go to Admin Portal
               </Button>
@@ -182,7 +182,7 @@ export default function EmployeeLogin() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center text-sm text-gray-500">
+        <div className="text-center text-sm text-slate-500 dark:text-slate-400">
           <p>Contact your administrator if you need help accessing your account</p>
         </div>
       </div>
