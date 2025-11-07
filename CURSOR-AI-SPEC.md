@@ -625,21 +625,26 @@ DELETE /api/notifications/:id       - Delete notification
 
 ```env
 # Database
-DATABASE_URL=postgresql://user:password@host:5432/database
+DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<db>
 
 # Email
-SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxx
+SENDGRID_API_KEY=<your_sendgrid_api_key>
+SENDGRID_FROM_EMAIL=<noreply@yourdomain.com>
 
 # Server
 NODE_ENV=development|production
 PORT=5000
 
-# Authentication (auto-generated if not provided)
-JWT_SECRET=your-secret-key
-SESSION_SECRET=your-session-secret
+# Authentication
+JWT_SECRET=<your_jwt_secret>
+SESSION_SECRET=<your_session_secret>
+
+# Supabase Storage
+SUPABASE_URL=https://<your-project-id>.supabase.co
+SERVICE_ROLE_SECRET=<your_supabase_service_role_secret>
 
 # Google Maps (frontend)
-VITE_GOOGLE_MAPS_API_KEY=your-api-key
+VITE_GOOGLE_MAPS_API_KEY=<your_google_maps_api_key>
 ```
 
 ---

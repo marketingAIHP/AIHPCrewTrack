@@ -33,7 +33,15 @@ import express from 'express';
 import { ImageCompressionService } from './imageCompression';
 import { uploadProfileImage, uploadSiteImage, uploadMiddleware, deleteImageFromSupabase, deleteSiteImageFromSupabase } from './uploadController';
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable must be set'); // Ensures leaked default secret removed
+}
+
+const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
+if (!SENDGRID_FROM_EMAIL) {
+  throw new Error('SENDGRID_FROM_EMAIL environment variable must be set'); // Prevents fallback email leaking into repo
+}
 
 // WebSocket connections for real-time notifications
 const adminConnections = new Map<number, WebSocket[]>(); // adminId -> WebSocket[]
@@ -2389,7 +2397,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const emailSent = await sendEmail({
         to: email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@labourtrackr.com',
+        from: SENDGRID_FROM_EMAIL,
+      const emailSent = await sendEmail({
+        to: email,
+        from: SENDGRID_FROM_EMAIL,
         subject: 'Verify Your Admin Account - LabourTrackr',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -2460,7 +2471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const emailSent = await sendEmail({
         to: validatedData.email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@labourtrackr.com',
+        from: SENDGRID_FROM_EMAIL,
         subject: 'Verify Your Admin Account - LabourTrackr',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

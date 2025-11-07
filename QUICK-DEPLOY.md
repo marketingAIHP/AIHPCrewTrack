@@ -37,15 +37,16 @@ git push -u origin main
      - **Plan**: **Free**
 
 4. **Add Environment Variables:**
-   ```
-   NODE_ENV=production
-   PORT=10000
-   DATABASE_URL=<paste_internal_database_url>
-   JWT_SECRET=<generate_with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
-   SENDGRID_API_KEY=<your_sendgrid_key>
-   GOOGLE_MAPS_API_KEY=<your_google_maps_key>
-   SENDGRID_FROM_EMAIL=noreply@labourtrackr.com
-   ```
+  ```
+  NODE_ENV=production
+  PORT=10000
+  DATABASE_URL=<your_database_connection_string>
+  JWT_SECRET=<generate_with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
+  SENDGRID_API_KEY=<your_sendgrid_api_key>
+  GOOGLE_MAPS_API_KEY=<your_google_maps_api_key>
+  SENDGRID_FROM_EMAIL=<noreply@yourdomain.com>
+  APP_BASE_URL=https://aihp.in
+  ```
 
 5. **Click Create Web Service** → Wait 5-10 min
 

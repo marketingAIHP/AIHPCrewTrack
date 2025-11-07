@@ -33,7 +33,7 @@ PORT=5000
 
 # Add these Supabase variables:
 SUPABASE_URL=https://your-project-id.supabase.co
-SERVICE_ROLE_SECRET=eyJhbGc...your_service_role_secret_key
+SERVICE_ROLE_SECRET=<your_supabase_service_role_secret>
 ```
 
 ### Step 3: Verify Bucket Exists

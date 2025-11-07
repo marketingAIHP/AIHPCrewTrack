@@ -24,7 +24,7 @@ services:
       - key: GOOGLE_MAPS_API_KEY
         sync: false  # You'll add this manually in Render dashboard
       - key: SENDGRID_FROM_EMAIL
-        value: noreply@labourtrackr.com
+        sync: false  # Configure in Render dashboard
     
 databases:
   # PostgreSQL Database

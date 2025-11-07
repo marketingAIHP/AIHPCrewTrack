@@ -89,7 +89,7 @@ DATABASE_URL=<paste_internal_database_url_from_step_3>
 JWT_SECRET=<generate_random_string_here>
 SENDGRID_API_KEY=<your_sendgrid_key>
 GOOGLE_MAPS_API_KEY=<your_google_maps_key>
-SENDGRID_FROM_EMAIL=noreply@labourtrackr.com
+SENDGRID_FROM_EMAIL=<noreply@yourdomain.com>
 ```
 
 **To generate JWT_SECRET:**
@@ -171,7 +171,7 @@ DATABASE_URL=<paste_from_database_service>
 JWT_SECRET=<generate_random_string>
 SENDGRID_API_KEY=<your_key>
 GOOGLE_MAPS_API_KEY=<your_key>
-SENDGRID_FROM_EMAIL=noreply@labourtrackr.com
+SENDGRID_FROM_EMAIL=<noreply@yourdomain.com>
 ```
 
 #### 7. Deploy
@@ -285,7 +285,7 @@ primary_region = "iad"
 fly secrets set JWT_SECRET="<your_secret>"
 fly secrets set SENDGRID_API_KEY="<your_key>"
 fly secrets set GOOGLE_MAPS_API_KEY="<your_key>"
-fly secrets set SENDGRID_FROM_EMAIL="noreply@labourtrackr.com"
+fly secrets set SENDGRID_FROM_EMAIL="noreply@yourdomain.com"
 ```
 
 Get database URL:
@@ -375,14 +375,17 @@ Create a `.env` file locally (for testing) or set in hosting platform:
 # Required
 NODE_ENV=production
 PORT=10000  # Render uses 10000, Railway/Fly auto-assign
-DATABASE_URL=postgresql://user:pass@host:5432/dbname
-JWT_SECRET=your_random_32_char_string_here
-SENDGRID_API_KEY=SG.xxxxxxxxxxxxx
-GOOGLE_MAPS_API_KEY=AIzaSyxxxxxxxxxxxxx
+DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<db>
+JWT_SECRET=<your_random_32_char_string>
+SENDGRID_API_KEY=<your_sendgrid_api_key>
+GOOGLE_MAPS_API_KEY=<your_google_maps_api_key>
+SENDGRID_FROM_EMAIL=<noreply@yourdomain.com>
+SUPABASE_URL=https://<your-project-id>.supabase.co
+SERVICE_ROLE_SECRET=<your_supabase_service_role_secret>
 
 # Optional
-SENDGRID_FROM_EMAIL=noreply@labourtrackr.com
-SESSION_SECRET=another_random_string
+SESSION_SECRET=<another_random_string>
+SERVER_URL=<https://your-hosted-app>
 ```
 
 **Generate secrets:**

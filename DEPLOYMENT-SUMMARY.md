@@ -46,11 +46,13 @@ You'll need to set these in your hosting platform:
 ```
 NODE_ENV=production
 PORT=10000                    # Render uses 10000
-DATABASE_URL=postgresql://... # From your database
-JWT_SECRET=<random_32_char_string>
-SENDGRID_API_KEY=SG.xxxxx
-GOOGLE_MAPS_API_KEY=AIzaSyxxxxx
-SENDGRID_FROM_EMAIL=noreply@labourtrackr.com
+DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<db>
+JWT_SECRET=<your_random_32_char_string>
+SENDGRID_API_KEY=<your_sendgrid_api_key>
+GOOGLE_MAPS_API_KEY=<your_google_maps_api_key>
+SENDGRID_FROM_EMAIL=<noreply@yourdomain.com>
+SUPABASE_URL=https://<your-project-id>.supabase.co
+SERVICE_ROLE_SECRET=<your_supabase_service_role_secret>
 ```
 
 **Generate JWT_SECRET:**

@@ -71,8 +71,8 @@ https://supabase.com/dashboard/project/[YOUR_PROJECT_ID]/storage/buckets
 ### Step 3: Verify Environment Variables
 Check `.env` file has:
 ```env
-SUPABASE_URL=https://rasicgufwqswowshhvoq.supabase.co
-SERVICE_ROLE_SECRET=eyJhbGc...
+SUPABASE_URL=https://<your-project-id>.supabase.co
+SERVICE_ROLE_SECRET=<your_supabase_service_role_secret>
 ```
 
 ### Step 4: Restart Backend Server
