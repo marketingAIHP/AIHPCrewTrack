@@ -2012,23 +2012,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentAttendance = await storage.getCurrentAttendance(employee.id);
           if (currentAttendance) {
             const location = await storage.getLatestEmployeeLocation(employee.id);
-            
-            // Calculate if employee is within geofence with GPS accuracy buffer
-            let isWithinGeofence = false;
-            const siteId = employee.siteId;
-            if (location && siteId) {
-              const assignedSite = await storage.getWorkSite(siteId);
-              if (assignedSite) {
-                const geofenceCheck = isWithinGeofence(
-                  location.latitude,
-                  location.longitude,
-                  assignedSite.latitude,
-                  assignedSite.longitude,
-                  assignedSite.geofenceRadius
-                );
-                isWithinGeofence = geofenceCheck.isWithin;
-                // Geofence check completed
-              }
+            let assignedSite = null;
+            let isEmployeeWithinGeofence = false;
+            let distanceFromSite: number | null = null;
+            let geofenceRadius: number | null = null;
+
+            if (employee.siteId) {
+              assignedSite = await storage.getWorkSite(employee.siteId);
+            }
+
+            if (location && assignedSite) {
+              const geofenceCheck = isWithinGeofence(
+                location.latitude,
+                location.longitude,
+                assignedSite.latitude,
+                assignedSite.longitude,
+                assignedSite.geofenceRadius
+              );
+              isEmployeeWithinGeofence = geofenceCheck.isWithin;
+              distanceFromSite = geofenceCheck.distance;
+              geofenceRadius = assignedSite?.geofenceRadius ?? null;
             }
             
             return {
@@ -2039,7 +2042,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               },
               location: location ? {
                 ...location,
-                isWithinGeofence
+                isWithinGeofence: isEmployeeWithinGeofence,
+                distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
+                geofenceRadius
               } : null,
             };
           }
@@ -2057,57 +2062,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/employee/location', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
     try {
-      // FIX: Ensure coordinates are numeric, not strings
       const { latitude, longitude } = req.body;
-      
-      // FIX: Parse coordinates to ensure they're numbers
+
       const empLat = typeof latitude === 'string' ? parseFloat(latitude) : Number(latitude);
       const empLon = typeof longitude === 'string' ? parseFloat(longitude) : Number(longitude);
-      
-      // Validate coordinates
+
       if (isNaN(empLat) || isNaN(empLon) || !isFinite(empLat) || !isFinite(empLon)) {
         console.error('❌ Invalid coordinates received:', { latitude, longitude, empLat, empLon });
         return res.status(400).json({ message: 'Invalid coordinates provided' });
       }
-      
+
       const employee = await storage.getEmployee(req.user!.id);
-      
       if (!employee) {
         return res.status(404).json({ message: 'Employee not found' });
       }
 
-      // Calculate if employee is on site with GPS accuracy buffer
       const assignedSite = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
+
+      let distanceFromSite: number | null = null;
       let isOnSite = false;
-      let distance = 0;
-      
+      let geofenceRadius: number | null = null;
+
       if (assignedSite) {
         const geofenceCheck = isWithinGeofence(
-          empLat, // Use parsed numeric values
-          empLon, // Use parsed numeric values
+          empLat,
+          empLon,
           assignedSite.latitude,
           assignedSite.longitude,
           assignedSite.geofenceRadius
         );
+
+        distanceFromSite = geofenceCheck.distance;
+        geofenceRadius = assignedSite?.geofenceRadius ?? null;
         isOnSite = geofenceCheck.isWithin;
-        distance = geofenceCheck.distance;
-        
-        // FIX: Log location update with clear message
-        const logMessage = isOnSite 
-          ? `✅ Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(distance)}m from site)`
-          : `❌ Employee ${employee.firstName} ${employee.lastName} is ${Math.round(distance)}m away from site`;
+
+        const logMessage = isOnSite
+          ? `✅ Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(distanceFromSite)}m from site)`
+          : `❌ Employee ${employee.firstName} ${employee.lastName} is ${Math.round(distanceFromSite)}m away from site`;
         console.log('📍 Location update:', logMessage);
       }
 
-      // FIX: Save location tracking with parsed numeric coordinates
       await storage.createLocationTracking({
         employeeId: employee.id,
-        latitude: empLat.toString(), // Store as string in DB
-        longitude: empLon.toString(), // Store as string in DB
+        latitude: empLat.toString(),
+        longitude: empLon.toString(),
         isOnSite,
       });
 
-      res.json({ success: true, isOnSite, distance: Math.round(distance) });
+      const payload = {
+        type: 'employee_location',
+        employeeId: employee.id,
+        employee: {
+          id: employee.id,
+          name: `${employee.firstName} ${employee.lastName}`,
+          email: employee.email,
+          siteId: employee.siteId,
+        },
+        location: {
+          latitude: empLat,
+          longitude: empLon,
+          isOnSite,
+          distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
+          geofenceRadius,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      const adminWsList = adminConnections.get(employee.adminId);
+      if (adminWsList) {
+        adminWsList.forEach(adminWs => {
+          if (adminWs.readyState === WebSocket.OPEN) {
+            adminWs.send(JSON.stringify(payload));
+          }
+        });
+      }
+
+      res.json({
+        success: true,
+        isOnSite,
+        distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
+      });
     } catch (error) {
       console.error('❌ Error updating location:', error);
       res.status(500).json({ message: 'Failed to update location' });

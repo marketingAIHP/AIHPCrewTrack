@@ -17,26 +17,24 @@ export function useWebSocket({ onMessage, onConnect, onDisconnect }: UseWebSocke
   const connect = () => {
     if (isUnmountedRef.current) return;
 
-    const currentToken = getAuthToken();
-    if (!currentToken) {
-      console.log('⏳ WebSocket waiting for authentication token...');
-      return;
-    }
-
     try {
+      const token = getAuthToken();
+      if (!token) {
+        console.error('No auth token for WebSocket connection');
+        return;
+      }
+
       // Close existing connection if any
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
 
-      // Get backend URL from environment or use current host
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || window.location.origin;
-      const protocol = backendUrl.startsWith('https') ? "wss:" : "ws:";
-      const host = backendUrl.replace(/^https?:\/\//, '');
-      const wsUrl = `${protocol}//${host}/ws?token=${currentToken}`;
-      
-      console.log('🔌 Connecting WebSocket with token...');
+      const wsHost = import.meta.env.VITE_WS_URL || window.location.host;
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${wsHost}/ws?token=${encodeURIComponent(token)}`;
+
+      console.log('Connecting to WebSocket...', wsHost);
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {

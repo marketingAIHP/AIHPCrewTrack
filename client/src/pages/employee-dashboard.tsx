@@ -62,6 +62,9 @@ export default function EmployeeDashboard() {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const locationWatchIdRef = useRef<number | null>(null);
+  const [serverLocationStatus, setServerLocationStatus] = useState<{ distanceFromSite: number | null; isOnSite: boolean | null } | null>(null);
+  const offsiteCounterRef = useRef(0);
+  const OFFSITE_THRESHOLD = 3;
 
   // GPS accuracy buffer to account for mobile GPS inaccuracies (typically 3-10m)
   // Using a 50m buffer to reduce false negatives when employees are on site
@@ -460,6 +463,20 @@ export default function EmployeeDashboard() {
     return getDistanceInfo(locationAccuracy).isWithinActualRadius;
   };
 
+  const getLatestDistance = () => {
+    if (serverLocationStatus && serverLocationStatus.distanceFromSite !== null) {
+      return serverLocationStatus.distanceFromSite;
+    }
+    return getDistanceInfo(currentLocation?.accuracy).distance;
+  };
+
+  const isCurrentlyOnSite = () => {
+    if (serverLocationStatus && serverLocationStatus.isOnSite !== null) {
+      return serverLocationStatus.isOnSite;
+    }
+    return isWithinActualGeofence(currentLocation?.accuracy);
+  };
+
   // Calculate distance between two points
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3; // Earth's radius in meters
@@ -487,19 +504,31 @@ export default function EmployeeDashboard() {
       });
       return response;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: 'Checked In',
         description: 'Successfully marked attendance.',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/employee/attendance/current'] });
+      offsiteCounterRef.current = 0;
       
       // Start location tracking
       if (currentLocation) {
-        apiRequest('POST', '/api/employee/location', {
-          latitude: currentLocation.lat,
-          longitude: currentLocation.lng,
-        }).catch(console.error);
+        console.log('✓ Check-in success, sending immediate location update:', currentLocation);
+        try {
+          const locationResponse = await apiRequest('POST', '/api/employee/location', {
+            latitude: currentLocation.lat,
+            longitude: currentLocation.lng,
+          });
+          const locationData = await locationResponse.json();
+          console.log('✓ Location updated immediately:', locationData);
+          setServerLocationStatus({
+            distanceFromSite: locationData.distanceFromSite ?? null,
+            isOnSite: typeof locationData.isOnSite === 'boolean' ? locationData.isOnSite : null,
+          });
+        } catch (error) {
+          console.error('✗ Failed to update location:', error);
+        }
       }
     },
     onError: (error: any) => {
@@ -544,6 +573,8 @@ export default function EmployeeDashboard() {
         description: 'Successfully marked departure.',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/employee/attendance/current'] });
+      setServerLocationStatus(null);
+      offsiteCounterRef.current = 0;
     },
     onError: (error: any) => {
       toast({
@@ -558,6 +589,7 @@ export default function EmployeeDashboard() {
     localStorage.removeItem('token');
     localStorage.removeItem('userType');
     setLocation('/employee/login');
+    offsiteCounterRef.current = 0;
   };
 
   const handleCheckIn = () => {
@@ -576,7 +608,7 @@ export default function EmployeeDashboard() {
     checkOutMutation.mutate();
   };
 
-  // Auto-update location periodically - 1 minute intervals with optimized speed
+  // Auto-update location periodically - 30 second intervals with optimized speed
   // This must be after mutations are defined
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -590,75 +622,60 @@ export default function EmployeeDashboard() {
           const lng = position.coords.longitude;
           const accuracy = position.coords.accuracy || 100;
           
-          // Only update if the new location is significantly different or more accurate
-          if (currentLocation) {
-            const distanceChange = calculateDistance(
-              currentLocation.lat,
-              currentLocation.lng,
-              lat,
-              lng
-            );
-            
-            // Update if location changed significantly (>15m) or accuracy improved significantly
-            if (distanceChange > 15 || (accuracy < (currentLocation.accuracy || 100) && accuracy < 50)) {
-              setCurrentLocation({
-                lat: lat,
-                lng: lng,
-                accuracy: accuracy,
-              });
-              
-              // If checked in, check if still within geofence and track location
-              if (currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime) {
-                // Check if still within geofence using dynamic buffer based on GPS accuracy
-                if (workSite) {
-                  const site = workSite as WorkSite;
-                  // Calculate distance using the fresh position data
-                  const distance = calculateDistance(
-                    lat,
-                    lng,
-                    parseFloat(site.latitude.toString()),
-                    parseFloat(site.longitude.toString())
-                  );
-                  
-                  const dynamicBuffer = accuracy && !isNaN(accuracy) 
-                    ? Math.max(accuracy, GPS_ACCURACY_BUFFER)
-                    : GPS_ACCURACY_BUFFER;
-                  
-                  const effectiveRadius = site.geofenceRadius + dynamicBuffer;
-                  const isWithinFence = distance <= effectiveRadius;
-                  
-                  // If outside geofence, auto check-out
-                  if (!isWithinFence) {
-                    // Use the mutation directly
-                    checkOutMutation.mutate();
-                    toast({
-                      title: 'Auto Check-Out',
-                      description: 'You left the work site area. Automatically checked out.',
-                      variant: 'destructive',
-                    });
-                    return;
-                  }
-                }
-                
-                // Send location to server for tracking
-                apiRequest('POST', '/api/employee/location', {
-                  latitude: lat,
-                  longitude: lng,
-                }).catch(console.error);
-              }
-            }
-          } else {
+          const shouldUpdate =
+            !currentLocation ||
+            calculateDistance(currentLocation.lat, currentLocation.lng, lat, lng) > 15 ||
+            (accuracy < (currentLocation?.accuracy || 100) && accuracy < 50);
+
+          if (shouldUpdate) {
             setCurrentLocation({
-              lat: lat,
-              lng: lng,
-              accuracy: accuracy,
+              lat,
+              lng,
+              accuracy,
             });
+
+            if (currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime) {
+              apiRequest('POST', '/api/employee/location', {
+                latitude: lat,
+                longitude: lng,
+              })
+                .then(res => res.json())
+                .then(data => {
+                  setServerLocationStatus({
+                    distanceFromSite: data.distanceFromSite ?? null,
+                    isOnSite: typeof data.isOnSite === 'boolean' ? data.isOnSite : null,
+                  });
+
+                  if (typeof data.isOnSite === 'boolean') {
+                    if (!data.isOnSite) {
+                      offsiteCounterRef.current += 1;
+                      if (
+                        offsiteCounterRef.current >= OFFSITE_THRESHOLD &&
+                        data.distanceFromSite != null &&
+                        workSite &&
+                        data.distanceFromSite > (workSite as WorkSite).geofenceRadius + GPS_ACCURACY_BUFFER
+                      ) {
+                        offsiteCounterRef.current = 0;
+                        checkOutMutation.mutate();
+                        toast({
+                          title: 'Auto Check-Out',
+                          description: 'You left the work site area. Automatically checked out.',
+                          variant: 'destructive',
+                        });
+                      }
+                    } else {
+                      offsiteCounterRef.current = 0;
+                    }
+                  }
+                })
+                .catch(console.error);
+            }
           }
         },
         (error) => console.error('Location tracking error:', error),
-        { enableHighAccuracy: true, timeout: LOCATION_TIMEOUT, maximumAge: 30000 }
+        { enableHighAccuracy: true, timeout: LOCATION_TIMEOUT, maximumAge: 0 }
       );
-    }, 60000); // Update every 1 minute
+    }, 30000); // Update every 30 seconds
 
     return () => clearInterval(interval);
   }, [currentAttendance, workSite, checkOutMutation, toast, currentLocation]);
@@ -873,12 +890,12 @@ export default function EmployeeDashboard() {
                         <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
                           <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
                           <Badge 
-                            className={isWithinActualGeofence(currentLocation?.accuracy) 
+                            className={isCurrentlyOnSite() 
                               ? "bg-gradient-to-r from-green-400 to-green-500 text-white border-0 shadow-sm" 
                               : "bg-gradient-to-r from-red-400 to-red-500 text-white border-0 shadow-sm"
                             }
                           >
-                            {isWithinActualGeofence(currentLocation?.accuracy) ? 'On Site' : 'Away from Site'}
+                            {isCurrentlyOnSite() ? 'On Site' : 'Away from Site'}
                           </Badge>
                         </div>
                         <Button 
@@ -928,12 +945,12 @@ export default function EmployeeDashboard() {
                         <span className="font-medium text-slate-700 dark:text-slate-300">Distance:</span>
                         <Badge className="bg-gradient-to-r from-purple-400 to-purple-500 text-white border-0 shadow-sm">
                           {(() => {
-                            const { distance, isWithinActualRadius } = getDistanceInfo(currentLocation?.accuracy);
-                            // Always show the actual distance, with a note if within range
-                            if (isWithinActualRadius) {
-                              return `${distance}m (Within Range)`;
+                            const distance = getLatestDistance();
+                            if (distance === Infinity) {
+                              return 'N/A';
                             }
-                            return `${distance}m`;
+                            const isWithinRange = isCurrentlyOnSite();
+                            return `${Math.round(distance)}m${isWithinRange ? ' (Within Range)' : ''}`;
                           })()}
                         </Badge>
                       </div>
@@ -943,12 +960,12 @@ export default function EmployeeDashboard() {
                       <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
                         <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
                         <Badge 
-                          className={isWithinActualGeofence(currentLocation?.accuracy) 
+                          className={isCurrentlyOnSite() 
                             ? "bg-gradient-to-r from-green-400 to-green-500 text-white border-0 shadow-sm" 
                             : "bg-gradient-to-r from-red-400 to-red-500 text-white border-0 shadow-sm"
                           }
                         >
-                          {isWithinActualGeofence(currentLocation?.accuracy) ? 'On Site' : 'Away from Site'}
+                          {isCurrentlyOnSite() ? 'On Site' : 'Away from Site'}
                         </Badge>
                       </div>
                     )}

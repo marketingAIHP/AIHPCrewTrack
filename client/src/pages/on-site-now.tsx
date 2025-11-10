@@ -19,7 +19,10 @@ interface LocationRecord {
   latitude: string;
   longitude: string;
   timestamp: string;
-  isWithinGeofence: boolean;
+  isWithinGeofence?: boolean;
+  isOnSite?: boolean;
+  distanceFromSite?: number | null;
+  geofenceRadius?: number | null;
   employee: Employee;
 }
 
@@ -60,7 +63,7 @@ export default function OnSiteNow() {
 
   // Filter for employees currently on site (within geofence)
   const onSiteEmployees = locations?.filter((item: any) => 
-    item.location?.isWithinGeofence && item.employee?.isActive
+    (item.location?.isWithinGeofence ?? item.location?.isOnSite ?? false) && item.employee?.isActive
   ) || [];
 
   if (locationsLoading) {
@@ -174,9 +177,18 @@ export default function OnSiteNow() {
                       On Site
                     </Badge>
                     {item.location && (
-                      <div className="text-sm text-gray-500 dark:text-slate-400">
+                      <div className="text-sm text-gray-500 dark:text-slate-400 space-y-1">
                         <div>Lat: {parseFloat(item.location.latitude).toFixed(4)}</div>
                         <div>Lng: {parseFloat(item.location.longitude).toFixed(4)}</div>
+                        {typeof item.location.distanceFromSite === 'number' && (
+                          <div>
+                            Distance: {item.location.distanceFromSite}m
+                            {typeof item.location.geofenceRadius === 'number' &&
+                              item.location.distanceFromSite <= item.location.geofenceRadius
+                              ? ' (Within Range)'
+                              : ''}
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="space-x-2">

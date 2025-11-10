@@ -41,6 +41,7 @@ export default function LiveTracking() {
   const [selectedProfileImage, setSelectedProfileImage] = useState<{url: string, name: string} | null>(null);
   const initializeCalledRef = useRef(false);
   const hasZoomedToSiteRef = useRef(false);
+  const hasZoomedToEmployeeRef = useRef(false);
 
   // Initialize component only once
   React.useEffect(() => {
@@ -136,6 +137,37 @@ export default function LiveTracking() {
     }
   }, [sites, mapLoaded, toast]);
 
+  // Zoom to specific employee when employeeId is provided in query params
+  React.useEffect(() => {
+    if (!mapLoaded || hasZoomedToEmployeeRef.current) return;
+    if (!Array.isArray(locations) || locations.length === 0) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const employeeIdParam = urlParams.get('employeeId');
+    if (!employeeIdParam) return;
+
+    const employeeId = parseInt(employeeIdParam, 10);
+    if (Number.isNaN(employeeId)) return;
+
+    const employeeEntry = locations.find((item: any) => item.employee?.id === employeeId);
+    const lat = employeeEntry?.location?.latitude;
+    const lng = employeeEntry?.location?.longitude;
+
+    if (lat != null && lng != null) {
+      const parsedLat = parseFloat(lat);
+      const parsedLng = parseFloat(lng);
+      if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
+        setMapCenter({ lat: parsedLat, lng: parsedLng });
+        setMapZoom(18);
+        hasZoomedToEmployeeRef.current = true;
+        toast({
+          title: 'Live Tracking',
+          description: `Centered on ${employeeEntry.employee.firstName} ${employeeEntry.employee.lastName}`,
+        });
+      }
+    }
+  }, [mapLoaded, locations, toast]);
+
   // WebSocket for real-time updates
   const { isConnected } = useWebSocket({
     onMessage: (data) => {
@@ -160,6 +192,8 @@ export default function LiveTracking() {
     }
   });
 
+  const isLocationOnSite = (location: any) => location?.isOnSite ?? location?.isWithinGeofence ?? false;
+
   const getStatusColor = (employee: any, location: any) => {
     if (!location) return 'bg-gray-500';
     
@@ -173,7 +207,7 @@ export default function LiveTracking() {
     if (!assignedSite) return 'bg-gray-500';
     
     // Check if location is within the geofence using isWithinGeofence from server
-    if (location.isWithinGeofence) {
+    if (isLocationOnSite(location)) {
       return 'bg-green-500';
     }
     
@@ -197,7 +231,7 @@ export default function LiveTracking() {
     }
     
     // Use server-calculated isWithinGeofence status
-    if (location.isWithinGeofence) {
+    if (isLocationOnSite(location)) {
       return `On Site: ${assignedSite.name}`;
     }
     
@@ -445,9 +479,7 @@ export default function LiveTracking() {
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
                 {Array.isArray(locations) ? 
-                  locations.filter((item: any) => {
-                    return item.location?.isWithinGeofence === true;
-                  }).length : 0
+                  locations.filter((item: any) => isLocationOnSite(item.location)).length : 0
                 }
               </div>
               <p className="text-xs text-muted-foreground">within boundaries</p>
@@ -462,9 +494,7 @@ export default function LiveTracking() {
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
                 {Array.isArray(locations) ? 
-                  locations.filter((item: any) => 
-                    item.location && !item.location.isWithinGeofence
-                  ).length : 0
+                  locations.filter((item: any) => item.location && !isLocationOnSite(item.location)).length : 0
                 }
               </div>
               <p className="text-xs text-muted-foreground">need attention</p>

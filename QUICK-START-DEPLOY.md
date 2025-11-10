@@ -9,7 +9,7 @@
 ## Step 1: Push to GitHub (2 minutes)
 
 ### Create GitHub Repository
-1. Go to github.com → New repository
+1. Go to github.com → New -repository
 2. Name: `aihp-crewtrack`
 3. **Don't** check "Initialize with README"
 4. Click "Create repository"
