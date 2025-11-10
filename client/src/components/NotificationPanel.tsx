@@ -10,8 +10,11 @@ import { formatDistanceToNow } from 'date-fns';
 export default function NotificationPanel() {
   const { notifications, connectionStatus, clearNotifications, markAsRead } = useNotifications();
 
-  const formatTime = (timestamp: string) => {
-    return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+  const formatTime = (timestamp?: string) => {
+    if (!timestamp) return 'Unknown';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return 'Unknown';
+    return formatDistanceToNow(date, { addSuffix: true });
   };
 
   const getNotificationIcon = (type: Notification['type']) => {

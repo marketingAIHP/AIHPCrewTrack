@@ -77,11 +77,8 @@ export function useNotifications() {
 
       setConnectionStatus('connecting');
 
-      // Get backend URL from environment or use current host
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || window.location.origin;
-      const protocol = backendUrl.startsWith('https') ? "wss:" : "ws:";
-      const host = backendUrl.replace(/^https?:\/\//, '');
-      const wsUrl = `${protocol}//${host}/ws?token=${token}`;
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
       
       console.log('🔌 Connecting notification WebSocket with token...');
       ws = new WebSocket(wsUrl);
