@@ -71,8 +71,8 @@ export default function EmployeeDashboard() {
   // This accounts for GPS drift, device accuracy variations, and signal issues
   const GPS_ACCURACY_BUFFER = 50; // meters - increased from 15m for better reliability
   const MIN_ACCURACY_THRESHOLD = 100; // Accept readings with accuracy better than 100m (more lenient for speed)
-  const LOCATION_AVERAGE_COUNT = 2; // Reduced to 2 readings for faster results
-  const LOCATION_TIMEOUT = 8000; // Reduced timeout to 8 seconds for faster response
+  const LOCATION_AVERAGE_COUNT = 1; // Single reading for faster initial location
+  const LOCATION_TIMEOUT = 6000; // Shorter timeout to reduce waiting time
 
   // Check authentication
   useEffect(() => {
@@ -182,7 +182,7 @@ export default function EmployeeDashboard() {
     const geolocationOptions = {
       enableHighAccuracy: true, // Critical: Use high accuracy GPS
       timeout: LOCATION_TIMEOUT,
-      maximumAge: 0, // FIX: Don't use cached readings - always get fresh GPS data
+      maximumAge: 5000, // Allow a very recent cached reading for faster response
     };
 
     // Try getCurrentPosition first for immediate result
@@ -683,7 +683,7 @@ export default function EmployeeDashboard() {
           }
         },
         (error) => console.error('Location tracking error:', error),
-        { enableHighAccuracy: true, timeout: LOCATION_TIMEOUT, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: LOCATION_TIMEOUT, maximumAge: 5000 }
       );
     }, 30000); // Update every 30 seconds
 

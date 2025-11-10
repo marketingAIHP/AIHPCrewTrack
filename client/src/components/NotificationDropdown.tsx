@@ -56,7 +56,7 @@ export default function NotificationDropdown() {
             </Badge>
           )}
           {!isConnected && (
-            <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse" />
+            <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse" />
           )}
         </Button>
       </DropdownMenuTrigger>
