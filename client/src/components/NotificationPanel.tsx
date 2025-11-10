@@ -8,7 +8,7 @@ import { useNotifications, type Notification } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function NotificationPanel() {
-  const { notifications, isConnected, clearNotifications, markAsRead } = useNotifications();
+  const { notifications, connectionStatus, clearNotifications, markAsRead } = useNotifications();
 
   const formatTime = (timestamp: string) => {
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
@@ -49,8 +49,21 @@ export default function NotificationPanel() {
           )}
         </CardTitle>
         <div className="flex items-center gap-2">
-          <Badge variant={isConnected ? "default" : "destructive"} className="text-xs">
-            {isConnected ? "Connected" : "Disconnected"}
+          <Badge
+            variant={
+              connectionStatus === 'connected'
+                ? 'default'
+                : connectionStatus === 'disconnected'
+                  ? 'destructive'
+                  : 'secondary'
+            }
+            className="text-xs"
+          >
+            {connectionStatus === 'connected'
+              ? 'Connected'
+              : connectionStatus === 'disconnected'
+                ? 'Disconnected'
+                : 'Connecting...'}
           </Badge>
           {notifications.length > 0 && (
             <Button

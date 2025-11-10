@@ -640,73 +640,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const employeeConnections = new Map<number, WebSocket>();
 
   wss.on('connection', (ws, req) => {
-    const url = new URL(req.url!, `http://${req.headers.host}`);
-    const token = url.searchParams.get('token');
-    
-    console.log(`WebSocket connection attempt from ${req.socket.remoteAddress}`);
-    
-    if (!token) {
-      // WebSocket connection rejected: No token provided
-      ws.close(1008, 'Token required');
-      return;
-    }
+    console.log('🔌 New WebSocket connection attempt');
 
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      // Token verified successfully
-      
+      const url = new URL(req.url!, `http://${req.headers.host}`);
+      const token = url.searchParams.get('token');
+
+      console.log('🔑 Token received:', token ? 'YES' : 'NO');
+
+      if (!token) {
+        console.error('❌ No token provided');
+        ws.close(1008, 'Token required');
+        return;
+      }
+
+      let decoded: any;
+      try {
+        decoded = jwt.verify(token, JWT_SECRET) as any;
+        console.log('✅ Token verified successfully:', { id: decoded.id, type: decoded.type });
+      } catch (error) {
+        console.error('❌ Token verification failed:', error);
+        ws.close(1008, 'Invalid token');
+        return;
+      }
+
       if (decoded.type === 'admin') {
-        // Add admin connection to notifications map
         const connections = adminConnections.get(decoded.id) || [];
         connections.push(ws);
         adminConnections.set(decoded.id, connections);
-        // Admin connected to WebSocket
-        
-        // Send initial connection confirmation
-        ws.send(JSON.stringify({
-          type: 'connection_established',
-          message: 'Connected to notification system'
-        }));
+        console.log(`✅ Admin ${decoded.id} connected to WebSocket. Total connections: ${connections.length}`);
 
-        // Send last 5 notifications if any (only for the first connection to avoid duplicates)
+        try {
+          ws.send(JSON.stringify({
+            type: 'connection_established',
+            message: 'Connected to notification system'
+          }));
+          console.log('✅ Sent connection confirmation to admin');
+        } catch (error) {
+          console.error('❌ Failed to send confirmation:', error);
+        }
+
         const existingConnections = adminConnections.get(decoded.id) || [];
-        if (existingConnections.length === 1) { // Only send history for first connection
+        if (existingConnections.length === 1) {
           const recentNotifications = notificationStacks.get(decoded.id) || [];
+          console.log(`📬 Sending ${recentNotifications.length} recent notifications`);
           if (recentNotifications.length > 0) {
             recentNotifications.forEach(notification => {
-              ws.send(JSON.stringify({
-                type: 'notification',
-                data: notification
-              }));
+              try {
+                ws.send(JSON.stringify({
+                  type: 'notification',
+                  data: notification
+                }));
+              } catch (error) {
+                console.error('❌ Failed to send notification:', error);
+              }
             });
           }
         }
       } else if (decoded.type === 'employee') {
         employeeConnections.set(decoded.id, ws);
+        console.log(`✅ Employee ${decoded.id} connected to WebSocket`);
       }
 
-      // Add error handler with detailed logging
-      ws.on('error', (error) => {
-        console.error(`WebSocket error for ${decoded.type} ${decoded.id}:`, error.message);
-      });
-
-      // Heartbeat mechanism - send ping every 30 seconds
-      const heartbeatInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.ping();
-        } else {
-          clearInterval(heartbeatInterval);
-        }
-      }, 30000);
-
-      // Handle pong responses to keep connection alive
-      ws.on('pong', () => {
-        // Connection is alive
-      });
-
       ws.on('close', (code, reason) => {
-        clearInterval(heartbeatInterval);
-        
+        console.log(`🔌 WebSocket closed: Code=${code}, Reason=${reason || 'none'}, Type=${decoded.type}, ID=${decoded.id}`);
+
         if (decoded.type === 'admin') {
           const connections = adminConnections.get(decoded.id) || [];
           const updatedConnections = connections.filter(conn => conn !== ws);
@@ -715,68 +713,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             adminConnections.delete(decoded.id);
           }
-          // Admin disconnected from WebSocket
+          console.log(`Admin ${decoded.id} disconnected. Remaining connections: ${updatedConnections.length}`);
         } else if (decoded.type === 'employee') {
           employeeConnections.delete(decoded.id);
-          // Employee disconnected from WebSocket
+          console.log(`Employee ${decoded.id} disconnected`);
         }
+      });
+
+      ws.on('error', (error) => {
+        console.error(`❌ WebSocket error for ${decoded.type} ${decoded.id}:`, error);
       });
 
       ws.on('message', async (data) => {
         try {
           const message = JSON.parse(data.toString());
-          
+          console.log(`📨 WebSocket message from ${decoded.type} ${decoded.id}:`, message.type);
+
           if (message.type === 'location_update' && decoded.type === 'employee') {
             const { latitude, longitude } = message;
+            const latNum = parseFloat(latitude);
+            const lonNum = parseFloat(longitude);
+
+            if (Number.isNaN(latNum) || Number.isNaN(lonNum)) {
+              console.error('❌ Invalid coordinates received from employee WebSocket message:', { latitude, longitude });
+              return;
+            }
+
             const employee = await storage.getEmployee(decoded.id);
-            
+
             if (employee && employee.siteId) {
               const site = await storage.getWorkSite(employee.siteId);
-              
+
               if (site) {
-                const geofenceCheck = isWithinGeofence(
-                  latitude,
-                  longitude,
-                  site.latitude,
-                  site.longitude,
-                  site.geofenceRadius
+                const distance = calculateDistance(
+                  latNum,
+                  lonNum,
+                  parseFloat(site.latitude as any),
+                  parseFloat(site.longitude as any)
                 );
-                
-                // Save location tracking
+
+                const isOnSite = distance <= site.geofenceRadius;
+
+                console.log(`📍 Location update: Employee ${employee.firstName}, Distance: ${Math.round(distance)}m, On Site: ${isOnSite}`);
+
                 await storage.createLocationTracking({
                   employeeId: decoded.id,
-                  latitude,
-                  longitude,
-                  isOnSite: geofenceCheck.isWithin,
+                  latitude: latNum.toString(),
+                  longitude: lonNum.toString(),
+                  isOnSite,
                 });
 
-                // Broadcast to admin
                 const adminWsList = adminConnections.get(employee.adminId);
-                if (adminWsList) {
+                if (adminWsList && adminWsList.length > 0) {
+                  console.log(`📡 Broadcasting to ${adminWsList.length} admin connections`);
                   adminWsList.forEach(adminWs => {
                     if (adminWs.readyState === WebSocket.OPEN) {
-                      adminWs.send(JSON.stringify({
-                    type: 'employee_location',
-                    employeeId: decoded.id,
-                    latitude,
-                    longitude,
-                    isOnSite: geofenceCheck.isWithin,
-                        timestamp: new Date().toISOString(),
-                      }));
+                      try {
+                        adminWs.send(JSON.stringify({
+                          type: 'employee_location',
+                          employeeId: decoded.id,
+                          employee: {
+                            id: employee.id,
+                            firstName: employee.firstName,
+                            lastName: employee.lastName,
+                            siteId: employee.siteId,
+                          },
+                          location: {
+                            latitude: latNum,
+                            longitude: lonNum,
+                            isOnSite,
+                            distanceFromSite: Math.round(distance),
+                            timestamp: new Date().toISOString(),
+                          },
+                        }));
+                      } catch (error) {
+                        console.error('❌ Failed to broadcast location:', error);
+                      }
                     }
                   });
+                } else {
+                  console.log(`⚠️ No admin connections for admin ${employee.adminId}`);
                 }
               }
             }
           }
         } catch (error) {
-          console.error('WebSocket message error:', error);
+          console.error('❌ WebSocket message error:', error);
         }
       });
 
-    } catch (error: any) {
-      console.error('WebSocket authentication failed:', error.message);
-      ws.close(1008, 'Invalid token');
+    } catch (error) {
+      console.error('❌ WebSocket connection error:', error);
+      try {
+        ws.close(1011, 'Server error');
+      } catch (e) {
+        console.error('❌ Failed to close WebSocket:', e);
+      }
     }
   });
 
@@ -2115,141 +2147,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/employee/location', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
     try {
       const { latitude, longitude } = req.body;
+      const employeeId = req.user!.id;
 
-      const empLat = typeof latitude === 'string' ? parseFloat(latitude) : Number(latitude);
-      const empLon = typeof longitude === 'string' ? parseFloat(longitude) : Number(longitude);
+      console.log('📍 Location update via HTTP:', { employeeId, latitude, longitude });
 
-      if (isNaN(empLat) || isNaN(empLon) || !isFinite(empLat) || !isFinite(empLon)) {
-        console.error('❌ Invalid coordinates received:', { latitude, longitude, empLat, empLon });
-        return res.status(400).json({ message: 'Invalid coordinates provided' });
-      }
-
-      const employee = await storage.getEmployee(req.user!.id);
+      const employee = await storage.getEmployee(employeeId);
       if (!employee) {
+        console.error('❌ Employee not found:', employeeId);
         return res.status(404).json({ message: 'Employee not found' });
       }
 
       const assignedSite = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
-
-      let distanceFromSite: number | null = null;
       let isOnSite = false;
-      let geofenceRadius: number | null = null;
+      let distanceFromSite: number | null = null;
+      const empLat = parseFloat(latitude.toString());
+      const empLng = parseFloat(longitude.toString());
 
-      if (assignedSite) {
-        const geofenceCheck = isWithinGeofence(
-          empLat,
-          empLon,
-          assignedSite.latitude,
-          assignedSite.longitude,
-          assignedSite.geofenceRadius
-        );
-
-        distanceFromSite = geofenceCheck.distance;
-        geofenceRadius = assignedSite?.geofenceRadius ?? null;
-        isOnSite = geofenceCheck.isWithin;
-
-        const logMessage = isOnSite
-          ? `✅ Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(distanceFromSite)}m from site)`
-          : `❌ Employee ${employee.firstName} ${employee.lastName} is ${Math.round(distanceFromSite)}m away from site`;
-        console.log('📍 Location update:', logMessage);
+      if (Number.isNaN(empLat) || Number.isNaN(empLng)) {
+        console.error('❌ Invalid coordinates provided:', { latitude, longitude });
+        return res.status(400).json({ message: 'Invalid coordinates provided' });
       }
 
-      const locationRecord = await storage.createLocationTracking({
+      if (assignedSite) {
+        const siteLat = parseFloat(assignedSite.latitude.toString());
+        const siteLng = parseFloat(assignedSite.longitude.toString());
+
+        const distance = calculateDistance(empLat, empLng, siteLat, siteLng);
+        distanceFromSite = Math.round(distance);
+        isOnSite = distance <= assignedSite.geofenceRadius;
+
+        console.log('📏 Distance calc:', {
+          distance: distanceFromSite,
+          radius: assignedSite.geofenceRadius,
+          isOnSite,
+          siteName: assignedSite.name
+        });
+      }
+
+      await storage.createLocationTracking({
         employeeId: employee.id,
         latitude: empLat.toString(),
-        longitude: empLon.toString(),
+        longitude: empLng.toString(),
         isOnSite,
       });
 
-      const currentAttendance = await storage.getCurrentAttendance(employee.id);
-      let autoCheckedOut = false;
+      console.log('💾 Location saved to database');
 
-      if (!isOnSite && currentAttendance) {
-        const checkInTime = currentAttendance.checkInTime ? new Date(currentAttendance.checkInTime) : null;
-        if (checkInTime) {
-        const firstOffsite = await storage.getFirstOffsiteLocationSince(
-          employee.id,
-          checkInTime
-        );
-
-        const referenceTimestampRaw = firstOffsite?.timestamp || locationRecord.timestamp;
-        const referenceTimestamp = referenceTimestampRaw ? new Date(referenceTimestampRaw) : null;
-
-        if (referenceTimestamp) {
-          const hoursAway = (Date.now() - referenceTimestamp.getTime()) / (1000 * 60 * 60);
-
-          if (hoursAway >= 2) {
-          await storage.updateAttendance(currentAttendance.id, {
-            checkOutTime: new Date(),
-            checkOutLatitude: empLat.toString(),
-            checkOutLongitude: empLon.toString(),
-          });
-
-          autoCheckedOut = true;
-
-          notifyAdmin(employee.adminId, {
-            type: 'employee_auto_checkout',
-            message: `${employee.firstName} ${employee.lastName} was automatically checked out after being away from ${assignedSite?.name || 'the work site'} for more than 2 hours`,
-            employee: {
-              id: employee.id,
-              name: `${employee.firstName} ${employee.lastName}`,
-              email: employee.email,
-            },
-            site: assignedSite
-              ? {
-                  id: assignedSite.id,
-                  name: assignedSite.name,
-                  address: assignedSite.address,
-                }
-              : null,
+      if (employee.adminId) {
+        const locationUpdate = {
+          type: 'employee_location',
+          employeeId: employee.id,
+          employee: {
+            id: employee.id,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            siteId: employee.siteId,
+          },
+          location: {
+            latitude: empLat,
+            longitude: empLng,
+            isOnSite,
+            distanceFromSite,
             timestamp: new Date().toISOString(),
-            location: {
-              latitude: empLat,
-              longitude: empLon,
-              distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
-            },
-          });
-        }
-      }
-        }
-      }
+          },
+        };
 
-      const payload = {
-        type: 'employee_location',
-        employeeId: employee.id,
-        employee: {
-          id: employee.id,
-          name: `${employee.firstName} ${employee.lastName}`,
-          email: employee.email,
-          siteId: employee.siteId,
-        },
-        location: {
-          latitude: empLat,
-          longitude: empLon,
-          isOnSite,
-          distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
-          geofenceRadius,
-          timestamp: new Date().toISOString(),
-        },
-      };
-
-      const adminWsList = adminConnections.get(employee.adminId);
-      if (adminWsList) {
-        adminWsList.forEach(adminWs => {
-          if (adminWs.readyState === WebSocket.OPEN) {
-            adminWs.send(JSON.stringify(payload));
-          }
-        });
+        notifyAdmin(employee.adminId, locationUpdate);
+        console.log('📡 Broadcasted location to admin:', employee.adminId);
       }
 
       res.json({
         success: true,
         isOnSite,
-        distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
-        autoCheckedOut,
+        distanceFromSite,
+        message: 'Location updated',
       });
     } catch (error) {
-      console.error('❌ Error updating location:', error);
+      console.error('❌ Location update error:', error);
       res.status(500).json({ message: 'Failed to update location' });
     }
   });

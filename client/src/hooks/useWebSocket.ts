@@ -20,37 +20,39 @@ export function useWebSocket({ onMessage, onConnect, onDisconnect }: UseWebSocke
     try {
       const token = getAuthToken();
       if (!token) {
-        console.error('No auth token for WebSocket connection');
+        console.error('❌ No auth token for WebSocket');
+        setTimeout(() => {
+          if (!isUnmountedRef.current) connect();
+        }, 5000);
         return;
       }
 
-      // Close existing connection if any
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
 
-      const wsHost = import.meta.env.VITE_WS_URL || window.location.host;
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${wsHost}/ws?token=${encodeURIComponent(token)}`;
-
-      console.log('Connecting to WebSocket...', wsHost);
+      console.log('🔌 Connecting to WebSocket...');
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
         if (isUnmountedRef.current) return;
         setIsConnected(true);
         onConnect?.();
-        console.log('✅ WebSocket connected:', wsUrl);
+        console.log('✅ WebSocket connected successfully');
       };
 
       wsRef.current.onmessage = (event) => {
         if (isUnmountedRef.current) return;
         try {
           const data = JSON.parse(event.data);
+          console.log('📨 WebSocket message:', data.type);
           onMessage?.(data);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          console.error('❌ Failed to parse WebSocket message:', error);
         }
       };
 
@@ -58,27 +60,21 @@ export function useWebSocket({ onMessage, onConnect, onDisconnect }: UseWebSocke
         if (isUnmountedRef.current) return;
         setIsConnected(false);
         onDisconnect?.();
-        console.log(`❌ WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason || 'none'}`);
+        console.log(`❌ WebSocket disconnected: Code=${event.code}, Reason=${event.reason || 'none'}`);
 
-        // Don't reconnect if it was a clean close or authentication failure
-        if (event.code !== 1000 && event.code !== 1008) {
-          console.log('🔄 Attempting to reconnect in 3 seconds...');
-          // Attempt to reconnect after 3 seconds
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (!isUnmountedRef.current) {
-              connect();
-            }
-          }, 3000);
-        } else {
-          console.log('⛔ Not reconnecting due to close code:', event.code);
-        }
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (!isUnmountedRef.current) {
+            console.log('🔄 Attempting to reconnect...');
+            connect();
+          }
+        }, 3000);
       };
 
       wsRef.current.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
       };
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
+      console.error('❌ Failed to create WebSocket connection:', error);
     }
   };
 

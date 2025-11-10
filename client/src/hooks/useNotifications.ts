@@ -9,6 +9,9 @@ export interface Notification {
     id: number;
     name: string;
     email: string;
+    firstName?: string;
+    lastName?: string;
+    profileImage?: string;
   };
   site: {
     id: number;
