@@ -486,7 +486,14 @@ export default function AdminDashboard() {
                         const lat = parseFloat(site.latitude);
                         const lng = parseFloat(site.longitude);
                         return !isNaN(lat) && !isNaN(lng)
-                          ? [{ position: { lat, lng }, title: `Work Site: ${site.name}`, color: '#22c55e', type: 'site' as const }]
+                          ? [{
+                              position: { lat, lng },
+                              title: `Work Site: ${site.name}`,
+                              color: '#22c55e',
+                              type: 'site' as const,
+                              label: site.name,
+                              onClick: () => setMapCenter({ lat, lng }),
+                            }]
                           : [];
                       }) : []),
                     ]}

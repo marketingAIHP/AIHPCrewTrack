@@ -646,6 +646,16 @@ export default function EmployeeDashboard() {
                     isOnSite: typeof data.isOnSite === 'boolean' ? data.isOnSite : null,
                   });
 
+                    if (data.autoCheckedOut) {
+                      offsiteCounterRef.current = 0;
+                      queryClient.invalidateQueries({ queryKey: ['/api/employee/attendance/current'] });
+                      toast({
+                        title: 'Auto Check-Out',
+                        description: 'You were automatically checked out after being away from the work site for over 2 hours.',
+                        variant: 'destructive',
+                      });
+                    }
+
                   if (typeof data.isOnSite === 'boolean') {
                     if (!data.isOnSite) {
                       offsiteCounterRef.current += 1;

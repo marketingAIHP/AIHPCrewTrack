@@ -55,6 +55,9 @@ const adminConnections = new Map<number, WebSocket[]>(); // adminId -> WebSocket
 // Notification stack to maintain last 5 transactions per admin
 const notificationStacks = new Map<number, any[]>(); // adminId -> notifications[]
 
+// Active employee sessions to enforce single-device logins
+const activeEmployeeSessions = new Map<number, string>(); // employeeId -> jwt token
+
 // Helper to add notification to stack
 function addToNotificationStack(adminId: number, notification: any) {
   const stack = notificationStacks.get(adminId) || [];
@@ -120,6 +123,12 @@ const authenticateToken = (userType?: 'admin' | 'employee' | 'super_admin' | ('a
         const allowedTypes = Array.isArray(userType) ? userType : [userType];
         if (!allowedTypes.includes(decoded.type)) {
           return res.status(403).json({ message: 'Insufficient permissions' });
+        }
+      }
+      if (decoded.type === 'employee') {
+        const activeToken = activeEmployeeSessions.get(decoded.id);
+        if (activeToken && activeToken !== token) {
+          return res.status(401).json({ message: 'You have been logged out because your account was used on another device.' });
         }
       }
       req.user = decoded;
@@ -336,6 +345,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { expiresIn: '24h' }
       );
 
+      activeEmployeeSessions.set(employee.id, token);
+
       res.json({ 
         token,
         employee: {
@@ -352,6 +363,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Employee login error:', error);
       res.status(400).json({ message: 'Invalid request data' });
     }
+  });
+
+  app.post('/api/employee/logout', authenticateToken('employee'), async (req: AuthenticatedRequest, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    const activeToken = activeEmployeeSessions.get(req.user!.id);
+    if (!activeToken || !token || activeToken === token) {
+      activeEmployeeSessions.delete(req.user!.id);
+    }
+    res.json({ success: true });
   });
 
   // Employee Profile Routes
@@ -529,6 +550,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { latitude, longitude } = req.body;
       const employeeId = req.user!.id;
 
+      const latNum = typeof latitude === 'string' ? parseFloat(latitude) : Number(latitude);
+      const lonNum = typeof longitude === 'string' ? parseFloat(longitude) : Number(longitude);
+
+      if (!isFinite(latNum) || !isFinite(lonNum)) {
+        return res.status(400).json({ message: 'Valid latitude and longitude are required for checkout.' });
+      }
+
+      const employee = await storage.getEmployee(employeeId);
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      if (!employee.siteId) {
+        return res.status(400).json({ message: 'No work site assigned for checkout validation.' });
+      }
+
+      const site = await storage.getWorkSite(employee.siteId);
+      if (!site) {
+        return res.status(404).json({ message: 'Assigned work site not found' });
+      }
+
+      const geofenceCheck = isWithinGeofence(
+        latNum,
+        lonNum,
+        site.latitude,
+        site.longitude,
+        site.geofenceRadius
+      );
+
+      if (!geofenceCheck.isWithin) {
+        return res.status(403).json({ message: 'You must be within the work site geofence to check out.' });
+      }
+
       // Get current attendance
       const currentAttendance = await storage.getCurrentAttendance(employeeId);
       if (!currentAttendance || currentAttendance.checkOutTime) {
@@ -538,22 +592,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update attendance record
       const updatedAttendance = await storage.updateAttendance(currentAttendance.id, {
         checkOutTime: new Date(),
-        checkOutLatitude: latitude.toString(),
-        checkOutLongitude: longitude.toString(),
+        checkOutLatitude: latNum.toString(),
+        checkOutLongitude: lonNum.toString(),
       });
 
       // Create location tracking record
       await storage.createLocationTracking({
         employeeId,
-        latitude: latitude.toString(),
-        longitude: longitude.toString(),
-        isOnSite: false,
+        latitude: latNum.toString(),
+        longitude: lonNum.toString(),
+        isOnSite: true,
       });
 
       // Send real-time notification to admin
-      const employee = await storage.getEmployee(employeeId);
-      if (employee) {
-        const site = employee.siteId ? await storage.getWorkSite(employee.siteId) : null;
+      {
         notifyAdmin(employee.adminId, {
           type: 'employee_checkout',
           message: `${employee.firstName} ${employee.lastName} checked out from ${site?.name || 'work site'}`,
@@ -2102,12 +2154,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('📍 Location update:', logMessage);
       }
 
-      await storage.createLocationTracking({
+      const locationRecord = await storage.createLocationTracking({
         employeeId: employee.id,
         latitude: empLat.toString(),
         longitude: empLon.toString(),
         isOnSite,
       });
+
+      const currentAttendance = await storage.getCurrentAttendance(employee.id);
+      let autoCheckedOut = false;
+
+      if (!isOnSite && currentAttendance) {
+        const checkInTime = currentAttendance.checkInTime ? new Date(currentAttendance.checkInTime) : null;
+        if (checkInTime) {
+        const firstOffsite = await storage.getFirstOffsiteLocationSince(
+          employee.id,
+          checkInTime
+        );
+
+        const referenceTimestampRaw = firstOffsite?.timestamp || locationRecord.timestamp;
+        const referenceTimestamp = referenceTimestampRaw ? new Date(referenceTimestampRaw) : null;
+
+        if (referenceTimestamp) {
+          const hoursAway = (Date.now() - referenceTimestamp.getTime()) / (1000 * 60 * 60);
+
+          if (hoursAway >= 2) {
+          await storage.updateAttendance(currentAttendance.id, {
+            checkOutTime: new Date(),
+            checkOutLatitude: empLat.toString(),
+            checkOutLongitude: empLon.toString(),
+          });
+
+          autoCheckedOut = true;
+
+          notifyAdmin(employee.adminId, {
+            type: 'employee_auto_checkout',
+            message: `${employee.firstName} ${employee.lastName} was automatically checked out after being away from ${assignedSite?.name || 'the work site'} for more than 2 hours`,
+            employee: {
+              id: employee.id,
+              name: `${employee.firstName} ${employee.lastName}`,
+              email: employee.email,
+            },
+            site: assignedSite
+              ? {
+                  id: assignedSite.id,
+                  name: assignedSite.name,
+                  address: assignedSite.address,
+                }
+              : null,
+            timestamp: new Date().toISOString(),
+            location: {
+              latitude: empLat,
+              longitude: empLon,
+              distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
+            },
+          });
+        }
+      }
+        }
+      }
 
       const payload = {
         type: 'employee_location',
@@ -2141,6 +2246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         isOnSite,
         distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
+        autoCheckedOut,
       });
     } catch (error) {
       console.error('❌ Error updating location:', error);

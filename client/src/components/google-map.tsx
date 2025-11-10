@@ -5,13 +5,16 @@ interface GoogleMapProps {
   zoom?: number;
   mapType?: 'roadmap' | 'satellite';
   markers?: Array<{
+    id?: string;
     position: { lat: number; lng: number };
     title: string;
     color?: string;
-    type?: 'employee' | 'site';
+    type?: 'employee' | 'site' | 'cluster';
+    label?: string;
     onClick?: () => void;
   }>;
   geofences?: Array<{
+    id?: string;
     center: { lat: number; lng: number };
     radius: number;
     color?: string;
@@ -47,6 +50,13 @@ export default function GoogleMap({
       return;
     }
 
+    const updateLabelScale = () => {
+      if (!mapInstanceRef.current || !mapRef.current) return;
+      const zoomLevel = ((mapInstanceRef.current as any)?.getZoom?.() ?? 12) as number;
+      const scale = Math.max(0.6, Math.min(1.6, zoomLevel / 12));
+      mapRef.current.style.setProperty('--marker-label-scale', scale.toString());
+    };
+
     try {
       // Initialize Google Map with error handling
       mapInstanceRef.current = new google.maps.Map(mapRef.current, {
@@ -78,6 +88,11 @@ export default function GoogleMap({
             onMapClick(event.latLng.lat(), event.latLng.lng());
           }
         });
+      }
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.addListener('zoom_changed', updateLabelScale);
+        updateLabelScale();
       }
     } catch (error) {
       console.error('Failed to initialize Google Map:', error);
@@ -126,6 +141,7 @@ export default function GoogleMap({
           `)}`,
           scaledSize: new (window as any).google.maps.Size(32, 32),
           anchor: new (window as any).google.maps.Point(16, 32),
+          labelOrigin: new (window as any).google.maps.Point(16, 4),
         };
       } else {
         // Create custom person icon SVG (default for employees)
@@ -140,6 +156,7 @@ export default function GoogleMap({
           `)}`,
           scaledSize: new (window as any).google.maps.Size(32, 32),
           anchor: new (window as any).google.maps.Point(16, 32),
+          labelOrigin: new (window as any).google.maps.Point(16, 4),
         };
       }
 
@@ -148,6 +165,13 @@ export default function GoogleMap({
         map: mapInstanceRef.current,
         title: markerData.title,
         icon: customIcon,
+        label: markerData.label
+          ? {
+              text: markerData.label,
+              className: markerData.type === 'site' ? 'map-marker-label site-label' : 'map-marker-label',
+            }
+          : undefined,
+        zIndex: markerData.type === 'site' ? 50 : undefined,
       });
 
       // Add click listener if onClick is provided
@@ -219,6 +243,22 @@ export default function GoogleMap({
         [title="Toggle between map and satellite imagery"] { display: none !important; }
         .gm-style-cc { display: none !important; }
         .gmnoprint div { display: none !important; }
+        .map-marker-label {
+          background: rgba(17, 24, 39, 0.85);
+          color: #fff;
+          padding: 2px 6px;
+          border-radius: 9999px;
+          font-size: 12px;
+          font-weight: 600;
+          transform: translate(-50%, calc(-34px - (var(--marker-label-scale, 1) - 1) * 6px)) scale(var(--marker-label-scale, 1));
+          transform-origin: center;
+          white-space: nowrap;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.3);
+          transition: transform 0.15s ease;
+        }
+        .map-marker-label.site-label {
+          background: rgba(34, 197, 94, 0.9);
+        }
       `}</style>
     </div>
   );

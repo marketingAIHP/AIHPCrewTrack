@@ -40,8 +40,8 @@ export default function LiveTracking() {
   const [profileImageModalOpen, setProfileImageModalOpen] = useState(false);
   const [selectedProfileImage, setSelectedProfileImage] = useState<{url: string, name: string} | null>(null);
   const initializeCalledRef = useRef(false);
-  const hasZoomedToSiteRef = useRef(false);
-  const hasZoomedToEmployeeRef = useRef(false);
+  const zoomedSiteIdRef = useRef<number | null>(null);
+  const zoomedEmployeeIdRef = useRef<number | null>(null);
 
   // Initialize component only once
   React.useEffect(() => {
@@ -106,32 +106,34 @@ export default function LiveTracking() {
 
   // Get siteId from URL query parameter and zoom to that site
   React.useEffect(() => {
-    if (!sites || sites.length === 0 || !mapLoaded || hasZoomedToSiteRef.current) return;
+    if (!sites || sites.length === 0 || !mapLoaded) return;
 
     const urlParams = new URLSearchParams(window.location.search);
     const siteIdParam = urlParams.get('siteId');
     
     if (siteIdParam) {
       const siteId = parseInt(siteIdParam);
-      const selectedSite = Array.isArray(sites) 
-        ? sites.find((site: any) => site.id === siteId) 
-        : null;
-      
-      if (selectedSite) {
-        const lat = parseFloat(selectedSite.latitude);
-        const lng = parseFloat(selectedSite.longitude);
+      if (!Number.isNaN(siteId) && zoomedSiteIdRef.current !== siteId) {
+        const selectedSite = Array.isArray(sites) 
+          ? sites.find((site: any) => site.id === siteId) 
+          : null;
         
-        if (!isNaN(lat) && !isNaN(lng)) {
-          // Zooming to selected site
-          setMapCenter({ lat, lng });
-          // Zoom to a close level to show the site clearly (zoom level 17 is good for site view)
-          setMapZoom(17);
-          hasZoomedToSiteRef.current = true;
+        if (selectedSite) {
+          const lat = parseFloat(selectedSite.latitude);
+          const lng = parseFloat(selectedSite.longitude);
           
-          toast({
-            title: 'Viewing Site',
-            description: `Centered map on ${selectedSite.name}`,
-          });
+          if (!isNaN(lat) && !isNaN(lng)) {
+            // Zooming to selected site
+            setMapCenter({ lat, lng });
+            // Zoom to a close level to show the site clearly (zoom level 17 is good for site view)
+            setMapZoom(17);
+            zoomedSiteIdRef.current = siteId;
+            
+            toast({
+              title: 'Viewing Site',
+              description: `Centered map on ${selectedSite.name}`,
+            });
+          }
         }
       }
     }
@@ -139,7 +141,7 @@ export default function LiveTracking() {
 
   // Zoom to specific employee when employeeId is provided in query params
   React.useEffect(() => {
-    if (!mapLoaded || hasZoomedToEmployeeRef.current) return;
+    if (!mapLoaded) return;
     if (!Array.isArray(locations) || locations.length === 0) return;
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -148,6 +150,8 @@ export default function LiveTracking() {
 
     const employeeId = parseInt(employeeIdParam, 10);
     if (Number.isNaN(employeeId)) return;
+
+    if (zoomedEmployeeIdRef.current === employeeId) return;
 
     const employeeEntry = locations.find((item: any) => item.employee?.id === employeeId);
     const lat = employeeEntry?.location?.latitude;
@@ -159,7 +163,7 @@ export default function LiveTracking() {
       if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
         setMapCenter({ lat: parsedLat, lng: parsedLng });
         setMapZoom(18);
-        hasZoomedToEmployeeRef.current = true;
+        zoomedEmployeeIdRef.current = employeeId;
         toast({
           title: 'Live Tracking',
           description: `Centered on ${employeeEntry.employee.firstName} ${employeeEntry.employee.lastName}`,
@@ -331,7 +335,7 @@ export default function LiveTracking() {
   }, [setLocation]);
 
   // Function to zoom to specific employee location
-  const zoomToEmployee = useCallback((lat: number, lng: number) => {
+  const zoomToLocation = useCallback((lat: number, lng: number) => {
     setMapCenter({ lat, lng });
     setMapZoom(18); // Close zoom level to see the employee clearly
   }, []);
@@ -364,7 +368,8 @@ export default function LiveTracking() {
             title: count > 1 ? `${count} employees` : `1 employee`,
             color: '#ff0000',
             type: 'employee',
-            onClick: () => zoomToEmployee(lat, lng),
+            label: count.toString(),
+            onClick: () => zoomToLocation(lat, lng),
           });
         });
       } else {
@@ -379,7 +384,7 @@ export default function LiveTracking() {
                 title: `${item.employee.firstName} ${item.employee.lastName}`,
                 color: '#ff0000',
                 type: 'employee',
-                onClick: () => zoomToEmployee(lat, lng),
+                onClick: () => zoomToLocation(lat, lng),
               });
             }
           }
@@ -399,7 +404,8 @@ export default function LiveTracking() {
             title: `Work Site: ${site.name}`,
             color: '#22c55e', // Green color for sites
             type: 'site',
-            onClick: () => zoomToEmployee(lat, lng), // Can also zoom to site
+            label: site.name,
+            onClick: () => zoomToLocation(lat, lng), // Can also zoom to site
           });
         }
       });

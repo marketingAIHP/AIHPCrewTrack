@@ -22,7 +22,7 @@ import {
   type InsertAttendance,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Admin operations
@@ -75,6 +75,7 @@ export interface IStorage {
   createLocationTracking(location: InsertLocationTracking): Promise<LocationTracking>;
   getLatestEmployeeLocation(employeeId: number): Promise<LocationTracking | undefined>;
   getEmployeeLocationHistory(employeeId: number, date?: Date): Promise<LocationTracking[]>;
+  getFirstOffsiteLocationSince(employeeId: number, since: Date): Promise<LocationTracking | undefined>;
 
   // Attendance operations
   createAttendance(attendance: InsertAttendance): Promise<Attendance>;
@@ -396,6 +397,22 @@ export class DatabaseStorage implements IStorage {
       .from(locationTracking)
       .where(eq(locationTracking.employeeId, employeeId))
       .orderBy(desc(locationTracking.timestamp));
+  }
+
+  async getFirstOffsiteLocationSince(employeeId: number, since: Date): Promise<LocationTracking | undefined> {
+    const [record] = await db
+      .select()
+      .from(locationTracking)
+      .where(
+        and(
+          eq(locationTracking.employeeId, employeeId),
+          eq(locationTracking.isOnSite, false),
+          sql`${locationTracking.timestamp} >= ${since}`
+        )
+      )
+      .orderBy(asc(locationTracking.timestamp))
+      .limit(1);
+    return record || undefined;
   }
 
   // Attendance operations
