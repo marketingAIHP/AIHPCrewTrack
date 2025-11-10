@@ -22,11 +22,13 @@ export interface Notification {
   };
 }
 
+type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
+
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
   const { toast } = useToast();
   const [token, setToken] = useState<string | null>(getAuthToken());
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
 
   // Load recent notifications from server on mount
   useEffect(() => {
@@ -70,6 +72,8 @@ export function useNotifications() {
         return;
       }
 
+      setConnectionStatus('connecting');
+
       // Get backend URL from environment or use current host
       const backendUrl = import.meta.env.VITE_BACKEND_URL || window.location.origin;
       const protocol = backendUrl.startsWith('https') ? "wss:" : "ws:";
@@ -80,7 +84,7 @@ export function useNotifications() {
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        setIsConnected(true);
+        setConnectionStatus('connected');
         console.log('✅ WebSocket connected to notification system:', wsUrl);
         // Clear any reconnect timer
         if (reconnectTimer) {
@@ -89,7 +93,7 @@ export function useNotifications() {
       };
 
       ws.onclose = (event) => {
-        setIsConnected(false);
+        setConnectionStatus('disconnected');
         console.log(`❌ WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason || 'none'}, Clean: ${event.wasClean}`);
         
         // Don't reconnect if it was a clean close (code 1000) or authentication failure (code 1008)
@@ -103,7 +107,7 @@ export function useNotifications() {
 
       ws.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
-        setIsConnected(false);
+        setConnectionStatus('disconnected');
       };
 
       ws.onmessage = (event) => {
@@ -205,7 +209,7 @@ export function useNotifications() {
 
   return {
     notifications,
-    isConnected,
+    connectionStatus,
     clearNotifications,
     markAsRead
   };

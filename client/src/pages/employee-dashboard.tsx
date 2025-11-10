@@ -185,9 +185,14 @@ export default function EmployeeDashboard() {
       maximumAge: 5000, // Allow a very recent cached reading for faster response
     };
 
-    // Try getCurrentPosition first for immediate result
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
+    let highAccuracyRequested = false;
+
+    const requestHighAccuracy = () => {
+      if (highAccuracyRequested) return;
+      highAccuracyRequested = true;
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
         const accuracy = position.coords.accuracy || 100;
         const reading = {
           lat: position.coords.latitude,
@@ -391,6 +396,49 @@ export default function EmployeeDashboard() {
       },
       geolocationOptions
     );
+    };
+
+    let quickResolved = false;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        quickResolved = true;
+        const quickLat = position.coords.latitude;
+        const quickLng = position.coords.longitude;
+        const quickAccuracy = position.coords.accuracy || 500;
+
+        if (!isNaN(quickLat) && !isNaN(quickLng) && isFinite(quickLat) && isFinite(quickLng)) {
+          console.log('✅ Quick coarse location obtained:', {
+            lat: quickLat.toFixed(6),
+            lng: quickLng.toFixed(6),
+            accuracy: Math.round(quickAccuracy)
+          });
+          setCurrentLocation({
+            lat: quickLat,
+            lng: quickLng,
+            accuracy: quickAccuracy,
+          });
+          setIsGettingLocation(false);
+          setTimeout(requestHighAccuracy, 500);
+        } else {
+          requestHighAccuracy();
+        }
+      },
+      (error) => {
+        console.warn('Quick location failed, falling back to high accuracy:', error);
+        requestHighAccuracy();
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 3000,
+        maximumAge: 10000,
+      }
+    );
+
+    setTimeout(() => {
+      if (!quickResolved) {
+        requestHighAccuracy();
+      }
+    }, 3500);
   };
 
   // Fallback method for manual refresh

@@ -13,7 +13,7 @@ import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function NotificationDropdown() {
-  const { notifications, isConnected, clearNotifications, markAsRead } = useNotifications();
+  const { notifications, connectionStatus, clearNotifications, markAsRead } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
 
   const formatTime = (timestamp: string) => {
@@ -55,7 +55,7 @@ export default function NotificationDropdown() {
               {notifications.length > 9 ? '9+' : notifications.length}
             </Badge>
           )}
-          {!isConnected && (
+          {connectionStatus === 'disconnected' && (
             <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse" />
           )}
         </Button>
@@ -71,8 +71,21 @@ export default function NotificationDropdown() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={isConnected ? "default" : "destructive"} className="text-xs">
-              {isConnected ? "Live" : "Offline"}
+            <Badge
+              variant={
+                connectionStatus === 'connected'
+                  ? 'default'
+                  : connectionStatus === 'disconnected'
+                    ? 'destructive'
+                    : 'secondary'
+              }
+              className="text-xs"
+            >
+              {connectionStatus === 'connected'
+                ? 'Live'
+                : connectionStatus === 'disconnected'
+                  ? 'Offline'
+                  : 'Connecting...'}
             </Badge>
             {notifications.length > 0 && (
               <Button
