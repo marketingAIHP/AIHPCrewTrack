@@ -1024,6 +1024,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete activity endpoint
+  app.delete('/api/admin/activities/:activityId', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { activityId } = req.params;
+      
+      // Parse activity ID to get attendance record ID
+      // Activity IDs are in format: "{attendanceId}-checkin" or "{attendanceId}-checkout"
+      const attendanceIdMatch = activityId.match(/^(\d+)-(checkin|checkout)$/);
+      if (!attendanceIdMatch) {
+        return res.status(400).json({ message: 'Invalid activity ID format' });
+      }
+      
+      const attendanceId = parseInt(attendanceIdMatch[1]);
+      
+      // Delete the attendance record (this will remove both check-in and check-out activities)
+      await storage.deleteAttendance(attendanceId, req.user!.id);
+      
+      res.json({ message: 'Activity deleted successfully' });
+    } catch (error: any) {
+      console.error('Error deleting activity:', error);
+      if (error.message === 'Attendance record not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes('Unauthorized')) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(500).json({ message: 'Failed to delete activity' });
+    }
+  });
+
   // Admin profile route
   app.get('/api/admin/profile', authenticateToken('admin'), async (req: AuthenticatedRequest, res) => {
     try {

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,6 +9,16 @@ import { getAuthToken, getUser, logout, getUserType } from '@/lib/auth';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
 import GoogleMap from '@/components/google-map';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import { 
   Users, 
@@ -19,7 +29,9 @@ import {
   Plus,
   Settings,
   Download,
-  LogOut
+  LogOut,
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
 import NotificationDropdown from '@/components/NotificationDropdown';
@@ -69,6 +81,7 @@ function groupActivitiesByDate(activities: any[]) {
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const user = getUser();
   const userType = getUserType();
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -76,6 +89,7 @@ export default function AdminDashboard() {
   const [mapZoom] = useState(12);
   const initializeCalledRef = useRef(false);
   const [alertsDialogOpen, setAlertsDialogOpen] = useState(false);
+  const [deleteActivityId, setDeleteActivityId] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -151,6 +165,56 @@ export default function AdminDashboard() {
       return response.json();
     },
   });
+
+  const handleRefresh = () => {
+    // Invalidate all queries to refresh all data
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/recent-activities'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/locations'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/sites'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/profile'] });
+    toast({
+      title: 'Refreshed',
+      description: 'All data updated successfully',
+    });
+  };
+
+  // Delete activity mutation
+  const deleteActivityMutation = useMutation({
+    mutationFn: async (activityId: string) => {
+      const response = await fetch(`/api/admin/activities/${activityId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete activity');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/recent-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/dashboard'] });
+      toast({
+        title: 'Activity Deleted',
+        description: 'The activity has been successfully deleted.',
+      });
+      setDeleteActivityId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Delete Failed',
+        description: error.message || 'Failed to delete activity. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleDeleteActivity = (activityId: string) => {
+    setDeleteActivityId(activityId);
+  };
 
   const handleLogout = () => {
     logout();
@@ -246,6 +310,14 @@ export default function AdminDashboard() {
             <div className="scale-90 sm:scale-100">
               <ThemeToggle />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              className="hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-all h-8 w-8 sm:h-9 sm:w-auto sm:px-3 p-0"
+            >
+              <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </Button>
             <Link href="/admin/profile">
               <div className="flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-1.5 sm:px-3 py-1 sm:py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                 <div className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 rounded-full overflow-hidden">
@@ -400,7 +472,7 @@ export default function AdminDashboard() {
                             {dayActivities.map((activity) => (
                               <div
                                 key={activity.id}
-                                className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 rounded-lg border border-gray-200 dark:border-slate-600 hover:shadow-sm transition-all"
+                                className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 rounded-lg border border-gray-200 dark:border-slate-600 hover:shadow-sm transition-all group"
                               >
                                 {activity.employee.profileImage ? (
                                   <img
@@ -443,6 +515,16 @@ export default function AdminDashboard() {
                                     </div>
                                   </div>
                                 </div>
+                                
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteActivity(activity.id)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  title="Delete activity"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             ))}
                           </div>
@@ -521,6 +603,28 @@ export default function AdminDashboard() {
       </main>
         
         <AlertsDialog open={alertsDialogOpen} onOpenChange={setAlertsDialogOpen} />
+        
+        {/* Delete Activity Confirmation Dialog */}
+        <AlertDialog open={!!deleteActivityId} onOpenChange={(open) => !open && setDeleteActivityId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this activity? This will permanently remove the attendance record from the database. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteActivityId && deleteActivityMutation.mutate(deleteActivityId)}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteActivityMutation.isPending}
+              >
+                {deleteActivityMutation.isPending ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }

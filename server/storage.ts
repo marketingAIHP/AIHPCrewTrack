@@ -80,6 +80,7 @@ export interface IStorage {
   // Attendance operations
   createAttendance(attendance: InsertAttendance): Promise<Attendance>;
   updateAttendance(id: number, attendance: Partial<Attendance>): Promise<Attendance>;
+  deleteAttendance(id: number, adminId: number): Promise<void>;
   getCurrentAttendance(employeeId: number): Promise<Attendance | undefined>;
   getAttendanceByAdmin(adminId: number, date?: Date): Promise<Attendance[]>;
   getEmployeeAttendanceHistory(employeeId: number, fromDate: Date): Promise<Attendance[]>;
@@ -428,6 +429,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(attendance.id, id))
       .returning();
     return updatedAttendance;
+  }
+
+  async deleteAttendance(id: number, adminId: number): Promise<void> {
+    // Verify that the attendance record belongs to an employee of this admin
+    const [attendanceRecord] = await db
+      .select({
+        attendanceId: attendance.id,
+        employeeAdminId: employees.adminId,
+      })
+      .from(attendance)
+      .innerJoin(employees, eq(attendance.employeeId, employees.id))
+      .where(eq(attendance.id, id))
+      .limit(1);
+
+    if (!attendanceRecord) {
+      throw new Error('Attendance record not found');
+    }
+
+    if (attendanceRecord.employeeAdminId !== adminId) {
+      throw new Error('Unauthorized: Attendance record does not belong to your employees');
+    }
+
+    // Delete the attendance record
+    await db
+      .delete(attendance)
+      .where(eq(attendance.id, id));
   }
 
   async getCurrentAttendance(employeeId: number): Promise<Attendance | undefined> {

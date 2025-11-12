@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface GoogleMapProps {
   center: { lat: number; lng: number };
@@ -36,6 +37,7 @@ export default function GoogleMap({
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const circlesRef = useRef<google.maps.Circle[]>([]);
+  const { theme } = useTheme();
 
   useEffect(() => {
     // Ensure DOM element exists and is valid before creating map
@@ -72,7 +74,93 @@ export default function GoogleMap({
         disableDefaultUI: true,
         scrollwheel: true, // Enable mouse wheel zoom
         gestureHandling: 'auto', // Enable all gestures including zoom
-        styles: [
+        styles: theme === 'dark' ? [
+          // Dark mode styles
+          { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+          { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+          { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+          {
+            featureType: 'administrative.locality',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#d59563' }],
+          },
+          {
+            featureType: 'poi',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#d59563' }],
+          },
+          {
+            featureType: 'poi.park',
+            elementType: 'geometry',
+            stylers: [{ color: '#263c3f' }],
+          },
+          {
+            featureType: 'poi.park',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#6b9a76' }],
+          },
+          {
+            featureType: 'road',
+            elementType: 'geometry',
+            stylers: [{ color: '#38414e' }],
+          },
+          {
+            featureType: 'road',
+            elementType: 'geometry.stroke',
+            stylers: [{ color: '#212a37' }],
+          },
+          {
+            featureType: 'road',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#9ca5b3' }],
+          },
+          {
+            featureType: 'road.highway',
+            elementType: 'geometry',
+            stylers: [{ color: '#746855' }],
+          },
+          {
+            featureType: 'road.highway',
+            elementType: 'geometry.stroke',
+            stylers: [{ color: '#1f2835' }],
+          },
+          {
+            featureType: 'road.highway',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#f3d19c' }],
+          },
+          {
+            featureType: 'transit',
+            elementType: 'geometry',
+            stylers: [{ color: '#2f3948' }],
+          },
+          {
+            featureType: 'transit.station',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#d59563' }],
+          },
+          {
+            featureType: 'water',
+            elementType: 'geometry',
+            stylers: [{ color: '#17263c' }],
+          },
+          {
+            featureType: 'water',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#515c6d' }],
+          },
+          {
+            featureType: 'water',
+            elementType: 'labels.text.stroke',
+            stylers: [{ color: '#17263c' }],
+          },
+          {
+            featureType: 'poi',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }],
+          },
+        ] : [
+          // Light mode styles (default)
           {
             featureType: 'poi',
             elementType: 'labels',
@@ -97,7 +185,7 @@ export default function GoogleMap({
     } catch (error) {
       console.error('Failed to initialize Google Map:', error);
     }
-  }, []);
+  }, [theme]);
 
   // Update map center when prop changes
   useEffect(() => {
@@ -126,6 +214,7 @@ export default function GoogleMap({
       
       if (markerData.type === 'site') {
         // Create custom site icon SVG (building/location marker in green)
+        // If label exists, we'll handle it separately with custom overlay
         customIcon = {
           url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -168,6 +257,9 @@ export default function GoogleMap({
         label: markerData.label
           ? {
               text: markerData.label,
+              color: markerData.type === 'site' ? '#ffffff' : '#ffffff',
+              fontSize: markerData.type === 'site' ? '10px' : '12px',
+              fontWeight: markerData.type === 'site' ? '500' : '600',
               className: markerData.type === 'site' ? 'map-marker-label site-label' : 'map-marker-label',
             }
           : undefined,
@@ -230,6 +322,110 @@ export default function GoogleMap({
     }
   }, [mapType]);
 
+  // Update map styles when theme changes
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+
+    const darkModeStyles = [
+      // Dark mode styles
+      { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+      { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+      { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+      {
+        featureType: 'administrative.locality',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#d59563' }],
+      },
+      {
+        featureType: 'poi',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#d59563' }],
+      },
+      {
+        featureType: 'poi.park',
+        elementType: 'geometry',
+        stylers: [{ color: '#263c3f' }],
+      },
+      {
+        featureType: 'poi.park',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#6b9a76' }],
+      },
+      {
+        featureType: 'road',
+        elementType: 'geometry',
+        stylers: [{ color: '#38414e' }],
+      },
+      {
+        featureType: 'road',
+        elementType: 'geometry.stroke',
+        stylers: [{ color: '#212a37' }],
+      },
+      {
+        featureType: 'road',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#9ca5b3' }],
+      },
+      {
+        featureType: 'road.highway',
+        elementType: 'geometry',
+        stylers: [{ color: '#746855' }],
+      },
+      {
+        featureType: 'road.highway',
+        elementType: 'geometry.stroke',
+        stylers: [{ color: '#1f2835' }],
+      },
+      {
+        featureType: 'road.highway',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#f3d19c' }],
+      },
+      {
+        featureType: 'transit',
+        elementType: 'geometry',
+        stylers: [{ color: '#2f3948' }],
+      },
+      {
+        featureType: 'transit.station',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#d59563' }],
+      },
+      {
+        featureType: 'water',
+        elementType: 'geometry',
+        stylers: [{ color: '#17263c' }],
+      },
+      {
+        featureType: 'water',
+        elementType: 'labels.text.fill',
+        stylers: [{ color: '#515c6d' }],
+      },
+      {
+        featureType: 'water',
+        elementType: 'labels.text.stroke',
+        stylers: [{ color: '#17263c' }],
+      },
+      {
+        featureType: 'poi',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+    ];
+
+    const lightModeStyles = [
+      {
+        featureType: 'poi',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+    ];
+
+    (mapInstanceRef.current as any).setOptions({
+      styles: theme === 'dark' ? darkModeStyles : lightModeStyles,
+    });
+  }, [theme]);
+
   return (
     <div className={`w-full h-full ${className}`}>
       <div ref={mapRef} className="w-full h-full rounded-lg" />
@@ -257,7 +453,27 @@ export default function GoogleMap({
           transition: transform 0.15s ease;
         }
         .map-marker-label.site-label {
-          background: rgba(34, 197, 94, 0.9);
+          background: #000000 !important;
+          color: #ffffff !important;
+          font-size: 10px !important;
+          font-weight: 500 !important;
+          padding: 2px 8px !important;
+          border: 1px solid #dc2626 !important;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(220, 38, 38, 0.2) !important;
+        }
+        /* Target Google Maps label elements directly */
+        .gm-style .gm-style-iw-d + div div[style*="position"] {
+          background: #000000 !important;
+          color: #ffffff !important;
+          font-size: 10px !important;
+          border: 1px solid #dc2626 !important;
+        }
+        /* Style site labels using attribute selectors */
+        div[style*="font-size: 10px"] {
+          background: #000000 !important;
+          color: #ffffff !important;
+          border: 1px solid #dc2626 !important;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
         }
       `}</style>
     </div>
