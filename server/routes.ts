@@ -70,11 +70,18 @@ function addToNotificationStack(adminId: number, notification: any) {
 
 // Helper function to send notification to admin
 function notifyAdmin(adminId: number, notification: any) {
+  // Validate notification type
+  if (!notification.type || (notification.type !== 'employee_checkin' && notification.type !== 'employee_checkout')) {
+    console.error('❌ Invalid notification type:', notification.type);
+    return;
+  }
+  
+  console.log(`📤 Notifying admin ${adminId}: type=${notification.type}, message="${notification.message}"`);
+  
   // Add to notification stack first
   addToNotificationStack(adminId, notification);
   
   const connections = adminConnections.get(adminId) || [];
-      // Attempting to notify admin
   
   // Clean up closed connections first
   const activeConnections = connections.filter(ws => ws.readyState === WebSocket.OPEN);
@@ -82,6 +89,7 @@ function notifyAdmin(adminId: number, notification: any) {
   
   if (activeConnections.length === 0) {
     // No active connections for admin
+    console.log(`⚠️ No active WebSocket connections for admin ${adminId}, notification queued`);
     return;
   }
   
@@ -94,9 +102,9 @@ function notifyAdmin(adminId: number, notification: any) {
   const ws = activeConnections[0];
   try {
     ws.send(message);
-    // Notification sent successfully
+    console.log(`✅ Notification sent to admin ${adminId}: type=${notification.type}`);
   } catch (error) {
-    console.error(`Failed to send notification to admin ${adminId}:`, error);
+    console.error(`❌ Failed to send notification to admin ${adminId}:`, error);
   }
 }
 
@@ -532,14 +540,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Send real-time notification to admin
-      // Sending check-in notification
-      notifyAdmin(employee.adminId, {
-        type: 'employee_checkin',
+      // IMPORTANT: Always send check-in notification with type 'employee_checkin'
+      const checkInNotification = {
+        type: 'employee_checkin' as const,
         message: `${employee.firstName} ${employee.lastName} checked in at ${site.name}`,
         employee: {
           id: employee.id,
           name: `${employee.firstName} ${employee.lastName}`,
-          email: employee.email
+          email: employee.email,
+          firstName: employee.firstName,
+          lastName: employee.lastName
         },
         site: {
           id: site.id,
@@ -548,7 +558,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         timestamp: new Date().toISOString(),
         location: { latitude, longitude }
-      });
+      };
+      
+      console.log('📬 Sending check-in notification:', checkInNotification.type, checkInNotification.message);
+      notifyAdmin(employee.adminId, checkInNotification);
 
       res.json(attendance);
     } catch (error) {
@@ -617,24 +630,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Send real-time notification to admin
-      {
-        notifyAdmin(employee.adminId, {
-          type: 'employee_checkout',
-          message: `${employee.firstName} ${employee.lastName} checked out from ${site?.name || 'work site'}`,
-          employee: {
-            id: employee.id,
-            name: `${employee.firstName} ${employee.lastName}`,
-            email: employee.email
-          },
-          site: site ? {
-            id: site.id,
-            name: site.name,
-            address: site.address
-          } : null,
-          timestamp: new Date().toISOString(),
-          location: { latitude, longitude }
-        });
-      }
+      // IMPORTANT: Always send check-out notification with type 'employee_checkout'
+      const checkOutNotification = {
+        type: 'employee_checkout' as const,
+        message: `${employee.firstName} ${employee.lastName} checked out from ${site?.name || 'work site'}`,
+        employee: {
+          id: employee.id,
+          name: `${employee.firstName} ${employee.lastName}`,
+          email: employee.email,
+          firstName: employee.firstName,
+          lastName: employee.lastName
+        },
+        site: site ? {
+          id: site.id,
+          name: site.name,
+          address: site.address
+        } : null,
+        timestamp: new Date().toISOString(),
+        location: { latitude, longitude }
+      };
+      
+      console.log('📬 Sending check-out notification:', checkOutNotification.type, checkOutNotification.message);
+      notifyAdmin(employee.adminId, checkOutNotification);
 
       res.json(updatedAttendance);
     } catch (error) {
