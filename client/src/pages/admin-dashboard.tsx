@@ -220,35 +220,41 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
-        <div className="max-w-screen-2xl mx-auto px-4 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-4 flex items-center justify-between">
           {/* Clickable Logo and Text - Navigates to Dashboard */}
           <Link href="/admin/dashboard">
-            <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
-              <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50">
+            <div className="flex items-center gap-1.5 sm:gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+              <div className="bg-black rounded-lg sm:rounded-xl p-1.5 sm:p-3 shadow-sm">
                 <img 
                   src="/logo-192.png" 
                   alt="AIHP CrewTrack" 
-                  className="h-14 w-14 object-contain"
+                  className="h-8 w-8 sm:h-12 sm:w-12 md:h-14 md:w-14 object-contain"
                 />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">AIHP CrewTrack</h1>
-                <p className="text-sm bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">Admin Dashboard</p>
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-lg md:text-2xl font-bold truncate">
+                  <span className="text-black dark:text-white">A</span><span className="text-red-600">I</span><span className="text-black dark:text-white">HP</span> <span className="text-black dark:text-white">CrewTrack</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 hidden sm:block">Admin Dashboard</p>
               </div>
             </div>
           </Link>
-          <div className="flex items-center gap-3">
-            <NotificationDropdown />
-            <ThemeToggle />
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
+            <div className="scale-90 sm:scale-100">
+              <NotificationDropdown />
+            </div>
+            <div className="scale-90 sm:scale-100">
+              <ThemeToggle />
+            </div>
             <Link href="/admin/profile">
-              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-3 py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                <div className="h-8 w-8 rounded-full overflow-hidden">
+              <div className="flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-1.5 sm:px-3 py-1 sm:py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <div className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 rounded-full overflow-hidden">
                   <AuthenticatedImage
                     src={adminProfile?.profileImage}
                     alt="Admin Avatar"
-                    className="h-8 w-8 object-cover"
+                    className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 object-cover"
                     fallback={
-                      <div className="h-8 w-8 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full font-bold">
+                      <div className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 bg-blue-600 text-white text-xs sm:text-sm flex items-center justify-center rounded-full font-bold">
                         {adminProfile?.firstName?.[0] || ''}{adminProfile?.lastName?.[0] || ''}
                       </div>
                     }
@@ -268,10 +274,10 @@ export default function AdminDashboard() {
               variant="ghost" 
               size="sm" 
               onClick={handleLogout}
-              className="text-red-600 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 border border-red-200 hover:border-red-600 transition-all duration-200 shadow-sm hover:shadow-md"
+              className="text-red-600 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 border border-red-200 hover:border-red-600 transition-all duration-200 shadow-sm hover:shadow-md h-8 w-8 sm:h-9 sm:w-auto sm:px-3 p-0 sm:p-2"
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>

@@ -101,7 +101,7 @@ export default function AdminLogin() {
       <Card className="w-full max-w-md shadow-xl bg-white dark:bg-slate-800/90 dark:border-slate-700">
         <CardHeader className="text-center space-y-4">
           <div className="flex items-center justify-center">
-            <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50 dark:ring-blue-500/30">
+            <div className="bg-black rounded-xl p-3 shadow-sm">
               <img 
                 src="/logo-192.png" 
                 alt="AIHP CrewTrack Logo" 
@@ -110,7 +110,9 @@ export default function AdminLogin() {
             </div>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">AIHP CrewTrack</h1>
+            <h1 className="text-2xl font-bold">
+              <span className="text-black dark:text-white">A</span><span className="text-red-600">I</span><span className="text-black dark:text-white">HP</span> <span className="text-black dark:text-white">CrewTrack</span>
+            </h1>
             <p className="text-slate-600 dark:text-slate-400 mt-2">Admin Portal Login</p>
           </div>
         </CardHeader>

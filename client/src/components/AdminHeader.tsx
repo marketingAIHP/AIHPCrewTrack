@@ -45,12 +45,14 @@ export function AdminHeader({ showProfile = true }: AdminHeaderProps) {
         {/* Clickable Logo and Text - Navigates to Dashboard */}
         <Link href="/admin/dashboard">
           <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
-            <div className="h-10 w-10 rounded-md bg-black dark:bg-slate-800 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-md bg-black flex items-center justify-center">
               <img src="/logo-192.png" alt="AIHP" className="h-8 w-8" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">AIHP CrewTrack</h1>
-              <p className="text-xs bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">Admin Dashboard</p>
+              <h1 className="text-lg font-bold">
+                <span className="text-black dark:text-white">A</span><span className="text-red-600">I</span><span className="text-black dark:text-white">HP</span> <span className="text-black dark:text-white">CrewTrack</span>
+              </h1>
+              <p className="text-xs text-slate-700 dark:text-slate-300">Admin Dashboard</p>
             </div>
           </div>
         </Link>

@@ -73,7 +73,7 @@ export function AlertsDialog({ open, onOpenChange }: AlertsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-lg">
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-lg w-[calc(100vw-1rem)] sm:w-full mx-auto">
             <DialogHeader className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-900/30 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b-2 border-slate-300 dark:border-slate-600">
               <DialogTitle className="flex items-center gap-2 text-purple-900 dark:text-purple-100">
                 <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-2">

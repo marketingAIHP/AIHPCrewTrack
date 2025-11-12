@@ -818,52 +818,54 @@ export default function EmployeeDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 dark:from-slate-900 dark:via-slate-800/50 dark:to-slate-900">
       {/* Header */}
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50">
+            <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+              <div className="bg-black rounded-lg sm:rounded-xl p-1.5 sm:p-3 shadow-sm">
                 <img 
                   src="/logo-192.png" 
                   alt="AIHP CrewTrack" 
-                  className="h-14 w-14 object-contain"
+                  className="h-8 w-8 sm:h-12 sm:w-12 md:h-14 md:w-14 object-contain"
                 />
               </div>
-              <div>
-                <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">
-                  AIHP CrewTrack
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-lg md:text-2xl font-semibold truncate">
+                  <span className="text-black dark:text-white">A</span><span className="text-red-600">I</span><span className="text-black dark:text-white">HP</span> <span className="text-black dark:text-white">CrewTrack</span>
                 </h1>
-                <p className="text-sm font-medium bg-gradient-to-r from-blue-400 to-purple-400 dark:from-blue-300 dark:to-purple-300 bg-clip-text text-transparent">Employee Dashboard</p>
+                <p className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 hidden sm:block">Employee Dashboard</p>
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
               {employee && (
                 <div 
-                  className="text-right cursor-pointer bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg px-4 py-2 border border-blue-200 dark:border-blue-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all hover:shadow-sm"
+                  className="text-right cursor-pointer bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg px-2 sm:px-4 py-1 sm:py-2 border border-blue-200 dark:border-blue-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all hover:shadow-sm hidden sm:block"
                   onClick={() => setIsProfileDialogOpen(true)}
                 >
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                     {(employee as EmployeeData).firstName} {(employee as EmployeeData).lastName}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">{(employee as EmployeeData).email}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 hidden md:block">{(employee as EmployeeData).email}</p>
                 </div>
               )}
-              <ThemeToggle />
+              <div className="scale-90 sm:scale-100">
+                <ThemeToggle />
+              </div>
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={handleRefresh}
-                className="hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
+                className="hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 transition-all h-8 w-8 sm:h-9 sm:w-auto sm:px-3 p-0"
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
               <Button 
                 variant="outline" 
                 onClick={handleLogout}
-                className="text-red-600 dark:text-red-400 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 border-red-300 dark:border-red-700 hover:border-red-600 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="text-red-600 dark:text-red-400 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 border-red-300 dark:border-red-700 hover:border-red-600 transition-all duration-200 shadow-sm hover:shadow-md h-8 w-8 sm:h-9 sm:w-auto sm:px-3 p-0 sm:p-2"
               >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
+                <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>

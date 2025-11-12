@@ -109,7 +109,7 @@ export default function ExportReportDialog({ children }: ExportReportDialogProps
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <DialogContent className="sm:max-w-[425px] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 w-[calc(100vw-1rem)] sm:w-full mx-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
             <Mail className="h-5 w-5" />

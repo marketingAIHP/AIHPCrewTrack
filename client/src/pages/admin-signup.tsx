@@ -79,7 +79,7 @@ export default function AdminSignup() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center space-y-4">
           <div className="flex items-center justify-center">
-            <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl p-3 shadow-sm ring-1 ring-blue-200/50">
+            <div className="bg-black rounded-xl p-3 shadow-sm">
               <img 
                 src="/logo-192.png" 
                 alt="AIHP CrewTrack Logo" 
@@ -88,7 +88,9 @@ export default function AdminSignup() {
             </div>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">AIHP CrewTrack</h1>
+            <h1 className="text-2xl font-bold">
+              <span className="text-black dark:text-white">A</span><span className="text-red-600">I</span><span className="text-black dark:text-white">HP</span> <span className="text-black dark:text-white">CrewTrack</span>
+            </h1>
             <p className="text-gray-600 mt-2">Create Admin Account - Setup Your Organization</p>
           </div>
         </CardHeader>

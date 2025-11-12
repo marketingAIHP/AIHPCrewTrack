@@ -63,7 +63,7 @@ export default function NotificationDropdown() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-96 p-0">
+      <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] sm:w-96 p-0">
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold">Notifications</h3>
