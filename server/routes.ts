@@ -500,7 +500,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if already checked in
       const currentAttendance = await storage.getCurrentAttendance(employeeId);
       if (currentAttendance && !currentAttendance.checkOutTime) {
-        return res.status(400).json({ message: 'Already checked in' });
+        // If there's an old attendance record that was never checked out, close it silently first
+        // This prevents duplicate check-in issues and ensures data integrity
+        console.log(`⚠️ Found old unchecked-out attendance record (ID: ${currentAttendance.id}), closing it before new check-in`);
+        
+        // Close the old attendance record silently (without sending notification)
+        // Use the same coordinates as the new check-in for the checkout
+        await storage.updateAttendance(currentAttendance.id, {
+          checkOutTime: new Date(),
+          checkOutLatitude: empLat.toString(),
+          checkOutLongitude: empLon.toString(),
+        });
+        
+        console.log(`✅ Closed old attendance record ${currentAttendance.id} before new check-in`);
       }
 
       // FIX: Create attendance record with parsed numeric coordinates
