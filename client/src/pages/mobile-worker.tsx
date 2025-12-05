@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { getAuthToken, getUser, logout, getUserType } from '@/lib/auth';
-import { useGeolocation } from '@/hooks/use-geolocation';
+import { useOptimizedGeolocation } from '@/hooks/use-optimized-geolocation';
 import { useWebSocket } from '@/hooks/use-websocket';
 import GoogleMap from '@/components/google-map';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
@@ -33,10 +33,17 @@ export default function MobileWorker() {
   const {
     latitude,
     longitude,
+    accuracy,
     error: locationError,
     loading: locationLoading,
     requestPermission,
-  } = useGeolocation({ watch: true });
+  } = useOptimizedGeolocation({
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0,
+    minAccuracy: 50,
+    throttleMs: 10000,
+  });
 
   useEffect(() => {
     if (!getAuthToken() || userType !== 'employee') {
@@ -68,24 +75,8 @@ export default function MobileWorker() {
     enabled: !!status?.assignedSite,
   });
 
-  // Location tracking mutation
-  const updateLocationMutation = useMutation({
-    mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
-      // FIX: Send coordinates as numbers, not strings, for consistent parsing
-      // This ensures the server receives numeric values and avoids type conversion issues
-      const response = await apiRequest('POST', '/api/employee/location', {
-        latitude: latitude, // Send as number, not string
-        longitude: longitude, // Send as number, not string
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/employee/status'] });
-    },
-    onError: (error: any) => {
-      console.error('Failed to update location:', error);
-    },
-  });
+  // Location tracking is now handled by useOptimizedGeolocation hook
+  // No need for manual location updates
 
   // WebSocket for location updates
   const { sendMessage, isConnected } = useWebSocket({
@@ -95,34 +86,6 @@ export default function MobileWorker() {
       }
     },
   });
-
-  // Send location updates automatically every 30 seconds when available
-  useEffect(() => {
-    if (latitude && longitude) {
-      // Send immediate location update
-      updateLocationMutation.mutate({ latitude, longitude });
-      
-      // Set up periodic location updates
-      const interval = setInterval(() => {
-        if (latitude && longitude) {
-          updateLocationMutation.mutate({ latitude, longitude });
-        }
-      }, 30000); // Every 30 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [latitude, longitude]);
-
-  // Send location updates via WebSocket when available
-  useEffect(() => {
-    if (latitude && longitude && isConnected && status?.isCheckedIn) {
-      sendMessage({
-        type: 'location_update',
-        latitude: latitude.toString(),
-        longitude: longitude.toString(),
-      });
-    }
-  }, [latitude, longitude, isConnected, status?.isCheckedIn, sendMessage]);
 
   const checkInMutation = useMutation({
     mutationFn: async () => {
@@ -414,7 +377,10 @@ export default function MobileWorker() {
                       id: 'current',
                       position: { lat: latitude, lng: longitude },
                       title: 'Your Location',
-                      color: 'blue',
+                      type: 'employee',
+                      accuracy: accuracy || undefined,
+                      isOnSite: status?.isOnSite,
+                      color: status?.isOnSite ? '#22c55e' : '#ef4444',
                     },
                   ]}
                   geofences={assignedSite ? [

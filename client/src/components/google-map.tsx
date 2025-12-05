@@ -13,6 +13,8 @@ interface GoogleMapProps {
     type?: 'employee' | 'site' | 'cluster';
     label?: string;
     onClick?: () => void;
+    accuracy?: number; // Accuracy radius in meters for accuracy circle
+    isOnSite?: boolean; // For geofence color coding (green if true, red if false)
   }>;
   geofences?: Array<{
     id?: string;
@@ -37,6 +39,7 @@ export default function GoogleMap({
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const circlesRef = useRef<google.maps.Circle[]>([]);
+  const accuracyCirclesRef = useRef<google.maps.Circle[]>([]);
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -208,6 +211,16 @@ export default function GoogleMap({
     });
     markersRef.current = [];
 
+    // Clear existing accuracy circles
+    accuracyCirclesRef.current.forEach(circle => {
+      try {
+        circle.setMap(null);
+      } catch (error) {
+        console.warn('Error clearing accuracy circle:', error);
+      }
+    });
+    accuracyCirclesRef.current = [];
+
     // Add new markers with custom icons
     markers.forEach(markerData => {
       let customIcon;
@@ -234,11 +247,16 @@ export default function GoogleMap({
         };
       } else {
         // Create custom person icon SVG (default for employees)
+        // Use green if on site, red if outside geofence
+        const markerColor = markerData.isOnSite !== undefined 
+          ? (markerData.isOnSite ? '#22c55e' : '#ef4444') 
+          : (markerData.color || '#4285F4');
+        
         customIcon = {
           url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
-                    fill="${markerData.color || '#ff0000'}" stroke="#ffffff" stroke-width="1"/>
+                    fill="${markerColor}" stroke="#ffffff" stroke-width="1"/>
               <circle cx="12" cy="8.5" r="2" fill="#ffffff"/>
               <path d="M8.5 13.5c0-1.5 1.57-2.5 3.5-2.5s3.5 1 3.5 2.5v1h-7v-1z" fill="#ffffff"/>
             </svg>
@@ -272,6 +290,25 @@ export default function GoogleMap({
       }
 
       markersRef.current.push(marker);
+
+      // Add accuracy circle if accuracy is provided (for employee markers)
+      if (markerData.accuracy && markerData.type === 'employee') {
+        const accuracyCircle = new google.maps.Circle({
+          strokeColor: markerData.isOnSite !== undefined 
+            ? (markerData.isOnSite ? '#22c55e' : '#ef4444')
+            : '#4285F4',
+          strokeOpacity: 0.4,
+          strokeWeight: 1,
+          fillColor: markerData.isOnSite !== undefined 
+            ? (markerData.isOnSite ? '#22c55e' : '#ef4444')
+            : '#4285F4',
+          fillOpacity: 0.15,
+          map: mapInstanceRef.current,
+          center: markerData.position,
+          radius: markerData.accuracy,
+        });
+        accuracyCirclesRef.current.push(accuracyCircle);
+      }
     });
   }, [markers]);
 

@@ -9,6 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken, getUserType } from '@/lib/auth';
 import { apiRequest } from '@/lib/queryClient';
+import { useOptimizedGeolocation } from '@/hooks/use-optimized-geolocation';
+import { loadGoogleMapsAPI } from '@/lib/google-maps';
+import GoogleMap from '@/components/google-map';
 import { 
   MapPin, 
   Clock, 
@@ -57,22 +60,66 @@ export default function EmployeeDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number, accuracy?: number} | null>(null);
-  const [locationError, setLocationError] = useState<string>('');
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
-  const locationWatchIdRef = useRef<number | null>(null);
   const [serverLocationStatus, setServerLocationStatus] = useState<{ distanceFromSite: number | null; isOnSite: boolean | null } | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const offsiteCounterRef = useRef(0);
   const OFFSITE_THRESHOLD = 3;
 
   // GPS accuracy buffer to account for mobile GPS inaccuracies (typically 3-10m)
   // Using a 50m buffer to reduce false negatives when employees are on site
-  // This accounts for GPS drift, device accuracy variations, and signal issues
   const GPS_ACCURACY_BUFFER = 50; // meters - increased from 15m for better reliability
-  const MIN_ACCURACY_THRESHOLD = 100; // Accept readings with accuracy better than 100m (more lenient for speed)
-  const LOCATION_AVERAGE_COUNT = 1; // Single reading for faster initial location
-  const LOCATION_TIMEOUT = 6000; // Shorter timeout to reduce waiting time
+
+  // Use optimized geolocation hook with high accuracy and throttling
+  const {
+    latitude,
+    longitude,
+    accuracy,
+    error: locationError,
+    loading: isGettingLocation,
+    timestamp,
+  } = useOptimizedGeolocation({
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0,
+    minAccuracy: 50, // Skip readings with accuracy > 50m initially (warm-up filter)
+    throttleMs: 10000, // Send to backend every 10 seconds
+    onLocationUpdate: async (position) => {
+      // Update server location status when location changes
+      if (currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime) {
+        try {
+          const response = await apiRequest('POST', '/api/employee/location', {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+          const data = await response.json();
+          setServerLocationStatus({
+            distanceFromSite: data.distanceFromSite ?? null,
+            isOnSite: typeof data.isOnSite === 'boolean' ? data.isOnSite : null,
+          });
+
+          if (data.autoCheckedOut) {
+            offsiteCounterRef.current = 0;
+            queryClient.invalidateQueries({ queryKey: ['/api/employee/attendance/current'] });
+            toast({
+              title: 'Auto Checked Out',
+              description: 'You have been automatically checked out for being outside the work site.',
+              variant: 'destructive',
+            });
+          }
+        } catch (error) {
+          console.error('Failed to update location status:', error);
+        }
+      }
+    },
+  });
+
+  // Derive currentLocation from optimized hook
+  const currentLocation = latitude && longitude ? {
+    lat: latitude,
+    lng: longitude,
+    accuracy: accuracy || undefined,
+  } : null;
 
   // Check authentication
   useEffect(() => {
@@ -83,6 +130,13 @@ export default function EmployeeDashboard() {
       setLocation('/employee/login');
       return;
     }
+
+    // Load Google Maps API
+    loadGoogleMapsAPI()
+      .then(() => setMapLoaded(true))
+      .catch((error) => {
+        console.error('Failed to load Google Maps:', error);
+      });
   }, [setLocation]);
 
   // Get employee data
@@ -118,333 +172,8 @@ export default function EmployeeDashboard() {
     gcTime: 0,
   });
 
-  // Get location on component mount with improved accuracy and retry logic
-  useEffect(() => {
-    // FIX: Ensure location is fetched after component mounts and permissions are ready
-    // Use a small delay to ensure geolocation API is fully initialized
-    const fetchLocation = async () => {
-      // Check if geolocation is available
-      if (!navigator.geolocation) {
-        setLocationError('Geolocation is not supported by your browser');
-        setIsGettingLocation(false);
-        return;
-      }
-      
-      // Request permission first if needed, then fetch location
-      try {
-        // Small delay to ensure permissions are ready
-        await new Promise(resolve => setTimeout(resolve, 100));
-        getCurrentLocationWithAveraging();
-      } catch (error) {
-        console.error('Error initializing location fetch:', error);
-        setLocationError('Failed to initialize location services');
-        setIsGettingLocation(false);
-      }
-    };
-    
-    fetchLocation();
-    
-    // Cleanup watch on unmount
-    return () => {
-      if (locationWatchIdRef.current !== null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(locationWatchIdRef.current);
-        locationWatchIdRef.current = null;
-      }
-    };
-  }, []);
-
-  // FIX: Add retry logic for location fetching (up to 3 retries)
-  const getCurrentLocationWithAveraging = (retryCount: number = 0) => {
-    const MAX_RETRIES = 3;
-    
-    // Clear any existing watch
-    if (locationWatchIdRef.current !== null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(locationWatchIdRef.current);
-      locationWatchIdRef.current = null;
-    }
-    
-    setIsGettingLocation(true);
-    setLocationError('');
-
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser');
-      setIsGettingLocation(false);
-      return;
-    }
-
-    const readings: Array<{lat: number, lng: number, accuracy: number}> = [];
-    let readingsCollected = 0;
-    let watchId: number | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
-    let bestReading: {lat: number, lng: number, accuracy: number} | null = null;
-
-    // FIX: Use high accuracy and longer timeout for better GPS accuracy
-    const geolocationOptions = {
-      enableHighAccuracy: true, // Critical: Use high accuracy GPS
-      timeout: LOCATION_TIMEOUT,
-      maximumAge: 5000, // Allow a very recent cached reading for faster response
-    };
-
-    let highAccuracyRequested = false;
-
-    const requestHighAccuracy = () => {
-      if (highAccuracyRequested) return;
-      highAccuracyRequested = true;
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-        const accuracy = position.coords.accuracy || 100;
-        const reading = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: accuracy,
-        };
-        
-        // FIX: Use first reading immediately if it's reasonably accurate, but validate first
-        if (accuracy <= MIN_ACCURACY_THRESHOLD) {
-          // Validate coordinates before setting
-          if (!isNaN(reading.lat) && !isNaN(reading.lng) && isFinite(reading.lat) && isFinite(reading.lng)) {
-            console.log('✅ Location fetched successfully (immediate):', {
-              lat: reading.lat.toFixed(6),
-              lng: reading.lng.toFixed(6),
-              accuracy: Math.round(reading.accuracy)
-            });
-            setCurrentLocation(reading);
-            setIsGettingLocation(false);
-            return;
-          } else {
-            console.error('❌ Invalid immediate reading:', reading);
-            // Continue with watch for better accuracy
-          }
-        }
-        
-        // Store as best reading and continue with watch for better accuracy
-        bestReading = reading;
-        readings.push(reading);
-        readingsCollected++;
-        
-        // Start watching for improved readings
-        watchId = navigator.geolocation.watchPosition(
-          (watchPosition) => {
-            const watchAccuracy = watchPosition.coords.accuracy || 100;
-            const watchReading = {
-              lat: watchPosition.coords.latitude,
-              lng: watchPosition.coords.longitude,
-              accuracy: watchAccuracy,
-            };
-            
-            // Update best reading if this one is better
-            if (!bestReading || watchAccuracy < bestReading.accuracy) {
-              bestReading = watchReading;
-            }
-            
-            readings.push(watchReading);
-            readingsCollected++;
-            
-            // If we have enough readings or a very accurate one, stop and use average
-            if (readingsCollected >= LOCATION_AVERAGE_COUNT || watchAccuracy <= 20) {
-              if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-              }
-              if (timeoutId !== null) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-              }
-              
-              // Use average of all readings for better accuracy
-              const avgLat = readings.reduce((sum, r) => sum + r.lat, 0) / readings.length;
-              const avgLng = readings.reduce((sum, r) => sum + r.lng, 0) / readings.length;
-              const avgAccuracy = readings.reduce((sum, r) => sum + r.accuracy, 0) / readings.length;
-              
-              // FIX: Ensure coordinates are valid numbers before setting
-              if (!isNaN(avgLat) && !isNaN(avgLng) && isFinite(avgLat) && isFinite(avgLng)) {
-                console.log('✅ Location fetched successfully:', {
-                  lat: avgLat.toFixed(6),
-                  lng: avgLng.toFixed(6),
-                  accuracy: Math.round(avgAccuracy),
-                  readings: readings.length
-                });
-                
-                setCurrentLocation({
-                  lat: avgLat,
-                  lng: avgLng,
-                  accuracy: avgAccuracy,
-                });
-                setIsGettingLocation(false);
-                locationWatchIdRef.current = null;
-              } else {
-                console.error('❌ Invalid coordinates calculated:', { avgLat, avgLng, avgAccuracy });
-                setLocationError('Invalid location coordinates received');
-                setIsGettingLocation(false);
-                locationWatchIdRef.current = null;
-              }
-            }
-          },
-          () => {
-            // FIX: On error, use best reading we have, but validate it first
-            if (bestReading) {
-              // Validate best reading before setting
-              if (!isNaN(bestReading.lat) && !isNaN(bestReading.lng) && isFinite(bestReading.lat) && isFinite(bestReading.lng)) {
-                console.log('✅ Location fetched successfully (error fallback):', {
-                  lat: bestReading.lat.toFixed(6),
-                  lng: bestReading.lng.toFixed(6),
-                  accuracy: Math.round(bestReading.accuracy)
-                });
-                setCurrentLocation(bestReading);
-              } else {
-                console.error('❌ Invalid best reading (error fallback):', bestReading);
-                setLocationError('Invalid location coordinates received');
-              }
-              setIsGettingLocation(false);
-            } else {
-              setLocationError('Unable to get location - no valid readings');
-              setIsGettingLocation(false);
-            }
-            if (watchId !== null) {
-              navigator.geolocation.clearWatch(watchId);
-            }
-            locationWatchIdRef.current = null;
-          },
-          geolocationOptions
-        );
-        
-        locationWatchIdRef.current = watchId;
-        
-        // Timeout: use best reading after timeout
-        timeoutId = setTimeout(() => {
-          if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-          }
-          
-          if (readings.length > 0) {
-            // Use average of collected readings
-            const avgLat = readings.reduce((sum, r) => sum + r.lat, 0) / readings.length;
-            const avgLng = readings.reduce((sum, r) => sum + r.lng, 0) / readings.length;
-            const avgAccuracy = readings.reduce((sum, r) => sum + r.accuracy, 0) / readings.length;
-            
-            // FIX: Validate coordinates before setting
-            if (!isNaN(avgLat) && !isNaN(avgLng) && isFinite(avgLat) && isFinite(avgLng)) {
-              console.log('✅ Location fetched successfully (timeout):', {
-                lat: avgLat.toFixed(6),
-                lng: avgLng.toFixed(6),
-                accuracy: Math.round(avgAccuracy),
-                readings: readings.length
-              });
-              
-              setCurrentLocation({
-                lat: avgLat,
-                lng: avgLng,
-                accuracy: avgAccuracy,
-              });
-            } else {
-              console.error('❌ Invalid coordinates calculated (timeout):', { avgLat, avgLng, avgAccuracy });
-              if (bestReading) {
-                setCurrentLocation(bestReading);
-              } else {
-                setLocationError('Invalid location coordinates received');
-              }
-            }
-          } else if (bestReading) {
-            // FIX: Validate best reading before setting
-            if (!isNaN(bestReading.lat) && !isNaN(bestReading.lng) && isFinite(bestReading.lat) && isFinite(bestReading.lng)) {
-              console.log('✅ Location fetched successfully (best reading):', {
-                lat: bestReading.lat.toFixed(6),
-                lng: bestReading.lng.toFixed(6),
-                accuracy: Math.round(bestReading.accuracy)
-              });
-              setCurrentLocation(bestReading);
-            } else {
-              console.error('❌ Invalid best reading:', bestReading);
-              setLocationError('Invalid location coordinates received');
-            }
-          } else {
-            setLocationError('Unable to get location after timeout');
-          }
-          setIsGettingLocation(false);
-          locationWatchIdRef.current = null;
-        }, LOCATION_TIMEOUT + 2000); // Slightly longer than getCurrentPosition timeout
-      },
-      (error) => {
-        // FIX: Retry logic - retry up to 3 times on timeout or unavailable errors
-        if (retryCount < MAX_RETRIES && (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE)) {
-          console.log(`🔄 Location fetch failed (attempt ${retryCount + 1}/${MAX_RETRIES}), retrying...`, error);
-          // Retry after a short delay (exponential backoff)
-          setTimeout(() => {
-            getCurrentLocationWithAveraging(retryCount + 1);
-          }, 1000 * (retryCount + 1)); // 1s, 2s, 3s delays
-          return;
-        }
-        
-        let errorMessage = 'Unable to get your location';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location services.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information unavailable. Please check your GPS settings.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = `Location request timed out after ${MAX_RETRIES + 1} attempts. Please try again.`;
-            break;
-        }
-        console.error('❌ Location fetch failed after retries:', errorMessage);
-        setLocationError(errorMessage);
-        setIsGettingLocation(false);
-        locationWatchIdRef.current = null;
-      },
-      geolocationOptions
-    );
-    };
-
-    let quickResolved = false;
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        quickResolved = true;
-        const quickLat = position.coords.latitude;
-        const quickLng = position.coords.longitude;
-        const quickAccuracy = position.coords.accuracy || 500;
-
-        if (!isNaN(quickLat) && !isNaN(quickLng) && isFinite(quickLat) && isFinite(quickLng)) {
-          console.log('✅ Quick coarse location obtained:', {
-            lat: quickLat.toFixed(6),
-            lng: quickLng.toFixed(6),
-            accuracy: Math.round(quickAccuracy)
-          });
-          setCurrentLocation({
-            lat: quickLat,
-            lng: quickLng,
-            accuracy: quickAccuracy,
-          });
-          setIsGettingLocation(false);
-          setTimeout(requestHighAccuracy, 500);
-        } else {
-          requestHighAccuracy();
-        }
-      },
-      (error) => {
-        console.warn('Quick location failed, falling back to high accuracy:', error);
-        requestHighAccuracy();
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: 3000,
-        maximumAge: 10000,
-      }
-    );
-
-    setTimeout(() => {
-      if (!quickResolved) {
-        requestHighAccuracy();
-      }
-    }, 3500);
-  };
-
-  // Fallback method for manual refresh
-  const getCurrentLocation = () => {
-    getCurrentLocationWithAveraging();
-  };
+  // Location tracking is now handled by useOptimizedGeolocation hook
+  // No need for manual location fetching code
 
   // FIX: Check if employee is within geofence and calculate distance with improved logging
   const getDistanceInfo = (locationAccuracy?: number) => {
@@ -656,87 +385,8 @@ export default function EmployeeDashboard() {
     checkOutMutation.mutate();
   };
 
-  // Auto-update location periodically - 30 second intervals with optimized speed
-  // This must be after mutations are defined
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-    if (!currentLocation) return; // Wait for initial location to be set
-
-    const interval = setInterval(() => {
-      // Use getCurrentPosition for faster periodic updates
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          const accuracy = position.coords.accuracy || 100;
-          
-          const shouldUpdate =
-            !currentLocation ||
-            calculateDistance(currentLocation.lat, currentLocation.lng, lat, lng) > 15 ||
-            (accuracy < (currentLocation?.accuracy || 100) && accuracy < 50);
-
-          if (shouldUpdate) {
-            setCurrentLocation({
-              lat,
-              lng,
-              accuracy,
-            });
-
-            if (currentAttendance && !(currentAttendance as AttendanceRecord).checkOutTime) {
-              apiRequest('POST', '/api/employee/location', {
-                latitude: lat,
-                longitude: lng,
-              })
-                .then(res => res.json())
-                .then(data => {
-                  setServerLocationStatus({
-                    distanceFromSite: data.distanceFromSite ?? null,
-                    isOnSite: typeof data.isOnSite === 'boolean' ? data.isOnSite : null,
-                  });
-
-                    if (data.autoCheckedOut) {
-                      offsiteCounterRef.current = 0;
-                      queryClient.invalidateQueries({ queryKey: ['/api/employee/attendance/current'] });
-                      toast({
-                        title: 'Auto Check-Out',
-                        description: 'You were automatically checked out after being away from the work site for over 2 hours.',
-                        variant: 'destructive',
-                      });
-                    }
-
-                  if (typeof data.isOnSite === 'boolean') {
-                    if (!data.isOnSite) {
-                      offsiteCounterRef.current += 1;
-                      if (
-                        offsiteCounterRef.current >= OFFSITE_THRESHOLD &&
-                        data.distanceFromSite != null &&
-                        workSite &&
-                        data.distanceFromSite > (workSite as WorkSite).geofenceRadius + GPS_ACCURACY_BUFFER
-                      ) {
-                        offsiteCounterRef.current = 0;
-                        checkOutMutation.mutate();
-                        toast({
-                          title: 'Auto Check-Out',
-                          description: 'You left the work site area. Automatically checked out.',
-                          variant: 'destructive',
-                        });
-                      }
-                    } else {
-                      offsiteCounterRef.current = 0;
-                    }
-                  }
-                })
-                .catch(console.error);
-            }
-          }
-        },
-        (error) => console.error('Location tracking error:', error),
-        { enableHighAccuracy: true, timeout: LOCATION_TIMEOUT, maximumAge: 5000 }
-      );
-    }, 30000); // Update every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [currentAttendance, workSite, checkOutMutation, toast, currentLocation]);
+  // Location updates are now handled by useOptimizedGeolocation hook
+  // No need for periodic location updates
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/employee/profile'] });
@@ -933,16 +583,11 @@ export default function EmployeeDashboard() {
                       </Alert>
                     )}
                     
-                    {!currentLocation && (
-                      <Button 
-                        onClick={getCurrentLocation}
-                        variant="outline"
-                        className="w-full border-blue-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all"
-                        disabled={isGettingLocation}
-                      >
-                        <Navigation className="h-4 w-4 mr-2" />
-                        {isGettingLocation ? 'Getting Location...' : 'Get My Location'}
-                      </Button>
+                    {!currentLocation && isGettingLocation && (
+                      <div className="text-center py-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">Getting location...</p>
+                      </div>
                     )}
                     
                     {currentLocation && workSite && (
@@ -1042,6 +687,68 @@ export default function EmployeeDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Location Map */}
+          {currentLocation && mapLoaded && (
+            <Card className="border-2 border-slate-300 dark:border-slate-600 shadow-sm bg-gradient-to-br from-white to-blue-50/20 dark:from-slate-800 dark:to-blue-900/10 hover:shadow-md transition-all duration-200">
+              <CardHeader className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-900/20 dark:to-purple-900/20 border-b-2 border-slate-300 dark:border-slate-600">
+                <CardTitle className="flex items-center space-x-2 text-blue-800 dark:text-blue-200">
+                  <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-2">
+                    <Navigation className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="font-semibold">Live Location Tracking</span>
+                </CardTitle>
+                <CardDescription className="text-blue-700 dark:text-blue-400 mt-1">
+                  Real-time GPS tracking with accuracy circle
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="h-96 rounded-lg overflow-hidden border-2 border-slate-200 dark:border-slate-700">
+                  <GoogleMap
+                    center={{ lat: currentLocation.lat, lng: currentLocation.lng }}
+                    zoom={16}
+                    markers={[
+                      {
+                        id: 'employee',
+                        position: { lat: currentLocation.lat, lng: currentLocation.lng },
+                        title: 'Your Location',
+                        type: 'employee',
+                        accuracy: currentLocation.accuracy,
+                        isOnSite: isCurrentlyOnSite(),
+                        color: isCurrentlyOnSite() ? '#22c55e' : '#ef4444',
+                      },
+                    ]}
+                    geofences={workSite ? [
+                      {
+                        id: 'worksite',
+                        center: {
+                          lat: parseFloat((workSite as WorkSite).latitude.toString()),
+                          lng: parseFloat((workSite as WorkSite).longitude.toString()),
+                        },
+                        radius: (workSite as WorkSite).geofenceRadius,
+                        color: '#1976D2',
+                      },
+                    ] : []}
+                    className="w-full h-full"
+                  />
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">GPS Accuracy:</span>
+                    <Badge className="bg-gradient-to-r from-purple-400 to-purple-500 text-white border-0 shadow-sm">
+                      {currentLocation.accuracy ? `${Math.round(currentLocation.accuracy)}m` : 'N/A'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">Coordinates:</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">
+                      {currentLocation.lat.toFixed(6)}, {currentLocation.lng.toFixed(6)}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Today's Hours */}
           <Card className="border-2 border-slate-300 dark:border-slate-600 shadow-sm bg-gradient-to-br from-white to-orange-50/20 dark:from-slate-800 dark:to-orange-900/10 hover:shadow-md transition-all duration-200">

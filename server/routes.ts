@@ -273,30 +273,33 @@ function isWithinGeofence(
   const isWithin = distance <= effectiveRadius;
   
   // FIX: Improved logging with clear success/failure messages
-  const logMessage = isWithin 
-    ? `✅ You are within site range (${Math.round(distance)}m from site, radius: ${geofenceRadius}m)`
-    : `❌ You are ${Math.round(distance)}m away from site (radius: ${geofenceRadius}m)`;
-  
-  console.log('📍 Geofence calculation:', {
-    employeeCoords: { 
-      lat: empLat.toFixed(6), 
-      lon: empLon.toFixed(6), 
-      original: { lat: rawEmpLat, lon: rawEmpLon }, 
-      swapped: empCoords.swapped 
-    },
-    siteCoords: { 
-      lat: sLat.toFixed(6), 
-      lon: sLon.toFixed(6), 
-      original: { lat: rawSiteLat, lon: rawSiteLon }, 
-      swapped: siteCoords.swapped 
-    },
-    distance: Math.round(distance),
-    geofenceRadius,
-    buffer: GPS_ACCURACY_BUFFER,
-    effectiveRadius: Math.round(effectiveRadius),
-    isWithin,
-    message: logMessage
-  });
+  // Only log in development mode to reduce console noise in production
+  if (process.env.NODE_ENV !== 'production') {
+    const logMessage = isWithin 
+      ? `✅ You are within site range (${Math.round(distance)}m from site, radius: ${geofenceRadius}m)`
+      : `❌ You are ${Math.round(distance)}m away from site (radius: ${geofenceRadius}m)`;
+    
+    console.log('📍 Geofence calculation:', {
+      employeeCoords: { 
+        lat: empLat.toFixed(6), 
+        lon: empLon.toFixed(6), 
+        original: { lat: rawEmpLat, lon: rawEmpLon }, 
+        swapped: empCoords.swapped 
+      },
+      siteCoords: { 
+        lat: sLat.toFixed(6), 
+        lon: sLon.toFixed(6), 
+        original: { lat: rawSiteLat, lon: rawSiteLon }, 
+        swapped: siteCoords.swapped 
+      },
+      distance: Math.round(distance),
+      geofenceRadius,
+      buffer: GPS_ACCURACY_BUFFER,
+      effectiveRadius: Math.round(effectiveRadius),
+      isWithin,
+      message: logMessage
+    });
+  }
   
   // Log if distance is suspiciously large (more than geofence radius + 100m buffer)
   if (distance > geofenceRadius + 100) {
