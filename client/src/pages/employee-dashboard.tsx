@@ -191,9 +191,6 @@ export default function EmployeeDashboard() {
     
     // Validate coordinates
     if (isNaN(empLat) || isNaN(empLng) || isNaN(siteLat) || isNaN(siteLng)) {
-        employee: { lat: empLat, lng: empLng },
-        site: { lat: siteLat, lng: siteLng }
-      });
       return { isWithin: false, distance: Infinity };
     }
     
