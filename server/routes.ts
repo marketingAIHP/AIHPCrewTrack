@@ -473,9 +473,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const employeeId = req.user!.id;
 
-      // Get employee and assigned work site
+      // Get employee
       const employee = await storage.getEmployee(employeeId);
-      if (!employee || !employee.siteId) {
+      if (!employee) {
+        return res.status(400).json({ message: 'Employee not found' });
+      }
+
+      // Check if employee has a work site assigned
+      if (!employee.siteId) {
         return res.status(400).json({ message: 'No work site assigned' });
       }
 
@@ -484,28 +489,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Work site not found' });
       }
 
-      // FIX: Check if employee is within geofence with GPS accuracy buffer
-      // Use parsed numeric values for accurate calculation
-      const geofenceCheck = isWithinGeofence(
-        empLat, // Use parsed numeric values
-        empLon, // Use parsed numeric values
-        site.latitude,
-        site.longitude,
-        site.geofenceRadius
-      );
+      // For remote employees or remote sites, skip geofence validation - they can check in from anywhere
+      // But still track their location for live tracking
+      const isRemote = employee.isRemote || site.isRemote;
+      
+      if (!isRemote) {
+        // FIX: Check if employee is within geofence with GPS accuracy buffer
+        // Use parsed numeric values for accurate calculation
+        const geofenceCheck = isWithinGeofence(
+          empLat, // Use parsed numeric values
+          empLon, // Use parsed numeric values
+          site.latitude,
+          site.longitude,
+          site.geofenceRadius
+        );
 
-      // FIX: Log check-in attempt with clear message
-      const logMessage = geofenceCheck.isWithin
-        ? `✅ Check-in allowed: Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(geofenceCheck.distance)}m from site)`
-        : `❌ Check-in denied: Employee ${employee.firstName} ${employee.lastName} is ${Math.round(geofenceCheck.distance)}m away from site (required: within ${site.geofenceRadius}m)`;
-      console.log('📍 Check-in geofence check:', logMessage);
+        // FIX: Log check-in attempt with clear message
+        const logMessage = geofenceCheck.isWithin
+          ? `✅ Check-in allowed: Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(geofenceCheck.distance)}m from site)`
+          : `❌ Check-in denied: Employee ${employee.firstName} ${employee.lastName} is ${Math.round(geofenceCheck.distance)}m away from site (required: within ${site.geofenceRadius}m)`;
+        console.log('📍 Check-in geofence check:', logMessage);
 
-      if (!geofenceCheck.isWithin) {
-        return res.status(400).json({ 
-          message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(geofenceCheck.distance)}m away.`,
-          distance: Math.round(geofenceCheck.distance),
-          requiredRadius: site.geofenceRadius
-        });
+        if (!geofenceCheck.isWithin) {
+          return res.status(400).json({ 
+            message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(geofenceCheck.distance)}m away.`,
+            distance: Math.round(geofenceCheck.distance),
+            requiredRadius: site.geofenceRadius
+          });
+        }
+      } else {
+        // Remote work site - log that geofence check is skipped
+        console.log(`✅ Remote check-in allowed: Employee ${employee.firstName} ${employee.lastName} can check in from anywhere (Remote: ${employee.isRemote ? 'employee' : 'site'} - ${site.name})`);
       }
 
       // Check if already checked in
@@ -1669,13 +1683,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Convert siteId to number if it's a string
+      // Handle remote work site option
+      let isRemote = false;
       if (processedData.siteId) {
         if (typeof processedData.siteId === 'string') {
-          if (processedData.siteId === 'none' || processedData.siteId === '') {
+          if (processedData.siteId === 'remote') {
             processedData.siteId = null;
+            isRemote = true;
+          } else if (processedData.siteId === 'none' || processedData.siteId === '') {
+            processedData.siteId = null;
+            isRemote = false;
           } else {
             processedData.siteId = parseInt(processedData.siteId);
+            isRemote = false;
           }
         }
       }
@@ -1715,6 +1735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword,
         profileImage,
         adminId: req.user!.id,
+        isRemote,
       });
 
       res.status(201).json(employee);
@@ -1746,14 +1767,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Convert siteId to number if it's a string
-      if (processedData.siteId) {
+      // Handle remote work site option
+      let isRemote = false;
+      if (processedData.siteId !== undefined) {
         if (typeof processedData.siteId === 'string') {
-          if (processedData.siteId === 'none' || processedData.siteId === '') {
+          if (processedData.siteId === 'remote') {
             processedData.siteId = null;
+            isRemote = true;
+          } else if (processedData.siteId === 'none' || processedData.siteId === '') {
+            processedData.siteId = null;
+            isRemote = false;
           } else {
             processedData.siteId = parseInt(processedData.siteId);
+            isRemote = false;
           }
+        } else if (processedData.siteId === null) {
+          isRemote = false;
         }
       }
       
@@ -1776,7 +1805,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const employee = await storage.updateEmployee(id, {
         ...validatedData,
-        ...(hashedPassword && { password: hashedPassword })
+        ...(hashedPassword && { password: hashedPassword }),
+        ...(processedData.siteId !== undefined && { isRemote }),
       });
       const { password, ...employeeData } = employee;
       res.json(employeeData);
@@ -2167,7 +2197,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               assignedSite = await storage.getWorkSite(employee.siteId);
             }
 
-            if (location && assignedSite) {
+            // For remote employees, always mark as within geofence (they can work from anywhere)
+            if (employee.isRemote) {
+              isEmployeeWithinGeofence = true;
+              distanceFromSite = null; // No distance calculation for remote employees
+              geofenceRadius = null;
+            } else if (location && assignedSite) {
               const geofenceCheck = isWithinGeofence(
                 location.latitude,
                 location.longitude,
@@ -2230,7 +2265,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid coordinates provided' });
       }
 
-      if (assignedSite) {
+      // For remote employees, always mark as "on site" since they can work from anywhere
+      // Still calculate distance if they have an assigned site for tracking purposes
+      if (employee.isRemote) {
+        isOnSite = true; // Remote employees are always considered "on site" for tracking
+        if (assignedSite) {
+          const siteLat = parseFloat(assignedSite.latitude.toString());
+          const siteLng = parseFloat(assignedSite.longitude.toString());
+          const distance = calculateDistance(empLat, empLng, siteLat, siteLng);
+          distanceFromSite = Math.round(distance);
+        }
+        console.log('📏 Remote employee location:', {
+          distance: distanceFromSite,
+          isOnSite: true,
+          isRemote: true
+        });
+      } else if (assignedSite) {
         const siteLat = parseFloat(assignedSite.latitude.toString());
         const siteLng = parseFloat(assignedSite.longitude.toString());
 

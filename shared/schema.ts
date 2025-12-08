@@ -34,6 +34,7 @@ export const employees = pgTable("employees", {
   departmentId: integer("department_id").references(() => departments.id),
   profileImage: text("profile_image"),
   isActive: boolean("is_active").default(true),
+  isRemote: boolean("is_remote").default(false), // Remote employee - can check in from anywhere
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -69,6 +70,7 @@ export const workSites = pgTable("work_sites", {
   areaId: integer("area_id").references(() => areas.id),
   adminId: integer("admin_id").notNull().references(() => admins.id),
   isActive: boolean("is_active").default(true),
+  isRemote: boolean("is_remote").default(false), // Remote work site - employees can check in from anywhere
   createdAt: timestamp("created_at").defaultNow(),
 });
 

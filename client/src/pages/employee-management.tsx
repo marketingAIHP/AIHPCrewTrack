@@ -472,7 +472,8 @@ export default function EmployeeManagement() {
     editEmployeeForm.setValue('email', employee.email);
     editEmployeeForm.setValue('phone', employee.phone || '');
     editEmployeeForm.setValue('departmentId', employee.departmentId?.toString() || 'none');
-    editEmployeeForm.setValue('siteId', employee.siteId?.toString() || 'none');
+    // Set siteId to 'remote' if employee is remote, otherwise use siteId or 'none'
+    editEmployeeForm.setValue('siteId', employee.isRemote ? 'remote' : (employee.siteId?.toString() || 'none'));
   };
 
   if (employeesLoading || departmentsLoading) {
@@ -517,15 +518,15 @@ export default function EmployeeManagement() {
                   Add Department
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-gradient-to-br from-blue-50/30 via-white to-purple-50/30 border-blue-200">
-              <DialogHeader className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200">
-                <DialogTitle className="text-blue-900 font-bold flex items-center gap-2">
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <DialogHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200 dark:border-blue-800">
+                <DialogTitle className="text-blue-900 dark:text-blue-100 font-bold flex items-center gap-2">
                   <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-2">
                     <Users className="h-5 w-5 text-white" />
                   </div>
                   Create New Department
                 </DialogTitle>
-                <DialogDescription className="text-blue-700 mt-1">
+                <DialogDescription className="text-blue-700 dark:text-blue-300 mt-1">
                   Add a new department to organize your employees.
                 </DialogDescription>
               </DialogHeader>
@@ -536,7 +537,7 @@ export default function EmployeeManagement() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Department Name</FormLabel>
+                        <FormLabel className="text-slate-900 dark:text-slate-100">Department Name</FormLabel>
                         <FormControl>
                           <Input placeholder="Enter department name" {...field} />
                         </FormControl>
@@ -549,7 +550,7 @@ export default function EmployeeManagement() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description (Optional)</FormLabel>
+                        <FormLabel className="text-slate-900 dark:text-slate-100">Description (Optional)</FormLabel>
                         <FormControl>
                           <Input placeholder="Enter department description" {...field} />
                         </FormControl>
@@ -557,7 +558,7 @@ export default function EmployeeManagement() {
                       </FormItem>
                     )}
                   />
-                  <DialogFooter className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mb-4 border-t border-blue-200 mt-4">
+                  <DialogFooter className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mb-4 border-t border-blue-200 dark:border-blue-800 mt-4">
                     <Button 
                       type="submit" 
                       disabled={createDepartmentMutation.isPending}
@@ -582,15 +583,15 @@ export default function EmployeeManagement() {
                 Add Employee
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-gradient-to-br from-green-50/30 via-white to-blue-50/30 border-green-200">
-              <DialogHeader className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-green-200">
-                <DialogTitle className="text-green-900 font-bold flex items-center gap-2">
+            <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <DialogHeader className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-green-200 dark:border-green-800">
+                <DialogTitle className="text-green-900 dark:text-green-100 font-bold flex items-center gap-2">
                   <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-2">
                     <Plus className="h-5 w-5 text-white" />
                   </div>
                   Create New Employee
                 </DialogTitle>
-                <DialogDescription className="text-green-700 mt-1">
+                <DialogDescription className="text-green-700 dark:text-green-300 mt-1">
                   Add a new employee to your workforce.
                 </DialogDescription>
               </DialogHeader>
@@ -603,7 +604,7 @@ export default function EmployeeManagement() {
                     name="employeeId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Employee ID</FormLabel>
+                        <FormLabel className="text-slate-900 dark:text-slate-100">Employee ID</FormLabel>
                         <FormControl>
                           <Input placeholder="EMP001" {...field} />
                         </FormControl>
@@ -619,7 +620,7 @@ export default function EmployeeManagement() {
                       name="firstName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>First Name</FormLabel>
+                          <FormLabel className="text-slate-900 dark:text-slate-100">First Name</FormLabel>
                           <FormControl>
                             <Input placeholder="John" {...field} />
                           </FormControl>
@@ -632,7 +633,7 @@ export default function EmployeeManagement() {
                       name="lastName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Last Name</FormLabel>
+                          <FormLabel className="text-slate-900 dark:text-slate-100">Last Name</FormLabel>
                           <FormControl>
                             <Input placeholder="Doe" {...field} />
                           </FormControl>
@@ -648,7 +649,7 @@ export default function EmployeeManagement() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel className="text-slate-900 dark:text-slate-100">Email</FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="john.doe@example.com" {...field} />
                         </FormControl>
@@ -662,7 +663,7 @@ export default function EmployeeManagement() {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
+                        <FormLabel className="text-slate-900 dark:text-slate-100">Phone Number</FormLabel>
                         <FormControl>
                           <Input type="tel" placeholder="+1 (555) 123-4567" {...field} />
                         </FormControl>
@@ -677,7 +678,7 @@ export default function EmployeeManagement() {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel className="text-slate-900 dark:text-slate-100">Password</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Input 
@@ -708,7 +709,7 @@ export default function EmployeeManagement() {
                       name="departmentId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Department</FormLabel>
+                          <FormLabel className="text-slate-900 dark:text-slate-100">Department</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
@@ -734,7 +735,7 @@ export default function EmployeeManagement() {
                       name="siteId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Work Site Assignment</FormLabel>
+                          <FormLabel className="text-slate-900 dark:text-slate-100">Work Site Assignment</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
@@ -743,6 +744,7 @@ export default function EmployeeManagement() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="none">No Site Assignment</SelectItem>
+                              <SelectItem value="remote">Remote Work Site</SelectItem>
                               {Array.isArray(workSites) && workSites.length > 0 ? (
                                 workSites.map((site: any) => (
                                   <SelectItem key={site.id} value={site.id.toString()}>
@@ -762,7 +764,7 @@ export default function EmployeeManagement() {
                     />
                   </div>
 
-                  <DialogFooter className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mb-4 border-t border-green-200 mt-4">
+                  <DialogFooter className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 rounded-lg p-4 -mx-4 -mb-4 border-t border-green-200 dark:border-green-800 mt-4">
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -770,7 +772,7 @@ export default function EmployeeManagement() {
                         setIsCreateEmployeeOpen(false);
                         createEmployeeForm.reset();
                       }}
-                      className="hover:bg-slate-50"
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
                       Cancel
                     </Button>
@@ -832,9 +834,9 @@ export default function EmployeeManagement() {
                     <AuthenticatedImage
                       src={employee.profileImage}
                       alt={`${employee.firstName} ${employee.lastName}`}
-                      className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-lg ring-2 ring-blue-200 group-hover:ring-blue-400 transition-all"
+                      className="w-16 h-16 rounded-full object-cover border-4 border-white dark:border-slate-800 shadow-lg ring-2 ring-blue-200 dark:ring-blue-800 group-hover:ring-blue-400 dark:group-hover:ring-blue-600 transition-all"
                       fallback={
-                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-white shadow-lg ring-2 ring-blue-200 group-hover:ring-blue-400 transition-all">
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-lg ring-2 ring-blue-200 dark:ring-blue-800 group-hover:ring-blue-400 dark:group-hover:ring-blue-600 transition-all">
                           <span className="text-white font-bold text-xl">{employee.firstName[0]}{employee.lastName[0]}</span>
                         </div>
                       }
@@ -843,21 +845,21 @@ export default function EmployeeManagement() {
                       <DialogTrigger asChild>
                         <Button
                           size="sm"
-                          className="absolute -bottom-1 -right-1 rounded-full w-7 h-7 p-0 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-md border-2 border-white"
+                          className="absolute -bottom-1 -right-1 rounded-full w-7 h-7 p-0 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-md border-2 border-white dark:border-slate-800"
                           onClick={() => setImageDialogEmployee(employee)}
                         >
                           <Camera className="h-3.5 w-3.5 text-white" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50/30 via-white to-purple-50/30 border-blue-200">
-                        <DialogHeader className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200">
-                          <DialogTitle className="text-blue-900 font-bold flex items-center gap-2">
+                      <DialogContent className="sm:max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                        <DialogHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200 dark:border-blue-800">
+                          <DialogTitle className="text-blue-900 dark:text-blue-100 font-bold flex items-center gap-2">
                             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-2">
                               <Camera className="h-5 w-5 text-white" />
                             </div>
                             Employee Profile Image
                           </DialogTitle>
-                          <DialogDescription className="text-blue-700 mt-1">
+                          <DialogDescription className="text-blue-700 dark:text-blue-300 mt-1">
                             Upload a new profile image for {employee.firstName} {employee.lastName} or remove the current one.
                           </DialogDescription>
                         </DialogHeader>
@@ -868,9 +870,9 @@ export default function EmployeeManagement() {
                                 <AuthenticatedImage
                                   src={employee.profileImage}
                                   alt={`${employee.firstName} ${employee.lastName}`}
-                                  className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-blue-200"
+                                  className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-slate-800 shadow-xl ring-4 ring-blue-200 dark:ring-blue-800"
                                   fallback={
-                                    <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-white shadow-xl ring-4 ring-blue-200">
+                                    <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-xl ring-4 ring-blue-200 dark:ring-blue-800">
                                       <span className="text-white font-bold text-2xl">
                                         {employee.firstName[0]}{employee.lastName[0]}
                                       </span>
@@ -926,7 +928,7 @@ export default function EmployeeManagement() {
                   variant={employee.isActive ? "default" : "secondary"}
                   className={employee.isActive 
                     ? "bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-sm" 
-                    : "bg-slate-200 text-slate-700 border-0"
+                    : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-0"
                   }
                 >
                   {employee.isActive ? "Active" : "Inactive"}
@@ -999,15 +1001,15 @@ export default function EmployeeManagement() {
 
       {/* Edit Employee Dialog */}
       <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-gradient-to-br from-blue-50/30 via-white to-purple-50/30 border-blue-200">
-          <DialogHeader className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200">
-            <DialogTitle className="text-blue-900 font-bold flex items-center gap-2">
+        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+          <DialogHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200 dark:border-blue-800">
+            <DialogTitle className="text-blue-900 dark:text-blue-100 font-bold flex items-center gap-2">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-2">
                 <Edit className="h-5 w-5 text-white" />
               </div>
               Edit Employee
             </DialogTitle>
-            <DialogDescription className="text-blue-700 mt-1">
+            <DialogDescription className="text-blue-700 dark:text-blue-300 mt-1">
               Update employee information.
             </DialogDescription>
           </DialogHeader>
@@ -1023,7 +1025,7 @@ export default function EmployeeManagement() {
                   name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>First Name</FormLabel>
+                      <FormLabel className="text-slate-900 dark:text-slate-100">First Name</FormLabel>
                       <FormControl>
                         <Input placeholder="Enter first name" {...field} />
                       </FormControl>
@@ -1036,7 +1038,7 @@ export default function EmployeeManagement() {
                   name="lastName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Last Name</FormLabel>
+                      <FormLabel className="text-slate-900 dark:text-slate-100">Last Name</FormLabel>
                       <FormControl>
                         <Input placeholder="Enter last name" {...field} />
                       </FormControl>
@@ -1052,7 +1054,7 @@ export default function EmployeeManagement() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-slate-900 dark:text-slate-100">Email</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="Enter email address" {...field} />
                     </FormControl>
@@ -1066,7 +1068,7 @@ export default function EmployeeManagement() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
+                    <FormLabel className="text-slate-900 dark:text-slate-100">Phone Number</FormLabel>
                     <FormControl>
                       <Input type="tel" placeholder="Enter phone number" {...field} />
                     </FormControl>
@@ -1082,7 +1084,7 @@ export default function EmployeeManagement() {
                   name="departmentId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Department</FormLabel>
+                      <FormLabel className="text-slate-900 dark:text-slate-100">Department</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || "none"}>
                         <FormControl>
                           <SelectTrigger>
@@ -1108,7 +1110,7 @@ export default function EmployeeManagement() {
                   name="siteId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Work Site Assignment</FormLabel>
+                      <FormLabel className="text-slate-900 dark:text-slate-100">Work Site Assignment</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || "none"}>
                         <FormControl>
                           <SelectTrigger>
@@ -1117,6 +1119,7 @@ export default function EmployeeManagement() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="none">No Site Assignment</SelectItem>
+                          <SelectItem value="remote">Remote Work Site</SelectItem>
                           {Array.isArray(workSites) && workSites.map((site: any) => (
                             <SelectItem key={site.id} value={site.id.toString()}>
                               {site.name}
@@ -1130,12 +1133,12 @@ export default function EmployeeManagement() {
                 />
               </div>
 
-              <DialogFooter className="bg-white/80 backdrop-blur-sm rounded-lg p-4 -mx-4 -mb-4 border-t border-blue-200 mt-4">
+              <DialogFooter className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mb-4 border-t border-blue-200 dark:border-blue-800 mt-4">
                 <Button 
                   type="button" 
                   variant="outline" 
                   onClick={() => setEditingEmployee(null)}
-                  className="hover:bg-slate-50"
+                  className="hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
                   Cancel
                 </Button>

@@ -38,6 +38,7 @@ interface EmployeeData {
   phone: string;
   siteId: number | null;
   profileImage?: string;
+  isRemote?: boolean;
 }
 
 interface WorkSite {
@@ -47,6 +48,7 @@ interface WorkSite {
   latitude: number;
   longitude: number;
   geofenceRadius: number;
+  isRemote?: boolean;
 }
 
 interface AttendanceRecord {
@@ -147,7 +149,7 @@ export default function EmployeeDashboard() {
     gcTime: 0, // Don't cache the response
   });
 
-  // Get assigned work site
+  // Get assigned work site (always fetch if siteId exists, even for remote employees)
   const { data: workSite, isLoading: siteLoading } = useQuery({
     queryKey: ['/api/employee/site'],
     retry: false,
@@ -370,7 +372,12 @@ export default function EmployeeDashboard() {
   };
 
   const handleCheckIn = () => {
-    if (!isWithinGeofence(currentLocation?.accuracy)) {
+    // For remote employees or remote sites, skip geofence validation - they can check in from anywhere
+    const employeeData = employee as EmployeeData;
+    const site = workSite as WorkSite;
+    const isRemote = employeeData?.isRemote || site?.isRemote;
+    
+    if (!isRemote && !isWithinGeofence(currentLocation?.accuracy)) {
       toast({
         title: 'Location Required',
         description: 'You must be at the work site to check in.',
@@ -590,23 +597,35 @@ export default function EmployeeDashboard() {
                       </div>
                     )}
                     
-                    {currentLocation && workSite && (
+                    {currentLocation && (
                       <div className="space-y-3 bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-blue-200/50 dark:border-blue-700/50">
-                        <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
-                          <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
-                          <Badge 
-                            className={isCurrentlyOnSite() 
-                              ? "bg-gradient-to-r from-green-400 to-green-500 text-white border-0 shadow-sm" 
-                              : "bg-gradient-to-r from-red-400 to-red-500 text-white border-0 shadow-sm"
-                            }
-                          >
-                            {isCurrentlyOnSite() ? 'On Site' : 'Away from Site'}
-                          </Badge>
-                        </div>
+                        {((employee as EmployeeData)?.isRemote || (workSite as WorkSite)?.isRemote) && (
+                          <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3 mb-3">
+                            <div className="flex items-center space-x-2">
+                              <Badge className="bg-blue-500 text-white">Remote Work Site</Badge>
+                              <p className="text-sm text-blue-800 dark:text-blue-200">
+                                You can check in from anywhere. Your location will still be tracked.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {!((employee as EmployeeData)?.isRemote || (workSite as WorkSite)?.isRemote) && workSite && (
+                          <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
+                            <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
+                            <Badge 
+                              className={isCurrentlyOnSite() 
+                                ? "bg-gradient-to-r from-green-400 to-green-500 text-white border-0 shadow-sm" 
+                                : "bg-gradient-to-r from-red-400 to-red-500 text-white border-0 shadow-sm"
+                              }
+                            >
+                              {isCurrentlyOnSite() ? 'On Site' : 'Away from Site'}
+                            </Badge>
+                          </div>
+                        )}
                         <Button 
                           onClick={handleCheckIn}
                           className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-sm"
-                          disabled={!isWithinGeofence(currentLocation?.accuracy) || checkInMutation.isPending}
+                          disabled={(!((employee as EmployeeData)?.isRemote || (workSite as WorkSite)?.isRemote) && !isWithinGeofence(currentLocation?.accuracy)) || checkInMutation.isPending}
                         >
                           {checkInMutation.isPending ? 'Checking In...' : 'Check In'}
                         </Button>
@@ -634,44 +653,60 @@ export default function EmployeeDashboard() {
                 {workSite ? (
                   <div className="space-y-4">
                     <div className="bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-blue-200/50 dark:border-blue-800/50">
-                      <h3 className="font-semibold text-base text-slate-900 dark:text-slate-100 mb-1">{(workSite as WorkSite).name}</h3>
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-semibold text-base text-slate-900 dark:text-slate-100">{(workSite as WorkSite).name}</h3>
+                        {(workSite as WorkSite).isRemote && (
+                          <Badge className="bg-blue-500 text-white">Remote</Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-slate-700 dark:text-slate-300">{(workSite as WorkSite).address}</p>
                     </div>
                     
-                    <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
-                      <span className="font-medium text-slate-700 dark:text-slate-300">Geofence Radius:</span>
-                      <Badge className="bg-gradient-to-r from-blue-400 to-blue-500 text-white border-0 shadow-sm">
-                        {(workSite as WorkSite).geofenceRadius}m
-                      </Badge>
-                    </div>
-                    
-                    {currentLocation && (
-                      <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
-                        <span className="font-medium text-slate-700 dark:text-slate-300">Distance:</span>
-                        <Badge className="bg-gradient-to-r from-purple-400 to-purple-500 text-white border-0 shadow-sm">
-                          {(() => {
-                            const distance = getLatestDistance();
-                            if (distance === Infinity) {
-                              return 'N/A';
-                            }
-                            const isWithinRange = isCurrentlyOnSite();
-                            return `${Math.round(distance)}m${isWithinRange ? ' (Within Range)' : ''}`;
-                          })()}
-                        </Badge>
-                      </div>
+                    {!(workSite as WorkSite).isRemote && (
+                      <>
+                        <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">Geofence Radius:</span>
+                          <Badge className="bg-gradient-to-r from-blue-400 to-blue-500 text-white border-0 shadow-sm">
+                            {(workSite as WorkSite).geofenceRadius}m
+                          </Badge>
+                        </div>
+                        
+                        {currentLocation && (
+                          <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
+                            <span className="font-medium text-slate-700 dark:text-slate-300">Distance:</span>
+                            <Badge className="bg-gradient-to-r from-purple-400 to-purple-500 text-white border-0 shadow-sm">
+                              {(() => {
+                                const distance = getLatestDistance();
+                                if (distance === Infinity) {
+                                  return 'N/A';
+                                }
+                                const isWithinRange = isCurrentlyOnSite();
+                                return `${Math.round(distance)}m${isWithinRange ? ' (Within Range)' : ''}`;
+                              })()}
+                            </Badge>
+                          </div>
+                        )}
+                        
+                        {currentLocation && (
+                          <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
+                            <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
+                            <Badge 
+                              className={isCurrentlyOnSite() 
+                                ? "bg-gradient-to-r from-green-400 to-green-500 text-white border-0 shadow-sm" 
+                                : "bg-gradient-to-r from-red-400 to-red-500 text-white border-0 shadow-sm"
+                              }
+                            >
+                              {isCurrentlyOnSite() ? 'On Site' : 'Away from Site'}
+                            </Badge>
+                          </div>
+                        )}
+                      </>
                     )}
-                    
-                    {currentLocation && (
-                      <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
-                        <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
-                        <Badge 
-                          className={isCurrentlyOnSite() 
-                            ? "bg-gradient-to-r from-green-400 to-green-500 text-white border-0 shadow-sm" 
-                            : "bg-gradient-to-r from-red-400 to-red-500 text-white border-0 shadow-sm"
-                          }
-                        >
-                          {isCurrentlyOnSite() ? 'On Site' : 'Away from Site'}
-                        </Badge>
+                    {(workSite as WorkSite).isRemote && (
+                      <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          This is a remote work site. You can check in and check out from anywhere. Your location will still be tracked for monitoring purposes.
+                        </p>
                       </div>
                     )}
                   </div>

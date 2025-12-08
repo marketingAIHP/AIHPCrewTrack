@@ -19,6 +19,7 @@ import GoogleMap from '@/components/google-map';
 import { loadGoogleMapsAPI } from '@/lib/google-maps';
 import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -42,6 +43,7 @@ const siteSchema = z.object({
   geofenceRadius: z.string().min(1, 'Geofence radius is required'),
   areaId: z.string().optional(),
   siteImage: z.string().optional(),
+  isRemote: z.boolean().optional().default(false),
 });
 
 const areaSchema = z.object({
@@ -103,6 +105,7 @@ export default function SiteManagement() {
       longitude: '',
       geofenceRadius: '200',
       areaId: 'none',
+      isRemote: false,
     },
   });
 
@@ -125,6 +128,7 @@ export default function SiteManagement() {
         geofenceRadius: parseInt(data.geofenceRadius),
         areaId: data.areaId && data.areaId !== 'none' ? parseInt(data.areaId) : null,
         siteImage: siteImageURL || undefined,
+        isRemote: data.isRemote || false,
       };
       
       if (editingSite) {
@@ -339,6 +343,7 @@ export default function SiteManagement() {
       latitude: site.latitude.toString(),
       longitude: site.longitude.toString(),
       geofenceRadius: site.geofenceRadius.toString(),
+      isRemote: site.isRemote || false,
       areaId: site.areaId ? site.areaId.toString() : 'none',
     });
     setSiteImageURL(site.siteImage || '');
@@ -517,9 +522,9 @@ export default function SiteManagement() {
                     Add Site
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-4 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                   <DialogHeader>
-                    <DialogTitle className="text-lg sm:text-xl">{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
+                    <DialogTitle className="text-lg sm:text-xl text-slate-900 dark:text-slate-100">{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <div>
@@ -710,9 +715,9 @@ export default function SiteManagement() {
           <div>
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">{selectedAreaView.name}</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100">{selectedAreaView.name}</h2>
                 {selectedAreaView.description && (
-                  <p className="text-slate-600 mt-2">{selectedAreaView.description}</p>
+                  <p className="text-slate-600 dark:text-slate-300 mt-2">{selectedAreaView.description}</p>
                 )}
               </div>
               <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -729,9 +734,9 @@ export default function SiteManagement() {
                     Add Site
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-4 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                   <DialogHeader>
-                    <DialogTitle className="text-lg sm:text-xl">{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
+                    <DialogTitle className="text-lg sm:text-xl text-slate-900 dark:text-slate-100">{editingSite ? 'Edit Work Site' : 'Add New Work Site'}</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                     <div>
@@ -920,13 +925,13 @@ export default function SiteManagement() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredSites.length === 0 ? (
-                <Card className="col-span-full border-2 border-dashed border-slate-300 dark:border-slate-600">
+                <Card className="col-span-full border-2 border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
                   <CardContent className="p-12 text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
-                      <Building2 className="h-8 w-8 text-blue-600" />
+                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-full flex items-center justify-center">
+                      <Building2 className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-slate-900 mb-2">No sites in this area</h3>
-                    <p className="text-slate-600 mb-4">Get started by adding your first work site</p>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No sites in this area</h3>
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">Get started by adding your first work site</p>
                     <Button onClick={() => setIsDialogOpen(true)} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
                       <Plus className="h-4 w-4 mr-2" />
                       Add First Site
@@ -935,32 +940,49 @@ export default function SiteManagement() {
                 </Card>
               ) : (
                 filteredSites.map((site: any) => (
-                  <Card key={site.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 border-2 border-slate-300 dark:border-slate-600 shadow-md group">
-                    <div className="h-48 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden relative">
+                  <Card key={site.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 border-2 border-slate-300 dark:border-slate-600 shadow-md group bg-white dark:bg-slate-800">
+                    <div className="h-48 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center overflow-hidden relative">
                       <AuthenticatedImage
                         src={site.siteImage}
                         alt={site.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         fallback={
                           <div className="text-center w-full h-full flex flex-col items-center justify-center">
-                            <Building2 className="h-12 w-12 text-slate-400 mb-2" />
-                            <p className="text-sm text-slate-600">Work Site</p>
+                            <Building2 className="h-12 w-12 text-slate-400 dark:text-slate-500 mb-2" />
+                            <p className="text-sm text-slate-600 dark:text-slate-400">Work Site</p>
                           </div>
                         }
                       />
-                      <div className="absolute top-3 right-3">
+                      <div className="absolute top-3 right-3 flex flex-col gap-2">
                         <Badge variant={site.isActive ? "default" : "secondary"} className="shadow-sm">
                           {site.isActive ? 'Active' : 'Inactive'}
                         </Badge>
+                        {site.isRemote && (
+                          <Badge className="bg-blue-500 text-white shadow-sm">
+                            Remote
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <CardContent className="p-6">
                       <div className="mb-4">
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">{site.name}</h3>
-                        <p className="text-slate-600 text-sm flex items-start">
-                          <MapPin className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0 text-slate-400" />
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{site.name}</h3>
+                          {site.isRemote && (
+                            <Badge className="bg-blue-500 text-white text-xs">
+                              Remote
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm flex items-start">
+                          <MapPin className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0 text-slate-400 dark:text-slate-500" />
                           <span className="line-clamp-2">{site.address}</span>
                         </p>
+                        {site.isRemote && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                            Employees can check in from anywhere
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-4 pb-4 border-b-2 border-slate-300 dark:border-slate-600">
                         <span className="flex items-center">
@@ -973,7 +995,7 @@ export default function SiteManagement() {
                         </span>
                       </div>
                       <div className="flex space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEditSite(site)} className="flex-1 hover:bg-blue-50 hover:border-blue-200">
+                        <Button variant="outline" size="sm" onClick={() => handleEditSite(site)} className="flex-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-200 dark:hover:border-blue-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
@@ -981,7 +1003,7 @@ export default function SiteManagement() {
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleDeleteSite(site)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
+                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-700 border-slate-200 dark:border-slate-700"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1009,9 +1031,9 @@ export default function SiteManagement() {
                     Add Area
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                   <DialogHeader>
-                    <DialogTitle>{editingArea ? 'Edit Area' : 'Add New Area'}</DialogTitle>
+                    <DialogTitle className="text-slate-900 dark:text-slate-100">{editingArea ? 'Edit Area' : 'Add New Area'}</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={areaForm.handleSubmit(onAreaSubmit)} className="space-y-6">
                     <div>

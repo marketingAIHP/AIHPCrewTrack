@@ -688,8 +688,9 @@ export class DatabaseStorage implements IStorage {
     const employees = await this.getEmployeesByAdmin(adminId);
     
     // Check for employees who are checked in but out of range
+    // Skip remote employees - they can work from anywhere
     for (const employee of employees) {
-      if (!employee.siteId || !employee.isActive) continue;
+      if (employee.isRemote || !employee.siteId || !employee.isActive) continue;
       
       const currentAttendance = await this.getCurrentAttendance(employee.id);
       if (!currentAttendance || currentAttendance.checkOutTime) continue;
@@ -700,6 +701,9 @@ export class DatabaseStorage implements IStorage {
       
       const site = await this.getWorkSite(employee.siteId);
       if (!site) continue;
+      
+      // Skip geofence alerts for remote work sites - they can work from anywhere
+      if (site.isRemote) continue;
       
       // Check if employee is out of range
       const distance = calculateDistance(
