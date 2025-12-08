@@ -220,6 +220,7 @@ export class DatabaseStorage implements IStorage {
     return db
       .select({
         id: employees.id,
+        employeeId: employees.employeeId,
         firstName: employees.firstName,
         lastName: employees.lastName,
         email: employees.email,
@@ -229,6 +230,7 @@ export class DatabaseStorage implements IStorage {
         departmentId: employees.departmentId,
         profileImage: employees.profileImage,
         isActive: employees.isActive,
+        isRemote: employees.isRemote,
         createdAt: employees.createdAt,
         siteName: workSites.name,
         departmentName: departments.name,

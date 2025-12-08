@@ -31,6 +31,7 @@ interface Employee {
   siteId?: number;
   profileImage?: string;
   isActive: boolean;
+  isRemote?: boolean;
   createdAt: string;
 }
 
