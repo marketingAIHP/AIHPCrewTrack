@@ -637,25 +637,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Employee not found' });
       }
 
-      if (!employee.siteId) {
-        return res.status(400).json({ message: 'No work site assigned for checkout validation.' });
-      }
+      // Skip geofence validation for remote employees
+      let site = null;
+      if (!employee.isRemote && employee.siteId) {
+        site = await storage.getWorkSite(employee.siteId);
+        if (!site) {
+          return res.status(404).json({ message: 'Assigned work site not found' });
+        }
 
-      const site = await storage.getWorkSite(employee.siteId);
-      if (!site) {
-        return res.status(404).json({ message: 'Assigned work site not found' });
-      }
+        const geofenceCheck = isWithinGeofence(
+          latNum,
+          lonNum,
+          site.latitude,
+          site.longitude,
+          site.geofenceRadius
+        );
 
-      const geofenceCheck = isWithinGeofence(
-        latNum,
-        lonNum,
-        site.latitude,
-        site.longitude,
-        site.geofenceRadius
-      );
-
-      if (!geofenceCheck.isWithin) {
-        return res.status(403).json({ message: 'You must be within the work site geofence to check out.' });
+        if (!geofenceCheck.isWithin) {
+          return res.status(403).json({ message: 'You must be within the work site geofence to check out.' });
+        }
       }
 
       // Get current attendance
@@ -1794,7 +1794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employee = await storage.updateEmployee(id, {
         ...validatedData,
         ...(hashedPassword && { password: hashedPassword }),
-        ...(processedData.siteId !== undefined && { isRemote }),
+        isRemote: isRemote, // Always include isRemote if it was provided
       });
       const { password, ...employeeData } = employee;
       res.json(employeeData);

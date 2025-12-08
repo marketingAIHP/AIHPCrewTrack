@@ -16,7 +16,7 @@ import { getAuthToken } from '@/lib/auth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiRequest } from '@/lib/queryClient';
 // Supabase Storage upload - using direct FormData instead of Uppy
 
@@ -154,16 +154,34 @@ export default function EmployeeManagement() {
     },
   });
 
+  // Watch isRemote field and clear siteId when remote is enabled for edit form
+  const isRemoteValue = editEmployeeForm.watch('isRemote');
+  useEffect(() => {
+    if (isRemoteValue) {
+      editEmployeeForm.setValue('siteId', 'none');
+    }
+  }, [isRemoteValue, editEmployeeForm]);
+
+  // Watch isRemote field and clear siteId when remote is enabled for create form
+  const createIsRemoteValue = createEmployeeForm.watch('isRemote');
+  useEffect(() => {
+    if (createIsRemoteValue) {
+      createEmployeeForm.setValue('siteId', 'none');
+    }
+  }, [createIsRemoteValue, createEmployeeForm]);
+
   // Mutations
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createEmployeeSchema>) => {
+      const isRemote = data.isRemote || false;
       const payload = {
         ...data,
         departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : null,
-        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
+        // If remote is enabled, set siteId to null; otherwise, use the provided siteId
+        siteId: isRemote ? null : (data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null),
         phone: data.phone || undefined,
         employeeId: data.employeeId || undefined,
-        isRemote: data.isRemote || false,
+        isRemote: isRemote,
       };
       // Sending employee creation request
       return await apiRequest('POST', '/api/admin/employees', payload);
@@ -188,24 +206,30 @@ export default function EmployeeManagement() {
 
   const updateEmployeeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof editEmployeeSchema> }) => {
+      const isRemote = data.isRemote || false;
       const payload = {
         ...data,
         departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : null,
-        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
+        // If remote is enabled, set siteId to null; otherwise, use the provided siteId
+        siteId: isRemote ? null : (data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null),
         phone: data.phone || undefined,
-        isRemote: data.isRemote || false,
+        isRemote: isRemote,
       };
       // Sending employee update request
       return await apiRequest('PUT', `/api/admin/employees/${id}`, payload);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Employee Updated",
         description: "Employee information has been updated successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
-      setEditingEmployee(null);
-      editEmployeeForm.reset();
+      // Don't reset form immediately - let the query invalidation update the data
+      // This ensures the UI reflects the correct state
+      setTimeout(() => {
+        setEditingEmployee(null);
+        editEmployeeForm.reset();
+      }, 100);
     },
     onError: (error: any) => {
       toast({
@@ -736,9 +760,13 @@ export default function EmployeeManagement() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-slate-900 dark:text-slate-100">Work Site Assignment</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || "none"}
+                            disabled={createIsRemoteValue}
+                          >
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className={createIsRemoteValue ? "opacity-50 cursor-not-allowed" : ""}>
                                 <SelectValue placeholder="Select work site" />
                               </SelectTrigger>
                             </FormControl>
@@ -757,11 +785,41 @@ export default function EmployeeManagement() {
                               )}
                             </SelectContent>
                           </Select>
+                          {createIsRemoteValue && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              Site assignment is disabled for remote employees
+                            </p>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
+
+                  {/* Remote Work Toggle */}
+                  <FormField
+                    control={createEmployeeForm.control}
+                    name="isRemote"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50">
+                        <div className="space-y-0.5 flex-1 pr-2">
+                          <FormLabel className="text-sm sm:text-base text-slate-900 dark:text-slate-100">
+                            Remote Work
+                          </FormLabel>
+                          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                            Allow this employee to check in from anywhere
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="flex-shrink-0"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
                   <DialogFooter className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 rounded-lg p-3 sm:p-4 -mx-4 -mb-4 border-t border-green-200 dark:border-green-800 mt-4 flex-col sm:flex-row gap-2 sm:gap-0">
                     <Button 
@@ -1110,9 +1168,13 @@ export default function EmployeeManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-slate-900 dark:text-slate-100">Work Site Assignment</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || "none"}>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value || "none"}
+                        disabled={isRemoteValue}
+                      >
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className={isRemoteValue ? "opacity-50 cursor-not-allowed" : ""}>
                             <SelectValue placeholder="Select work site" />
                           </SelectTrigger>
                         </FormControl>
@@ -1125,6 +1187,11 @@ export default function EmployeeManagement() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {isRemoteValue && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Site assignment is disabled for remote employees
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
