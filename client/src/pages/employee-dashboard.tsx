@@ -206,16 +206,6 @@ export default function EmployeeDashboard() {
     const effectiveRadius = site.geofenceRadius + dynamicBuffer;
     const isWithin = distance <= effectiveRadius;
     
-    // FIX: Log distance calculation for debugging
-      employeeLocation: { lat: empLat.toFixed(6), lng: empLng.toFixed(6) },
-      siteLocation: { lat: siteLat.toFixed(6), lng: siteLng.toFixed(6) },
-      distance: Math.round(distance),
-      geofenceRadius: site.geofenceRadius,
-      buffer: Math.round(dynamicBuffer),
-      effectiveRadius: Math.round(effectiveRadius),
-      isWithin: isWithin ? '✅ You are within site range' : `❌ You are ${Math.round(distance)}m away from site`
-    });
-    
     return {
       isWithin: isWithin,
       distance: Math.round(distance),
