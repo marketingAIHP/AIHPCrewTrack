@@ -61,10 +61,15 @@ export default function OnSiteNow() {
     return site?.name || 'Unknown Site';
   };
 
-  // Filter for employees currently on site (within geofence)
-  const onSiteEmployees = locations?.filter((item: any) => 
-    (item.location?.isWithinGeofence ?? item.location?.isOnSite ?? false) && item.employee?.isActive
-  ) || [];
+  // Filter for employees currently on site (within geofence or remote employees)
+  const onSiteEmployees = locations?.filter((item: any) => {
+    // Include remote employees (they can work from anywhere)
+    if (item.employee?.isRemote) {
+      return item.employee?.isActive;
+    }
+    // Include regular employees who are within geofence
+    return (item.location?.isWithinGeofence ?? item.location?.isOnSite ?? false) && item.employee?.isActive;
+  }) || [];
 
   if (locationsLoading) {
     return (
@@ -157,11 +162,18 @@ export default function OnSiteNow() {
                       </Link>
                       <p className="text-gray-600 dark:text-slate-400">{item.employee.email}</p>
                       <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-slate-400 mt-1">
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          <span>{getSiteName(item.employee.siteId)}</span>
-                        </div>
-                        {item.location && (
+                        {item.employee.isRemote ? (
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-1" />
+                            <span>Remote Work</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-1" />
+                            <span>{getSiteName(item.employee.siteId)}</span>
+                          </div>
+                        )}
+                        {item.location && item.location.id !== 0 && (
                           <div className="flex items-center">
                             <Clock className="h-4 w-4 mr-1" />
                             <span>Last update: {new Date(item.location.timestamp).toLocaleTimeString()}</span>
@@ -172,11 +184,14 @@ export default function OnSiteNow() {
                   </div>
                   
                   <div className="text-right space-y-2">
-                    <Badge className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50">
+                    <Badge className={item.employee.isRemote 
+                      ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50"
+                      : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50"
+                    }>
                       <User className="h-3 w-3 mr-1" />
-                      On Site
+                      {item.employee.isRemote ? 'Remote' : 'On Site'}
                     </Badge>
-                    {item.location && (
+                    {item.location && item.location.id !== 0 && (
                       <div className="text-sm text-gray-500 dark:text-slate-400 space-y-1">
                         <div>Lat: {parseFloat(item.location.latitude).toFixed(4)}</div>
                         <div>Lng: {parseFloat(item.location.longitude).toFixed(4)}</div>
@@ -189,6 +204,11 @@ export default function OnSiteNow() {
                               : ''}
                           </div>
                         )}
+                      </div>
+                    )}
+                    {item.employee.isRemote && (!item.location || item.location.id === 0) && (
+                      <div className="text-sm text-gray-500 dark:text-slate-400">
+                        Waiting for location update...
                       </div>
                     )}
                     <div className="space-x-2">

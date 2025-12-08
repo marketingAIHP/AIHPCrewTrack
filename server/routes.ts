@@ -2190,6 +2190,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               isEmployeeWithinGeofence = true;
               distanceFromSite = null; // No distance calculation for remote employees
               geofenceRadius = null;
+              
+              // For remote employees, always return a location object (even if no actual location data)
+              // This ensures they appear in the "on site" list
+              return {
+                employee: {
+                  ...employee,
+                  isCheckedIn: true,
+                  isActive: true,
+                  isRemote: true
+                },
+                location: location ? {
+                  ...location,
+                  isWithinGeofence: true,
+                  distanceFromSite: null,
+                  geofenceRadius: null,
+                  isOnSite: true
+                } : {
+                  // Return a placeholder location object for remote employees without location data
+                  id: 0,
+                  employeeId: employee.id,
+                  latitude: '0',
+                  longitude: '0',
+                  timestamp: new Date().toISOString(),
+                  isWithinGeofence: true,
+                  isOnSite: true,
+                  distanceFromSite: null,
+                  geofenceRadius: null
+                },
+              };
             } else if (location && assignedSite) {
               const geofenceCheck = isWithinGeofence(
                 location.latitude,

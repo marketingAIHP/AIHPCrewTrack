@@ -196,9 +196,16 @@ export default function LiveTracking() {
     }
   });
 
-  const isLocationOnSite = (location: any) => location?.isOnSite ?? location?.isWithinGeofence ?? false;
+  const isLocationOnSite = (location: any, employee: any) => {
+    // Remote employees are always considered "on site"
+    if (employee?.isRemote) return true;
+    return location?.isOnSite ?? location?.isWithinGeofence ?? false;
+  };
 
   const getStatusColor = (employee: any, location: any) => {
+    // Remote employees always show as purple (on site)
+    if (employee?.isRemote) return 'bg-purple-500';
+    
     if (!location) return 'bg-gray-500';
     
     // Check if employee has a siteId (assigned site) - handle both camelCase and snake_case
@@ -211,15 +218,39 @@ export default function LiveTracking() {
     if (!assignedSite) return 'bg-gray-500';
     
     // Check if location is within the geofence using isWithinGeofence from server
-    if (isLocationOnSite(location)) {
+    if (isLocationOnSite(location, employee)) {
       return 'bg-green-500';
     }
     
     return 'bg-red-500';
   };
 
+  const getStatusColorHex = (employee: any, location: any) => {
+    // Remote employees always show as purple
+    if (employee?.isRemote) return '#9333ea';
+    
+    if (!location) return '#6b7280';
+    
+    const siteId = employee.siteId || employee.site_id;
+    if (!siteId) return '#6b7280';
+    
+    const assignedSite = Array.isArray(sites) ? sites.find((site: any) => site.id === siteId) : null;
+    if (!assignedSite) return '#6b7280';
+    
+    if (isLocationOnSite(location, employee)) {
+      return '#22c55e';
+    }
+    
+    return '#ef4444';
+  };
+
   const getStatusText = (employee: any, location: any) => {
-    if (!location) return 'No Location';
+    // Remote employees
+    if (employee?.isRemote) {
+      return 'Remote Work';
+    }
+    
+    if (!location || location.id === 0) return 'No Location';
     
     // Check if employee has a siteId (assigned site) - handle both camelCase and snake_case
     const siteId = employee.siteId || employee.site_id;
@@ -235,7 +266,7 @@ export default function LiveTracking() {
     }
     
     // Use server-calculated isWithinGeofence status
-    if (isLocationOnSite(location)) {
+    if (isLocationOnSite(location, employee)) {
       return `On Site: ${assignedSite.name}`;
     }
     
@@ -374,15 +405,25 @@ export default function LiveTracking() {
         });
       } else {
         locations.forEach((item: any) => {
-          if (item.location?.latitude && item.location?.longitude) {
+          // For remote employees, show marker even if location is placeholder (id === 0)
+          const hasValidLocation = item.location?.latitude && item.location?.longitude && item.location.id !== 0;
+          const isRemote = item.employee?.isRemote;
+          
+          if (hasValidLocation || isRemote) {
+            // For remote employees without location, use last known location or skip marker
+            if (isRemote && (!item.location || item.location.id === 0)) {
+              // Skip marker for remote employees without location data
+              return;
+            }
+            
             const lat = parseFloat(item.location.latitude);
             const lng = parseFloat(item.location.longitude);
             
             if (!isNaN(lat) && !isNaN(lng)) {
               markers.push({
                 position: { lat, lng },
-                title: `${item.employee.firstName} ${item.employee.lastName}`,
-                color: '#ff0000',
+                title: `${item.employee.firstName} ${item.employee.lastName}${isRemote ? ' (Remote)' : ''}`,
+                color: getStatusColorHex(item.employee, item.location),
                 type: 'employee',
                 onClick: () => zoomToLocation(lat, lng),
               });
@@ -485,7 +526,7 @@ export default function LiveTracking() {
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
                 {Array.isArray(locations) ? 
-                  locations.filter((item: any) => isLocationOnSite(item.location)).length : 0
+                  locations.filter((item: any) => isLocationOnSite(item.location, item.employee)).length : 0
                 }
               </div>
               <p className="text-xs text-muted-foreground">within boundaries</p>
@@ -500,7 +541,7 @@ export default function LiveTracking() {
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
                 {Array.isArray(locations) ? 
-                  locations.filter((item: any) => item.location && !isLocationOnSite(item.location)).length : 0
+                  locations.filter((item: any) => item.location && !isLocationOnSite(item.location, item.employee)).length : 0
                 }
               </div>
               <p className="text-xs text-muted-foreground">need attention</p>
