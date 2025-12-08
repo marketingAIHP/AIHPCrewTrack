@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { getInitialLocation } from '@/utils/getLocation';
 
 interface GeolocationState {
   latitude: number | null;
@@ -99,16 +100,45 @@ export function useOptimizedGeolocation(options: UseOptimizedGeolocationOptions 
     }
   }, [throttleMs]);
 
+  // Get initial location quickly with IP fallback (non-blocking)
+  useEffect(() => {
+    let cancelled = false;
+
+    // Try to get initial location quickly
+    getInitialLocation()
+      .then((location) => {
+        if (!cancelled) {
+          console.log('🚀 Initial location fetched:', location);
+          setState((prev) => ({
+            ...prev,
+            latitude: location.lat,
+            longitude: location.lon,
+            accuracy: location.accuracy ?? null,
+            error: null,
+            loading: false,
+            timestamp: location.timestamp,
+          }));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn('⚠️ Initial location fetch failed, will use watchPosition:', error);
+          // Don't set error here, let watchPosition handle it
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (!navigator.geolocation) {
-      setState({
-        latitude: null,
-        longitude: null,
-        accuracy: null,
+      setState((prev) => ({
+        ...prev,
         error: 'Geolocation is not supported by this browser.',
         loading: false,
-        timestamp: null,
-      });
+      }));
       return;
     }
 
@@ -171,7 +201,7 @@ export function useOptimizedGeolocation(options: UseOptimizedGeolocationOptions 
 
     const geoOptions: PositionOptions = {
       enableHighAccuracy,
-      timeout,
+      timeout: Math.min(timeout, 5000), // Reduced timeout for faster response (max 5s)
       maximumAge,
     };
 
