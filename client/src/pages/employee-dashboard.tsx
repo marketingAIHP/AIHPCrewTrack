@@ -599,36 +599,48 @@ export default function EmployeeDashboard() {
                     
                     {currentLocation && (
                       <div className="space-y-3 bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 border border-blue-200/50 dark:border-blue-700/50">
-                        {((employee as EmployeeData)?.isRemote || (workSite as WorkSite)?.isRemote) && (
-                          <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3 mb-3">
-                            <div className="flex items-center space-x-2">
-                              <Badge className="bg-blue-500 text-white">Remote Work Site</Badge>
-                              <p className="text-sm text-blue-800 dark:text-blue-200">
-                                You can check in from anywhere. Your location will still be tracked.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                        {!((employee as EmployeeData)?.isRemote || (workSite as WorkSite)?.isRemote) && workSite && (
-                          <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
-                            <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
-                            <Badge 
-                              className={isCurrentlyOnSite() 
-                                ? "bg-gradient-to-r from-green-400 to-green-500 text-white border-0 shadow-sm" 
-                                : "bg-gradient-to-r from-red-400 to-red-500 text-white border-0 shadow-sm"
-                              }
-                            >
-                              {isCurrentlyOnSite() ? 'On Site' : 'Away from Site'}
-                            </Badge>
-                          </div>
-                        )}
-                        <Button 
-                          onClick={handleCheckIn}
-                          className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-sm"
-                          disabled={(!((employee as EmployeeData)?.isRemote || (workSite as WorkSite)?.isRemote) && !isWithinGeofence(currentLocation?.accuracy)) || checkInMutation.isPending}
-                        >
-                          {checkInMutation.isPending ? 'Checking In...' : 'Check In'}
-                        </Button>
+                        {(() => {
+                          const employeeData = employee as EmployeeData;
+                          const site = workSite as WorkSite;
+                          const isRemote = employeeData?.isRemote || site?.isRemote;
+                          const isWithinRange = isWithinGeofence(currentLocation?.accuracy);
+                          const shouldDisable = !isRemote && !isWithinRange;
+                          
+                          return (
+                            <>
+                              {isRemote && (
+                                <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3 mb-3">
+                                  <div className="flex items-center space-x-2">
+                                    <Badge className="bg-blue-500 text-white">Remote Work Site</Badge>
+                                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                                      You can check in from anywhere. Your location will still be tracked.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              {!isRemote && workSite && (
+                                <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
+                                  <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>
+                                  <Badge 
+                                    className={isCurrentlyOnSite() 
+                                      ? "bg-gradient-to-r from-green-400 to-green-500 text-white border-0 shadow-sm" 
+                                      : "bg-gradient-to-r from-red-400 to-red-500 text-white border-0 shadow-sm"
+                                    }
+                                  >
+                                    {isCurrentlyOnSite() ? 'On Site' : 'Away from Site'}
+                                  </Badge>
+                                </div>
+                              )}
+                              <Button 
+                                onClick={handleCheckIn}
+                                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={shouldDisable || checkInMutation.isPending}
+                              >
+                                {checkInMutation.isPending ? 'Checking In...' : 'Check In'}
+                              </Button>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

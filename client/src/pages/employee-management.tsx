@@ -155,7 +155,8 @@ export default function EmployeeManagement() {
       const payload = {
         ...data,
         departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : null,
-        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
+        // Keep "remote" as string so backend can detect it and set isRemote = true
+        siteId: data.siteId === 'remote' ? 'remote' : (data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null),
         phone: data.phone || undefined,
         employeeId: data.employeeId || undefined,
       };
@@ -185,7 +186,8 @@ export default function EmployeeManagement() {
       const payload = {
         ...data,
         departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : null,
-        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
+        // Keep "remote" as string so backend can detect it and set isRemote = true
+        siteId: data.siteId === 'remote' ? 'remote' : (data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null),
         phone: data.phone || undefined,
       };
       // Sending employee update request

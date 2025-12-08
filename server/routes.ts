@@ -479,19 +479,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Employee not found' });
       }
 
-      // Check if employee has a work site assigned
-      if (!employee.siteId) {
+      // For remote employees, allow check-in without a siteId
+      // For non-remote employees, require a siteId
+      if (!employee.isRemote && !employee.siteId) {
         return res.status(400).json({ message: 'No work site assigned' });
       }
 
-      const site = await storage.getWorkSite(employee.siteId);
-      if (!site) {
-        return res.status(400).json({ message: 'Work site not found' });
+      // Get site if employee has one assigned (may be null for remote employees)
+      let site = null;
+      if (employee.siteId) {
+        site = await storage.getWorkSite(employee.siteId);
+        if (!site) {
+          return res.status(400).json({ message: 'Work site not found' });
+        }
       }
 
       // For remote employees or remote sites, skip geofence validation - they can check in from anywhere
       // But still track their location for live tracking
-      const isRemote = employee.isRemote || site.isRemote;
+      const isRemote = employee.isRemote || (site?.isRemote ?? false);
       
       if (!isRemote) {
         // FIX: Check if employee is within geofence with GPS accuracy buffer
@@ -519,7 +524,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // Remote work site - log that geofence check is skipped
-        console.log(`✅ Remote check-in allowed: Employee ${employee.firstName} ${employee.lastName} can check in from anywhere (Remote: ${employee.isRemote ? 'employee' : 'site'} - ${site.name})`);
+        const remoteType = employee.isRemote ? 'employee' : 'site';
+        const siteName = site?.name || 'Remote Work Site';
+        console.log(`✅ Remote check-in allowed: Employee ${employee.firstName} ${employee.lastName} can check in from anywhere (Remote: ${remoteType} - ${siteName})`);
       }
 
       // Check if already checked in
@@ -541,9 +548,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // FIX: Create attendance record with parsed numeric coordinates
+      // For remote employees without a siteId, we need to get or create a default remote site
+      // Since attendance table requires siteId, we'll use the employee's siteId if available
+      // For remote employees, we should create a default "Remote Work Site" or make siteId nullable
+      // For now, if siteId is null and employee is remote, we'll need to handle this
+      // Check if we need to create a default remote site for this admin
+      let finalSiteId = employee.siteId;
+      if (!finalSiteId && employee.isRemote) {
+        // For remote employees without a siteId, try to find or create a default remote site
+        // Get all sites for this admin and find a remote one, or use the first site as fallback
+        const adminSites = await storage.getWorkSitesByAdmin(employee.adminId);
+        const remoteSite = adminSites.find(s => s.isRemote);
+        if (remoteSite) {
+          finalSiteId = remoteSite.id;
+        } else if (adminSites.length > 0) {
+          // Fallback to first site if no remote site exists
+          finalSiteId = adminSites[0].id;
+        } else {
+          // If no sites exist, we can't create attendance - this shouldn't happen
+          return res.status(400).json({ message: 'No work sites available for remote check-in. Please contact administrator.' });
+        }
+      }
+      
+      if (!finalSiteId) {
+        return res.status(400).json({ message: 'No work site assigned' });
+      }
+
       const attendance = await storage.createAttendance({
         employeeId,
-        siteId: employee.siteId,
+        siteId: finalSiteId,
         checkInLatitude: empLat.toString(), // Store as string in DB
         checkInLongitude: empLon.toString(), // Store as string in DB
       });
@@ -558,9 +591,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send real-time notification to admin
       // IMPORTANT: Always send check-in notification with type 'employee_checkin'
+      // Get the final site for notification (may be different from employee.siteId for remote employees)
+      const finalSite = site || await storage.getWorkSite(finalSiteId);
+      const siteName = finalSite?.name || 'Remote Work Site';
+      const siteAddress = finalSite?.address || 'Remote Location';
+      
       const checkInNotification = {
         type: 'employee_checkin' as const,
-        message: `${employee.firstName} ${employee.lastName} checked in at ${site.name}`,
+        message: `${employee.firstName} ${employee.lastName} checked in${employee.isRemote ? ' (Remote)' : ` at ${siteName}`}`,
         employee: {
           id: employee.id,
           name: `${employee.firstName} ${employee.lastName}`,
@@ -569,9 +607,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: employee.lastName
         },
         site: {
-          id: site.id,
-          name: site.name,
-          address: site.address
+          id: finalSiteId,
+          name: siteName,
+          address: siteAddress
         },
         timestamp: new Date().toISOString(),
         location: { latitude, longitude }
