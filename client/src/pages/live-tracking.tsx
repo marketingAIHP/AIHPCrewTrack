@@ -43,23 +43,31 @@ export default function LiveTracking() {
   const zoomedSiteIdRef = useRef<number | null>(null);
   const zoomedEmployeeIdRef = useRef<number | null>(null);
 
+  // Check authentication on every render - this page is admin-only
+  const token = getAuthToken();
+  const userType = getUserType();
+  
+  // Immediately redirect if not admin - don't render anything
+  React.useEffect(() => {
+    if (!token || userType !== 'admin') {
+      toast({
+        title: 'Unauthorized',
+        description: 'This page is only accessible to administrators.',
+        variant: 'destructive',
+      });
+      setLocation('/admin/login');
+    }
+  }, [token, userType, setLocation, toast]);
+
+  // Don't render anything if user is not an admin
+  if (!token || userType !== 'admin') {
+    return null;
+  }
+
   // Initialize component only once
   React.useEffect(() => {
     if (initializeCalledRef.current) return;
     initializeCalledRef.current = true;
-
-    const token = getAuthToken();
-    const userType = getUserType();
-    
-    if (!token || userType !== 'admin') {
-      toast({
-        title: 'Unauthorized',
-        description: 'Please log in as an admin to access this page.',
-        variant: 'destructive',
-      });
-      setLocation('/admin/login');
-      return;
-    }
 
     // Load Google Maps API
     loadGoogleMapsAPI()
