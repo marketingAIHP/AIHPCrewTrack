@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Users, Plus, MapPin, Clock, Edit, Trash2, Camera, Upload, X, Eye, EyeOff } from 'lucide-react';
 import { AuthenticatedImage } from '@/components/AuthenticatedImage';
@@ -52,6 +53,7 @@ const createEmployeeSchema = z.object({
       "Password must contain letters, numbers, and special characters"),
   departmentId: z.string().optional(),
   siteId: z.string().optional(),
+  isRemote: z.boolean().optional(),
 });
 
 const editEmployeeSchema = z.object({
@@ -61,6 +63,7 @@ const editEmployeeSchema = z.object({
   phone: z.string().optional(),
   departmentId: z.string().optional(),
   siteId: z.string().optional(),
+  isRemote: z.boolean().optional(),
 });
 
 const createDepartmentSchema = z.object({
@@ -126,6 +129,7 @@ export default function EmployeeManagement() {
       password: '',
       departmentId: 'none',
       siteId: 'none',
+      isRemote: false,
     },
   });
 
@@ -138,6 +142,7 @@ export default function EmployeeManagement() {
       phone: '',
       departmentId: 'none',
       siteId: 'none',
+      isRemote: false,
     },
   });
 
@@ -155,10 +160,10 @@ export default function EmployeeManagement() {
       const payload = {
         ...data,
         departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : null,
-        // Keep "remote" as string so backend can detect it and set isRemote = true
-        siteId: data.siteId === 'remote' ? 'remote' : (data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null),
+        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
         phone: data.phone || undefined,
         employeeId: data.employeeId || undefined,
+        isRemote: data.isRemote || false,
       };
       // Sending employee creation request
       return await apiRequest('POST', '/api/admin/employees', payload);
@@ -186,9 +191,9 @@ export default function EmployeeManagement() {
       const payload = {
         ...data,
         departmentId: data.departmentId && data.departmentId !== 'none' ? parseInt(data.departmentId) : null,
-        // Keep "remote" as string so backend can detect it and set isRemote = true
-        siteId: data.siteId === 'remote' ? 'remote' : (data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null),
+        siteId: data.siteId && data.siteId !== 'none' ? parseInt(data.siteId) : null,
         phone: data.phone || undefined,
+        isRemote: data.isRemote || false,
       };
       // Sending employee update request
       return await apiRequest('PUT', `/api/admin/employees/${id}`, payload);
@@ -234,7 +239,6 @@ export default function EmployeeManagement() {
         
         return await response.json();
       } catch (error: any) {
-        console.error('Delete employee error:', error);
         throw error;
       }
     },
@@ -246,7 +250,6 @@ export default function EmployeeManagement() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/employees'] });
     },
     onError: (error: any) => {
-      console.error('Delete employee mutation error:', error);
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete employee.",
@@ -353,7 +356,6 @@ export default function EmployeeManagement() {
       
       if (!response.ok) {
         const text = await response.text();
-        console.error('Get upload params failed:', response.status, text);
         let errorData: any = { message: 'Failed to get upload parameters' };
         try { errorData = JSON.parse(text); } catch {}
         throw new Error(errorData.message || 'Failed to get upload parameters');
@@ -375,7 +377,6 @@ export default function EmployeeManagement() {
         }
       };
     } catch (error) {
-      console.error('Upload parameters error:', error);
       throw error;
     }
   };
@@ -397,7 +398,6 @@ export default function EmployeeManagement() {
           imageURL 
         });
       } else {
-        console.error('❌ No upload URL found in result:', uploadedFile);
         toast({
           title: "Upload Error",
           description: "Image uploaded but URL not found. Please try again.",
@@ -405,7 +405,6 @@ export default function EmployeeManagement() {
         });
       }
     } else {
-      console.error('Upload failed or no employee selected:', { result, imageDialogEmployee });
       toast({
         title: "Upload Failed",
         description: "Image upload was not successful. Please try again.",
@@ -446,7 +445,6 @@ export default function EmployeeManagement() {
         throw new Error('No profile image URL returned from upload');
       }
     } catch (error: any) {
-      console.error('❌ Upload error:', error);
       toast({
         title: "Upload Failed",
         description: error.message || "Failed to upload image. Please try again.",
@@ -474,8 +472,8 @@ export default function EmployeeManagement() {
     editEmployeeForm.setValue('email', employee.email);
     editEmployeeForm.setValue('phone', employee.phone || '');
     editEmployeeForm.setValue('departmentId', employee.departmentId?.toString() || 'none');
-    // Set siteId to 'remote' if employee is remote, otherwise use siteId or 'none'
-    editEmployeeForm.setValue('siteId', employee.isRemote ? 'remote' : (employee.siteId?.toString() || 'none'));
+    editEmployeeForm.setValue('siteId', employee.siteId?.toString() || 'none');
+    editEmployeeForm.setValue('isRemote', employee.isRemote || false);
   };
 
   if (employeesLoading || departmentsLoading) {
@@ -560,7 +558,7 @@ export default function EmployeeManagement() {
                       </FormItem>
                     )}
                   />
-                  <DialogFooter className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mb-4 border-t border-blue-200 dark:border-blue-800 mt-4">
+                  <DialogFooter className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-3 sm:p-4 -mx-4 -mb-4 border-t border-blue-200 dark:border-blue-800 mt-4 flex-col sm:flex-row gap-2 sm:gap-0">
                     <Button 
                       type="submit" 
                       disabled={createDepartmentMutation.isPending}
@@ -585,20 +583,20 @@ export default function EmployeeManagement() {
                 Add Employee
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-              <DialogHeader className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-green-200 dark:border-green-800">
-                <DialogTitle className="text-green-900 dark:text-green-100 font-bold flex items-center gap-2">
+            <DialogContent className="w-[95vw] sm:w-full sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 mx-2 sm:mx-auto">
+              <DialogHeader className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 rounded-lg p-3 sm:p-4 -mx-4 -mt-4 mb-3 sm:mb-4 border-b border-green-200 dark:border-green-800">
+                <DialogTitle className="text-green-900 dark:text-green-100 font-bold flex items-center gap-2 text-sm sm:text-base">
                   <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-2">
-                    <Plus className="h-5 w-5 text-white" />
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
                   Create New Employee
                 </DialogTitle>
-                <DialogDescription className="text-green-700 dark:text-green-300 mt-1">
+                <DialogDescription className="text-green-700 dark:text-green-300 mt-1 text-xs sm:text-sm">
                   Add a new employee to your workforce.
                 </DialogDescription>
               </DialogHeader>
               <Form {...createEmployeeForm}>
-                <form onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))} className="space-y-6">
+                <form onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))} className="space-y-4 sm:space-y-6 px-1 sm:px-0">
                   
                   {/* Employee ID */}
                   <FormField
@@ -705,7 +703,7 @@ export default function EmployeeManagement() {
                   />
 
                   {/* Assignment Fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <FormField
                       control={createEmployeeForm.control}
                       name="departmentId"
@@ -746,7 +744,6 @@ export default function EmployeeManagement() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="none">No Site Assignment</SelectItem>
-                              <SelectItem value="remote">Remote Work Site</SelectItem>
                               {Array.isArray(workSites) && workSites.length > 0 ? (
                                 workSites.map((site: any) => (
                                   <SelectItem key={site.id} value={site.id.toString()}>
@@ -766,7 +763,7 @@ export default function EmployeeManagement() {
                     />
                   </div>
 
-                  <DialogFooter className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 rounded-lg p-4 -mx-4 -mb-4 border-t border-green-200 dark:border-green-800 mt-4">
+                  <DialogFooter className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 rounded-lg p-3 sm:p-4 -mx-4 -mb-4 border-t border-green-200 dark:border-green-800 mt-4 flex-col sm:flex-row gap-2 sm:gap-0">
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -774,14 +771,14 @@ export default function EmployeeManagement() {
                         setIsCreateEmployeeOpen(false);
                         createEmployeeForm.reset();
                       }}
-                      className="hover:bg-slate-50 dark:hover:bg-slate-700"
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700 w-full sm:w-auto"
                     >
                       Cancel
                     </Button>
                     <Button 
                       type="submit" 
                       disabled={createEmployeeMutation.isPending}
-                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-md"
+                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-md w-full sm:w-auto"
                     >
                       {createEmployeeMutation.isPending ? 'Creating...' : 'Create Employee'}
                     </Button>
@@ -853,15 +850,15 @@ export default function EmployeeManagement() {
                           <Camera className="h-3.5 w-3.5 text-white" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                        <DialogHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200 dark:border-blue-800">
-                          <DialogTitle className="text-blue-900 dark:text-blue-100 font-bold flex items-center gap-2">
+                      <DialogContent className="w-[95vw] sm:w-full sm:max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 mx-2 sm:mx-auto">
+                        <DialogHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-3 sm:p-4 -mx-4 -mt-4 mb-3 sm:mb-4 border-b border-blue-200 dark:border-blue-800">
+                          <DialogTitle className="text-blue-900 dark:text-blue-100 font-bold flex items-center gap-2 text-sm sm:text-base">
                             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-2">
-                              <Camera className="h-5 w-5 text-white" />
+                              <Camera className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                             </div>
                             Employee Profile Image
                           </DialogTitle>
-                          <DialogDescription className="text-blue-700 dark:text-blue-300 mt-1">
+                          <DialogDescription className="text-blue-700 dark:text-blue-300 mt-1 text-xs sm:text-sm">
                             Upload a new profile image for {employee.firstName} {employee.lastName} or remove the current one.
                           </DialogDescription>
                         </DialogHeader>
@@ -1003,25 +1000,25 @@ export default function EmployeeManagement() {
 
       {/* Edit Employee Dialog */}
       <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-          <DialogHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mt-4 mb-4 border-b border-blue-200 dark:border-blue-800">
-            <DialogTitle className="text-blue-900 dark:text-blue-100 font-bold flex items-center gap-2">
+        <DialogContent className="w-[95vw] sm:w-full sm:max-w-2xl max-h-[95vh] overflow-y-auto bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 mx-2 sm:mx-auto">
+          <DialogHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-3 sm:p-4 -mx-4 -mt-4 mb-3 sm:mb-4 border-b border-blue-200 dark:border-blue-800">
+            <DialogTitle className="text-blue-900 dark:text-blue-100 font-bold flex items-center gap-2 text-sm sm:text-base">
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-2">
-                <Edit className="h-5 w-5 text-white" />
+                <Edit className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
               Edit Employee
             </DialogTitle>
-            <DialogDescription className="text-blue-700 dark:text-blue-300 mt-1">
+            <DialogDescription className="text-blue-700 dark:text-blue-300 mt-1 text-xs sm:text-sm">
               Update employee information.
             </DialogDescription>
           </DialogHeader>
           <Form {...editEmployeeForm}>
             <form onSubmit={editEmployeeForm.handleSubmit((data) => 
               editingEmployee && updateEmployeeMutation.mutate({ id: editingEmployee.id, data })
-            )} className="space-y-6">
+            )} className="space-y-4 sm:space-y-6 px-1 sm:px-0">
               
               {/* Name Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <FormField
                   control={editEmployeeForm.control}
                   name="firstName"
@@ -1080,7 +1077,7 @@ export default function EmployeeManagement() {
               />
 
               {/* Assignment Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <FormField
                   control={editEmployeeForm.control}
                   name="departmentId"
@@ -1121,7 +1118,6 @@ export default function EmployeeManagement() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="none">No Site Assignment</SelectItem>
-                          <SelectItem value="remote">Remote Work Site</SelectItem>
                           {Array.isArray(workSites) && workSites.map((site: any) => (
                             <SelectItem key={site.id} value={site.id.toString()}>
                               {site.name}
@@ -1135,19 +1131,44 @@ export default function EmployeeManagement() {
                 />
               </div>
 
-              <DialogFooter className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-4 -mx-4 -mb-4 border-t border-blue-200 dark:border-blue-800 mt-4">
+              {/* Remote Work Toggle */}
+              <FormField
+                control={editEmployeeForm.control}
+                name="isRemote"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50">
+                    <div className="space-y-0.5 flex-1 pr-2">
+                      <FormLabel className="text-sm sm:text-base text-slate-900 dark:text-slate-100">
+                        Remote Work
+                      </FormLabel>
+                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                        Allow this employee to check in from anywhere
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        className="flex-shrink-0"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg p-3 sm:p-4 -mx-4 -mb-4 border-t border-blue-200 dark:border-blue-800 mt-4 flex-col sm:flex-row gap-2 sm:gap-0">
                 <Button 
                   type="button" 
                   variant="outline" 
                   onClick={() => setEditingEmployee(null)}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-700"
+                  className="hover:bg-slate-50 dark:hover:bg-slate-700 w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={updateEmployeeMutation.isPending}
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md"
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md w-full sm:w-auto"
                 >
                   {updateEmployeeMutation.isPending ? 'Updating...' : 'Update Employee'}
                 </Button>

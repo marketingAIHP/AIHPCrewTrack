@@ -72,11 +72,11 @@ function addToNotificationStack(adminId: number, notification: any) {
 function notifyAdmin(adminId: number, notification: any) {
   // Validate notification type
   if (!notification.type || (notification.type !== 'employee_checkin' && notification.type !== 'employee_checkout')) {
-    console.error('❌ Invalid notification type:', notification.type);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('❌ Invalid notification type:', notification.type);
+    }
     return;
   }
-  
-  console.log(`📤 Notifying admin ${adminId}: type=${notification.type}, message="${notification.message}"`);
   
   // Add to notification stack first
   addToNotificationStack(adminId, notification);
@@ -89,7 +89,6 @@ function notifyAdmin(adminId: number, notification: any) {
   
   if (activeConnections.length === 0) {
     // No active connections for admin
-    console.log(`⚠️ No active WebSocket connections for admin ${adminId}, notification queued`);
     return;
   }
   
@@ -102,9 +101,10 @@ function notifyAdmin(adminId: number, notification: any) {
   const ws = activeConnections[0];
   try {
     ws.send(message);
-    console.log(`✅ Notification sent to admin ${adminId}: type=${notification.type}`);
   } catch (error) {
-    console.error(`❌ Failed to send notification to admin ${adminId}:`, error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(`❌ Failed to send notification to admin ${adminId}:`, error);
+    }
   }
 }
 
@@ -208,16 +208,13 @@ function validateAndCorrectCoordinates(
   // Check if coordinates might be swapped
   if ((lat < -90 || lat > 90) && (lon >= -90 && lon <= 90) && (lat >= -180 && lat <= 180)) {
     // Lat is invalid but could be a valid lon, and lon could be a valid lat - likely swapped
-    console.warn(`Possible coordinate swap detected for ${context}. Original: lat=${lat}, lon=${lon}`);
     finalLat = lon;
     finalLon = lat;
     swapped = true;
-    console.warn(`Swapped coordinates for ${context}. New: lat=${finalLat}, lon=${finalLon}`);
   }
   
   // Ensure final values are within valid ranges
   if (finalLat < -90 || finalLat > 90 || finalLon < -180 || finalLon > 180) {
-    console.error(`Invalid coordinates for ${context} after correction: lat=${finalLat}, lon=${finalLon}`);
   }
   
   return { lat: finalLat, lon: finalLon, swapped };
@@ -252,18 +249,20 @@ function isWithinGeofence(
   const isValidSiteLon = !isNaN(sLon) && sLon >= -180 && sLon <= 180;
   
   if (!isValidLat || !isValidLon || !isValidSiteLat || !isValidSiteLon) {
-    console.error('Invalid coordinates for geofence check:', { 
-      raw: {
-        employeeLat: employeeLat, 
-        employeeLon: employeeLon, 
-        siteLat: siteLat, 
-        siteLon: siteLon
-      },
-      parsed: { empLat, empLon, sLat, sLon },
-      employeeSwapped: empCoords.swapped,
-      siteSwapped: siteCoords.swapped,
-      valid: { isValidLat, isValidLon, isValidSiteLat, isValidSiteLon }
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Invalid coordinates for geofence check:', { 
+        raw: {
+          employeeLat: employeeLat, 
+          employeeLon: employeeLon, 
+          siteLat: siteLat, 
+          siteLon: siteLon
+        },
+        parsed: { empLat, empLon, sLat, sLon },
+        employeeSwapped: empCoords.swapped,
+        siteSwapped: siteCoords.swapped,
+        valid: { isValidLat, isValidLon, isValidSiteLat, isValidSiteLon }
+      });
+    }
     return { isWithin: false, distance: Infinity, effectiveRadius: geofenceRadius + GPS_ACCURACY_BUFFER };
   }
   
@@ -303,16 +302,18 @@ function isWithinGeofence(
   
   // Log if distance is suspiciously large (more than geofence radius + 100m buffer)
   if (distance > geofenceRadius + 100) {
-    console.warn('⚠️ Large distance calculated - possible coordinate issue:', {
-      employeeCoords: { lat: empLat.toFixed(6), lon: empLon.toFixed(6) },
-      siteCoords: { lat: sLat.toFixed(6), lon: sLon.toFixed(6) },
-      distance: Math.round(distance),
-      geofenceRadius,
-      effectiveRadius: Math.round(effectiveRadius),
-      difference: Math.round(distance - effectiveRadius),
-      employeeSwapped: empCoords.swapped,
-      siteSwapped: siteCoords.swapped
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('⚠️ Large distance calculated - possible coordinate issue:', {
+        employeeCoords: { lat: empLat.toFixed(6), lon: empLon.toFixed(6) },
+        siteCoords: { lat: sLat.toFixed(6), lon: sLon.toFixed(6) },
+        distance: Math.round(distance),
+        geofenceRadius,
+        effectiveRadius: Math.round(effectiveRadius),
+        difference: Math.round(distance - effectiveRadius),
+        employeeSwapped: empCoords.swapped,
+        siteSwapped: siteCoords.swapped
+      });
+    }
   }
   
   return { isWithin, distance, effectiveRadius };
@@ -467,7 +468,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate coordinates
       if (isNaN(empLat) || isNaN(empLon) || !isFinite(empLat) || !isFinite(empLon)) {
-        console.error('❌ Invalid coordinates for check-in:', { latitude, longitude, empLat, empLon });
         return res.status(400).json({ message: 'Invalid coordinates provided' });
       }
       
@@ -513,7 +513,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const logMessage = geofenceCheck.isWithin
           ? `✅ Check-in allowed: Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(geofenceCheck.distance)}m from site)`
           : `❌ Check-in denied: Employee ${employee.firstName} ${employee.lastName} is ${Math.round(geofenceCheck.distance)}m away from site (required: within ${site.geofenceRadius}m)`;
-        console.log('📍 Check-in geofence check:', logMessage);
 
         if (!geofenceCheck.isWithin) {
           return res.status(400).json({ 
@@ -526,7 +525,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Remote work site - log that geofence check is skipped
         const remoteType = employee.isRemote ? 'employee' : 'site';
         const siteName = site?.name || 'Remote Work Site';
-        console.log(`✅ Remote check-in allowed: Employee ${employee.firstName} ${employee.lastName} can check in from anywhere (Remote: ${remoteType} - ${siteName})`);
       }
 
       // Check if already checked in
@@ -534,7 +532,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (currentAttendance && !currentAttendance.checkOutTime) {
         // If there's an old attendance record that was never checked out, close it silently first
         // This prevents duplicate check-in issues and ensures data integrity
-        console.log(`⚠️ Found old unchecked-out attendance record (ID: ${currentAttendance.id}), closing it before new check-in`);
         
         // Close the old attendance record silently (without sending notification)
         // Use the same coordinates as the new check-in for the checkout
@@ -544,7 +541,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           checkOutLongitude: empLon.toString(),
         });
         
-        console.log(`✅ Closed old attendance record ${currentAttendance.id} before new check-in`);
       }
 
       // FIX: Create attendance record with parsed numeric coordinates
@@ -615,7 +611,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: { latitude, longitude }
       };
       
-      console.log('📬 Sending check-in notification:', checkInNotification.type, checkInNotification.message);
       notifyAdmin(employee.adminId, checkInNotification);
 
       res.json(attendance);
@@ -705,7 +700,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: { latitude, longitude }
       };
       
-      console.log('📬 Sending check-out notification:', checkOutNotification.type, checkOutNotification.message);
       notifyAdmin(employee.adminId, checkOutNotification);
 
       res.json(updatedAttendance);
@@ -724,16 +718,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const employeeConnections = new Map<number, WebSocket>();
 
   wss.on('connection', (ws, req) => {
-    console.log('🔌 New WebSocket connection attempt');
 
     try {
       const url = new URL(req.url!, `http://${req.headers.host}`);
       const token = url.searchParams.get('token');
 
-      console.log('🔑 Token received:', token ? 'YES' : 'NO');
 
       if (!token) {
-        console.error('❌ No token provided');
         ws.close(1008, 'Token required');
         return;
       }
@@ -741,9 +732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let decoded: any;
       try {
         decoded = jwt.verify(token, JWT_SECRET) as any;
-        console.log('✅ Token verified successfully:', { id: decoded.id, type: decoded.type });
       } catch (error) {
-        console.error('❌ Token verification failed:', error);
         ws.close(1008, 'Invalid token');
         return;
       }
@@ -752,22 +741,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const connections = adminConnections.get(decoded.id) || [];
         connections.push(ws);
         adminConnections.set(decoded.id, connections);
-        console.log(`✅ Admin ${decoded.id} connected to WebSocket. Total connections: ${connections.length}`);
 
         try {
           ws.send(JSON.stringify({
             type: 'connection_established',
             message: 'Connected to notification system'
           }));
-          console.log('✅ Sent connection confirmation to admin');
         } catch (error) {
-          console.error('❌ Failed to send confirmation:', error);
         }
 
         const existingConnections = adminConnections.get(decoded.id) || [];
         if (existingConnections.length === 1) {
           const recentNotifications = notificationStacks.get(decoded.id) || [];
-          console.log(`📬 Sending ${recentNotifications.length} recent notifications`);
           if (recentNotifications.length > 0) {
             recentNotifications.forEach(notification => {
               try {
@@ -776,18 +761,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   data: notification
                 }));
               } catch (error) {
-                console.error('❌ Failed to send notification:', error);
               }
             });
           }
         }
       } else if (decoded.type === 'employee') {
         employeeConnections.set(decoded.id, ws);
-        console.log(`✅ Employee ${decoded.id} connected to WebSocket`);
       }
 
       ws.on('close', (code, reason) => {
-        console.log(`🔌 WebSocket closed: Code=${code}, Reason=${reason || 'none'}, Type=${decoded.type}, ID=${decoded.id}`);
 
         if (decoded.type === 'admin') {
           const connections = adminConnections.get(decoded.id) || [];
@@ -797,21 +779,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             adminConnections.delete(decoded.id);
           }
-          console.log(`Admin ${decoded.id} disconnected. Remaining connections: ${updatedConnections.length}`);
         } else if (decoded.type === 'employee') {
           employeeConnections.delete(decoded.id);
-          console.log(`Employee ${decoded.id} disconnected`);
         }
       });
 
       ws.on('error', (error) => {
-        console.error(`❌ WebSocket error for ${decoded.type} ${decoded.id}:`, error);
       });
 
       ws.on('message', async (data) => {
         try {
           const message = JSON.parse(data.toString());
-          console.log(`📨 WebSocket message from ${decoded.type} ${decoded.id}:`, message.type);
 
           if (message.type === 'location_update' && decoded.type === 'employee') {
             const { latitude, longitude } = message;
@@ -819,7 +797,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const lonNum = parseFloat(longitude);
 
             if (Number.isNaN(latNum) || Number.isNaN(lonNum)) {
-              console.error('❌ Invalid coordinates received from employee WebSocket message:', { latitude, longitude });
               return;
             }
 
@@ -838,7 +815,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 const isOnSite = distance <= site.geofenceRadius;
 
-                console.log(`📍 Location update: Employee ${employee.firstName}, Distance: ${Math.round(distance)}m, On Site: ${isOnSite}`);
 
                 await storage.createLocationTracking({
                   employeeId: decoded.id,
@@ -849,7 +825,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 const adminWsList = adminConnections.get(employee.adminId);
                 if (adminWsList && adminWsList.length > 0) {
-                  console.log(`📡 Broadcasting to ${adminWsList.length} admin connections`);
                   adminWsList.forEach(adminWs => {
                     if (adminWs.readyState === WebSocket.OPEN) {
                       try {
@@ -871,27 +846,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                           },
                         }));
                       } catch (error) {
-                        console.error('❌ Failed to broadcast location:', error);
                       }
                     }
                   });
                 } else {
-                  console.log(`⚠️ No admin connections for admin ${employee.adminId}`);
                 }
               }
             }
           }
         } catch (error) {
-          console.error('❌ WebSocket message error:', error);
         }
       });
 
     } catch (error) {
-      console.error('❌ WebSocket connection error:', error);
       try {
         ws.close(1011, 'Server error');
       } catch (e) {
-        console.error('❌ Failed to close WebSocket:', e);
       }
     }
   });
@@ -1721,21 +1691,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Handle remote work site option
-      let isRemote = false;
-      if (processedData.siteId) {
-        if (typeof processedData.siteId === 'string') {
-          if (processedData.siteId === 'remote') {
-            processedData.siteId = null;
-            isRemote = true;
-          } else if (processedData.siteId === 'none' || processedData.siteId === '') {
-            processedData.siteId = null;
-            isRemote = false;
-          } else {
-            processedData.siteId = parseInt(processedData.siteId);
-            isRemote = false;
-          }
-        }
+      // Handle remote work option - now comes directly as isRemote boolean
+      const isRemote = processedData.isRemote === true;
+      
+      // If employee is remote, set siteId to null
+      if (isRemote) {
+        processedData.siteId = null;
       }
       
       // Remove adminId from validation since we set it manually
@@ -1805,23 +1766,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Handle remote work site option
-      let isRemote = false;
-      if (processedData.siteId !== undefined) {
-        if (typeof processedData.siteId === 'string') {
-          if (processedData.siteId === 'remote') {
-            processedData.siteId = null;
-            isRemote = true;
-          } else if (processedData.siteId === 'none' || processedData.siteId === '') {
-            processedData.siteId = null;
-            isRemote = false;
-          } else {
-            processedData.siteId = parseInt(processedData.siteId);
-            isRemote = false;
-          }
-        } else if (processedData.siteId === null) {
-          isRemote = false;
-        }
+      // Handle remote work option - now comes directly as isRemote boolean
+      const isRemote = processedData.isRemote === true;
+      
+      // If employee is remote, set siteId to null
+      if (isRemote) {
+        processedData.siteId = null;
       }
       
       const validatedData = insertEmployeeSchema.omit({ 

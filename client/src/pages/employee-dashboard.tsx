@@ -110,7 +110,6 @@ export default function EmployeeDashboard() {
             });
           }
         } catch (error) {
-          console.error('Failed to update location status:', error);
         }
       }
     },
@@ -137,7 +136,6 @@ export default function EmployeeDashboard() {
     loadGoogleMapsAPI()
       .then(() => setMapLoaded(true))
       .catch((error) => {
-        console.error('Failed to load Google Maps:', error);
       });
   }, [setLocation]);
 
@@ -180,7 +178,6 @@ export default function EmployeeDashboard() {
   // FIX: Check if employee is within geofence and calculate distance with improved logging
   const getDistanceInfo = (locationAccuracy?: number) => {
     if (!currentLocation || !workSite) {
-      console.warn('⚠️ Cannot calculate distance: missing location or worksite');
       return { isWithin: false, distance: 0 };
     }
     
@@ -194,7 +191,6 @@ export default function EmployeeDashboard() {
     
     // Validate coordinates
     if (isNaN(empLat) || isNaN(empLng) || isNaN(siteLat) || isNaN(siteLng)) {
-      console.error('❌ Invalid coordinates for distance calculation:', {
         employee: { lat: empLat, lng: empLng },
         site: { lat: siteLat, lng: siteLng }
       });
@@ -214,7 +210,6 @@ export default function EmployeeDashboard() {
     const isWithin = distance <= effectiveRadius;
     
     // FIX: Log distance calculation for debugging
-    console.log('📍 Distance calculation:', {
       employeeLocation: { lat: empLat.toFixed(6), lng: empLng.toFixed(6) },
       siteLocation: { lat: siteLat.toFixed(6), lng: siteLng.toFixed(6) },
       distance: Math.round(distance),
@@ -293,20 +288,17 @@ export default function EmployeeDashboard() {
       
       // Start location tracking
       if (currentLocation) {
-        console.log('✓ Check-in success, sending immediate location update:', currentLocation);
         try {
           const locationResponse = await apiRequest('POST', '/api/employee/location', {
             latitude: currentLocation.lat,
             longitude: currentLocation.lng,
           });
           const locationData = await locationResponse.json();
-          console.log('✓ Location updated immediately:', locationData);
           setServerLocationStatus({
             distanceFromSite: locationData.distanceFromSite ?? null,
             isOnSite: typeof locationData.isOnSite === 'boolean' ? locationData.isOnSite : null,
           });
         } catch (error) {
-          console.error('✗ Failed to update location:', error);
         }
       }
     },
