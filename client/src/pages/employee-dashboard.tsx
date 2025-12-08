@@ -714,68 +714,6 @@ export default function EmployeeDashboard() {
             </Card>
           </div>
 
-          {/* Location Map */}
-          {currentLocation && mapLoaded && (
-            <Card className="border-2 border-slate-300 dark:border-slate-600 shadow-sm bg-gradient-to-br from-white to-blue-50/20 dark:from-slate-800 dark:to-blue-900/10 hover:shadow-md transition-all duration-200">
-              <CardHeader className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-900/20 dark:to-purple-900/20 border-b-2 border-slate-300 dark:border-slate-600">
-                <CardTitle className="flex items-center space-x-2 text-blue-800 dark:text-blue-200">
-                  <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-2">
-                    <Navigation className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="font-semibold">Live Location Tracking</span>
-                </CardTitle>
-                <CardDescription className="text-blue-700 dark:text-blue-400 mt-1">
-                  Real-time GPS tracking with accuracy circle
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="h-96 rounded-lg overflow-hidden border-2 border-slate-200 dark:border-slate-700">
-                  <GoogleMap
-                    center={{ lat: currentLocation.lat, lng: currentLocation.lng }}
-                    zoom={16}
-                    markers={[
-                      {
-                        id: 'employee',
-                        position: { lat: currentLocation.lat, lng: currentLocation.lng },
-                        title: 'Your Location',
-                        type: 'employee',
-                        accuracy: currentLocation.accuracy,
-                        isOnSite: isCurrentlyOnSite(),
-                        color: isCurrentlyOnSite() ? '#22c55e' : '#ef4444',
-                      },
-                    ]}
-                    geofences={workSite ? [
-                      {
-                        id: 'worksite',
-                        center: {
-                          lat: parseFloat((workSite as WorkSite).latitude.toString()),
-                          lng: parseFloat((workSite as WorkSite).longitude.toString()),
-                        },
-                        radius: (workSite as WorkSite).geofenceRadius,
-                        color: '#1976D2',
-                      },
-                    ] : []}
-                    className="w-full h-full"
-                  />
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">GPS Accuracy:</span>
-                    <Badge className="bg-gradient-to-r from-purple-400 to-purple-500 text-white border-0 shadow-sm">
-                      {currentLocation.accuracy ? `${Math.round(currentLocation.accuracy)}m` : 'N/A'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between text-sm bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">Coordinates:</span>
-                    <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">
-                      {currentLocation.lat.toFixed(6)}, {currentLocation.lng.toFixed(6)}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Today's Hours */}
           <Card className="border-2 border-slate-300 dark:border-slate-600 shadow-sm bg-gradient-to-br from-white to-orange-50/20 dark:from-slate-800 dark:to-orange-900/10 hover:shadow-md transition-all duration-200">
             <CardHeader className="bg-gradient-to-r from-orange-50/50 to-amber-50/50 dark:from-orange-900/20 dark:to-amber-900/20 border-b-2 border-slate-300 dark:border-slate-600">

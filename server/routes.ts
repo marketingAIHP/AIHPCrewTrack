@@ -1019,26 +1019,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const stats = await storage.getDashboardStats(req.user!.id);
       
-      // Calculate "on site now" - employees checked in and within geofence
+      // Calculate "on site now" - employees checked in and within geofence (or remote employees)
       const employees = await storage.getEmployeesByAdmin(req.user!.id);
       let onSiteCount = 0;
       
       for (const employee of employees) {
         const currentAttendance = await storage.getCurrentAttendance(employee.id);
-        if (currentAttendance && employee.siteId) {
-          const location = await storage.getLatestEmployeeLocation(employee.id);
-          if (location) {
-            const assignedSite = await storage.getWorkSite(employee.siteId);
-            if (assignedSite) {
-              const geofenceCheck = isWithinGeofence(
-                location.latitude,
-                location.longitude,
-                assignedSite.latitude,
-                assignedSite.longitude,
-                assignedSite.geofenceRadius
-              );
-              if (geofenceCheck.isWithin) {
-                onSiteCount++;
+        if (currentAttendance) {
+          // Remote employees are always considered "on site" when checked in
+          if (employee.isRemote) {
+            onSiteCount++;
+          } else if (employee.siteId) {
+            // For regular employees, check if they're within geofence
+            const location = await storage.getLatestEmployeeLocation(employee.id);
+            if (location) {
+              const assignedSite = await storage.getWorkSite(employee.siteId);
+              if (assignedSite) {
+                const geofenceCheck = isWithinGeofence(
+                  location.latitude,
+                  location.longitude,
+                  assignedSite.latitude,
+                  assignedSite.longitude,
+                  assignedSite.geofenceRadius
+                );
+                if (geofenceCheck.isWithin) {
+                  onSiteCount++;
+                }
               }
             }
           }
