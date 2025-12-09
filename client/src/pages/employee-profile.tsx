@@ -24,7 +24,8 @@ import {
   XCircle,
   Camera,
   Upload,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 
 interface Employee {
@@ -99,9 +100,11 @@ export default function EmployeeProfile() {
     enabled: !!getAuthToken() && getUserType() === 'admin' && !!employeeId,
   });
 
-  const { data: locations = [] } = useQuery<LocationRecord[]>({
+  const { data: locations = [], isLoading: loadingLocations, refetch: refetchLocations, isRefetching } = useQuery<LocationRecord[]>({
     queryKey: [`/api/admin/employees/${employeeId}/locations`],
     enabled: !!getAuthToken() && getUserType() === 'admin' && !!employeeId,
+    refetchInterval: 10000, // Auto-refresh every 10 seconds
+    staleTime: 0, // Always consider data stale to ensure fresh updates
   });
 
   // Profile image upload to Supabase (for admin to update employee profile)
@@ -510,11 +513,25 @@ export default function EmployeeProfile() {
         {/* Location History */}
         <Card className="mt-8 border-2 border-slate-300 dark:border-slate-600">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Navigation className="h-5 w-5" />
-              <span>Recent Location History</span>
-            </CardTitle>
-            <CardDescription>Latest GPS location updates</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center space-x-2">
+                  <Navigation className="h-5 w-5" />
+                  <span>Recent Location History</span>
+                </CardTitle>
+                <CardDescription>Latest GPS location updates</CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => refetchLocations()}
+                disabled={isRefetching}
+                className="flex items-center space-x-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {recentLocations.length > 0 ? (

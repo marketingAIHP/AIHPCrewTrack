@@ -73,7 +73,7 @@ function notifyAdmin(adminId: number, notification: any) {
   // Validate notification type
   if (!notification.type || (notification.type !== 'employee_checkin' && notification.type !== 'employee_checkout')) {
     if (process.env.NODE_ENV !== 'production') {
-      console.error('❌ Invalid notification type:', notification.type);
+    console.error('❌ Invalid notification type:', notification.type);
     }
     return;
   }
@@ -103,7 +103,7 @@ function notifyAdmin(adminId: number, notification: any) {
     ws.send(message);
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
-      console.error(`❌ Failed to send notification to admin ${adminId}:`, error);
+    console.error(`❌ Failed to send notification to admin ${adminId}:`, error);
     }
   }
 }
@@ -250,18 +250,18 @@ function isWithinGeofence(
   
   if (!isValidLat || !isValidLon || !isValidSiteLat || !isValidSiteLon) {
     if (process.env.NODE_ENV !== 'production') {
-      console.error('Invalid coordinates for geofence check:', { 
-        raw: {
-          employeeLat: employeeLat, 
-          employeeLon: employeeLon, 
-          siteLat: siteLat, 
-          siteLon: siteLon
-        },
-        parsed: { empLat, empLon, sLat, sLon },
-        employeeSwapped: empCoords.swapped,
-        siteSwapped: siteCoords.swapped,
-        valid: { isValidLat, isValidLon, isValidSiteLat, isValidSiteLon }
-      });
+    console.error('Invalid coordinates for geofence check:', { 
+      raw: {
+        employeeLat: employeeLat, 
+        employeeLon: employeeLon, 
+        siteLat: siteLat, 
+        siteLon: siteLon
+      },
+      parsed: { empLat, empLon, sLat, sLon },
+      employeeSwapped: empCoords.swapped,
+      siteSwapped: siteCoords.swapped,
+      valid: { isValidLat, isValidLon, isValidSiteLat, isValidSiteLon }
+    });
     }
     return { isWithin: false, distance: Infinity, effectiveRadius: geofenceRadius + GPS_ACCURACY_BUFFER };
   }
@@ -274,45 +274,45 @@ function isWithinGeofence(
   // FIX: Improved logging with clear success/failure messages
   // Only log in development mode to reduce console noise in production
   if (process.env.NODE_ENV !== 'production') {
-    const logMessage = isWithin 
-      ? `✅ You are within site range (${Math.round(distance)}m from site, radius: ${geofenceRadius}m)`
-      : `❌ You are ${Math.round(distance)}m away from site (radius: ${geofenceRadius}m)`;
-    
-    console.log('📍 Geofence calculation:', {
-      employeeCoords: { 
-        lat: empLat.toFixed(6), 
-        lon: empLon.toFixed(6), 
-        original: { lat: rawEmpLat, lon: rawEmpLon }, 
-        swapped: empCoords.swapped 
-      },
-      siteCoords: { 
-        lat: sLat.toFixed(6), 
-        lon: sLon.toFixed(6), 
-        original: { lat: rawSiteLat, lon: rawSiteLon }, 
-        swapped: siteCoords.swapped 
-      },
-      distance: Math.round(distance),
-      geofenceRadius,
-      buffer: GPS_ACCURACY_BUFFER,
-      effectiveRadius: Math.round(effectiveRadius),
-      isWithin,
-      message: logMessage
-    });
+  const logMessage = isWithin 
+    ? `✅ You are within site range (${Math.round(distance)}m from site, radius: ${geofenceRadius}m)`
+    : `❌ You are ${Math.round(distance)}m away from site (radius: ${geofenceRadius}m)`;
+  
+  console.log('📍 Geofence calculation:', {
+    employeeCoords: { 
+      lat: empLat.toFixed(6), 
+      lon: empLon.toFixed(6), 
+      original: { lat: rawEmpLat, lon: rawEmpLon }, 
+      swapped: empCoords.swapped 
+    },
+    siteCoords: { 
+      lat: sLat.toFixed(6), 
+      lon: sLon.toFixed(6), 
+      original: { lat: rawSiteLat, lon: rawSiteLon }, 
+      swapped: siteCoords.swapped 
+    },
+    distance: Math.round(distance),
+    geofenceRadius,
+    buffer: GPS_ACCURACY_BUFFER,
+    effectiveRadius: Math.round(effectiveRadius),
+    isWithin,
+    message: logMessage
+  });
   }
   
   // Log if distance is suspiciously large (more than geofence radius + 100m buffer)
   if (distance > geofenceRadius + 100) {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn('⚠️ Large distance calculated - possible coordinate issue:', {
-        employeeCoords: { lat: empLat.toFixed(6), lon: empLon.toFixed(6) },
-        siteCoords: { lat: sLat.toFixed(6), lon: sLon.toFixed(6) },
-        distance: Math.round(distance),
-        geofenceRadius,
-        effectiveRadius: Math.round(effectiveRadius),
-        difference: Math.round(distance - effectiveRadius),
-        employeeSwapped: empCoords.swapped,
-        siteSwapped: siteCoords.swapped
-      });
+    console.warn('⚠️ Large distance calculated - possible coordinate issue:', {
+      employeeCoords: { lat: empLat.toFixed(6), lon: empLon.toFixed(6) },
+      siteCoords: { lat: sLat.toFixed(6), lon: sLon.toFixed(6) },
+      distance: Math.round(distance),
+      geofenceRadius,
+      effectiveRadius: Math.round(effectiveRadius),
+      difference: Math.round(distance - effectiveRadius),
+      employeeSwapped: empCoords.swapped,
+      siteSwapped: siteCoords.swapped
+    });
     }
   }
   
@@ -489,8 +489,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let site = null;
       if (employee.siteId) {
         site = await storage.getWorkSite(employee.siteId);
-        if (!site) {
-          return res.status(400).json({ message: 'Work site not found' });
+      if (!site) {
+        return res.status(400).json({ message: 'Work site not found' });
         }
       }
 
@@ -499,27 +499,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isRemote = employee.isRemote || (site?.isRemote ?? false);
       
       if (!isRemote) {
-        // FIX: Check if employee is within geofence with GPS accuracy buffer
-        // Use parsed numeric values for accurate calculation
-        const geofenceCheck = isWithinGeofence(
-          empLat, // Use parsed numeric values
-          empLon, // Use parsed numeric values
-          site.latitude,
-          site.longitude,
-          site.geofenceRadius
-        );
+      // FIX: Check if employee is within geofence with GPS accuracy buffer
+      // Use parsed numeric values for accurate calculation
+      const geofenceCheck = isWithinGeofence(
+        empLat, // Use parsed numeric values
+        empLon, // Use parsed numeric values
+        site.latitude,
+        site.longitude,
+        site.geofenceRadius
+      );
 
-        // FIX: Log check-in attempt with clear message
-        const logMessage = geofenceCheck.isWithin
-          ? `✅ Check-in allowed: Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(geofenceCheck.distance)}m from site)`
-          : `❌ Check-in denied: Employee ${employee.firstName} ${employee.lastName} is ${Math.round(geofenceCheck.distance)}m away from site (required: within ${site.geofenceRadius}m)`;
+      // FIX: Log check-in attempt with clear message
+      const logMessage = geofenceCheck.isWithin
+        ? `✅ Check-in allowed: Employee ${employee.firstName} ${employee.lastName} is within site range (${Math.round(geofenceCheck.distance)}m from site)`
+        : `❌ Check-in denied: Employee ${employee.firstName} ${employee.lastName} is ${Math.round(geofenceCheck.distance)}m away from site (required: within ${site.geofenceRadius}m)`;
 
-        if (!geofenceCheck.isWithin) {
-          return res.status(400).json({ 
-            message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(geofenceCheck.distance)}m away.`,
-            distance: Math.round(geofenceCheck.distance),
-            requiredRadius: site.geofenceRadius
-          });
+      if (!geofenceCheck.isWithin) {
+        return res.status(400).json({ 
+          message: `You must be within ${site.geofenceRadius}m of the work site to check in. You are ${Math.round(geofenceCheck.distance)}m away.`,
+          distance: Math.round(geofenceCheck.distance),
+          requiredRadius: site.geofenceRadius
+        });
         }
       } else {
         // Remote work site - log that geofence check is skipped
@@ -641,20 +641,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let site = null;
       if (!employee.isRemote && employee.siteId) {
         site = await storage.getWorkSite(employee.siteId);
-        if (!site) {
-          return res.status(404).json({ message: 'Assigned work site not found' });
-        }
+      if (!site) {
+        return res.status(404).json({ message: 'Assigned work site not found' });
+      }
 
-        const geofenceCheck = isWithinGeofence(
-          latNum,
-          lonNum,
-          site.latitude,
-          site.longitude,
-          site.geofenceRadius
-        );
+      const geofenceCheck = isWithinGeofence(
+        latNum,
+        lonNum,
+        site.latitude,
+        site.longitude,
+        site.geofenceRadius
+      );
 
-        if (!geofenceCheck.isWithin) {
-          return res.status(403).json({ message: 'You must be within the work site geofence to check out.' });
+      if (!geofenceCheck.isWithin) {
+        return res.status(403).json({ message: 'You must be within the work site geofence to check out.' });
         }
       }
 
@@ -1031,19 +1031,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             onSiteCount++;
           } else if (employee.siteId) {
             // For regular employees, check if they're within geofence
-            const location = await storage.getLatestEmployeeLocation(employee.id);
-            if (location) {
-              const assignedSite = await storage.getWorkSite(employee.siteId);
-              if (assignedSite) {
-                const geofenceCheck = isWithinGeofence(
-                  location.latitude,
-                  location.longitude,
-                  assignedSite.latitude,
-                  assignedSite.longitude,
-                  assignedSite.geofenceRadius
-                );
-                if (geofenceCheck.isWithin) {
-                  onSiteCount++;
+          const location = await storage.getLatestEmployeeLocation(employee.id);
+          if (location) {
+            const assignedSite = await storage.getWorkSite(employee.siteId);
+            if (assignedSite) {
+              const geofenceCheck = isWithinGeofence(
+                location.latitude,
+                location.longitude,
+                assignedSite.latitude,
+                assignedSite.longitude,
+                assignedSite.geofenceRadius
+              );
+              if (geofenceCheck.isWithin) {
+                onSiteCount++;
                 }
               }
             }
@@ -1702,7 +1702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If employee is remote, set siteId to null
       if (isRemote) {
-        processedData.siteId = null;
+            processedData.siteId = null;
       }
       
       // Remove adminId from validation since we set it manually
@@ -1777,7 +1777,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If employee is remote, set siteId to null
       if (isRemote) {
-        processedData.siteId = null;
+            processedData.siteId = null;
       }
       
       const validatedData = insertEmployeeSchema.omit({ 
@@ -2199,7 +2199,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               // For remote employees, always return a location object (even if no actual location data)
               // This ensures they appear in the "on site" list
-              const currentTime = new Date().toISOString();
               return {
                 employee: {
                   ...employee,
@@ -2212,20 +2211,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   isWithinGeofence: true,
                   distanceFromSite: null,
                   geofenceRadius: null,
-                  isOnSite: true,
-                  lastFetched: currentTime // Add timestamp for when this data was fetched
+                  isOnSite: true
                 } : {
                   // Return a placeholder location object for remote employees without location data
                   id: 0,
                   employeeId: employee.id,
                   latitude: '0',
                   longitude: '0',
-                  timestamp: currentTime,
+                  timestamp: new Date().toISOString(),
                   isWithinGeofence: true,
                   isOnSite: true,
                   distanceFromSite: null,
-                  geofenceRadius: null,
-                  lastFetched: currentTime // Add timestamp for when this data was fetched
+                  geofenceRadius: null
                 },
               };
             } else if (location && assignedSite) {
@@ -2241,7 +2238,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               geofenceRadius = assignedSite?.geofenceRadius ?? null;
             }
             
-            const currentTime = new Date().toISOString();
             return {
               employee: {
                 ...employee,
@@ -2252,8 +2248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ...location,
                 isWithinGeofence: isEmployeeWithinGeofence,
                 distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
-                geofenceRadius,
-                lastFetched: currentTime // Add timestamp for when this data was fetched
+                geofenceRadius
               } : null,
             };
           }
@@ -2297,7 +2292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Still calculate distance if they have an assigned site for tracking purposes
       if (employee.isRemote) {
         isOnSite = true; // Remote employees are always considered "on site" for tracking
-        if (assignedSite) {
+      if (assignedSite) {
           const siteLat = parseFloat(assignedSite.latitude.toString());
           const siteLng = parseFloat(assignedSite.longitude.toString());
           const distance = calculateDistance(empLat, empLng, siteLat, siteLng);

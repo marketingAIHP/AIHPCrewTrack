@@ -103,6 +103,7 @@ export default function LiveTracking() {
   }, []);
 
   const queryClient = useQueryClient();
+  const [previousLocations, setPreviousLocations] = useState<EmployeeLocation[]>([]);
   const { data: locations = [], isLoading, refetch: refetchLocations, isRefetching } = useQuery({
     queryKey: ['/api/admin/locations'],
     enabled: !!getAuthToken() && getUserType() === 'admin',
@@ -192,21 +193,104 @@ export default function LiveTracking() {
     }
   });
 
-  // Sync locations from query data
+  // Sync locations from query data and detect changes
   React.useEffect(() => {
     if (Array.isArray(locations)) {
+      // Check if locations have actually changed
+      const hasLocationChanged = previousLocations.length > 0 && 
+        locations.some((item: any, index: number) => {
+          const prevItem = previousLocations[index];
+          if (!prevItem || prevItem.employee?.id !== item.employee?.id) return true;
+          const prevLoc = prevItem.location;
+          const currLoc = item.location;
+          if (!prevLoc || !currLoc) return prevLoc !== currLoc;
+          
+          // Check if coordinates changed
+          const prevLat = parseFloat(prevLoc.latitude || '0');
+          const prevLng = parseFloat(prevLoc.longitude || '0');
+          const currLat = parseFloat(currLoc.latitude || '0');
+          const currLng = parseFloat(currLoc.longitude || '0');
+          
+          return prevLat !== currLat || prevLng !== currLng;
+        });
+      
       setEmployeeLocations(locations);
+      setPreviousLocations(locations);
     }
-  }, [locations]);
+  }, [locations, previousLocations]);
 
-  // Manual refresh handler
+  // Manual refresh handler with location freshness check
   const handleRefresh = useCallback(async () => {
-    await refetchLocations();
-    toast({
-      title: 'Location Updated',
-      description: 'Employee locations have been refreshed',
+    const result = await refetchLocations();
+    const freshLocations = result.data || [];
+    
+    if (!Array.isArray(freshLocations) || freshLocations.length === 0) {
+      toast({
+        title: 'No Location Data',
+        description: 'No employee locations are currently available',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Check location freshness and detect changes
+    const now = new Date();
+    const staleLocations: string[] = [];
+    const noLocationEmployees: string[] = [];
+    const updatedLocations: string[] = [];
+    
+    freshLocations.forEach((item: any) => {
+      if (!item.location || item.location.id === 0) {
+        noLocationEmployees.push(`${item.employee?.firstName || ''} ${item.employee?.lastName || ''}`.trim());
+        return;
+      }
+      
+      const locationTime = new Date(item.location.timestamp);
+      const ageInSeconds = (now.getTime() - locationTime.getTime()) / 1000;
+      
+      // Check if location changed from previous
+      const prevLocation = previousLocations.find(prev => prev.employee?.id === item.employee?.id);
+      if (prevLocation && prevLocation.location) {
+        const prevLat = parseFloat(prevLocation.location.latitude || '0');
+        const prevLng = parseFloat(prevLocation.location.longitude || '0');
+        const currLat = parseFloat(item.location.latitude || '0');
+        const currLng = parseFloat(item.location.longitude || '0');
+        
+        if (prevLat !== currLat || prevLng !== currLng) {
+          updatedLocations.push(`${item.employee?.firstName || ''} ${item.employee?.lastName || ''}`.trim());
+        }
+      }
+      
+      // Consider location stale if older than 60 seconds
+      if (ageInSeconds > 60) {
+        staleLocations.push(`${item.employee?.firstName || ''} ${item.employee?.lastName || ''}`.trim());
+      }
     });
-  }, [refetchLocations, toast]);
+    
+    if (updatedLocations.length > 0) {
+      toast({
+        title: 'Location Updated',
+        description: `Location data refreshed. ${updatedLocations.length} employee(s) have new location coordinates.`,
+      });
+    } else if (staleLocations.length > 0) {
+      toast({
+        title: 'Stale Location Data',
+        description: `Location data for ${staleLocations.length} employee(s) is older than 60 seconds. The employee device may not be sending updates.`,
+        variant: 'destructive',
+      });
+    } else if (noLocationEmployees.length > 0) {
+      toast({
+        title: 'No Location Available',
+        description: `Unable to get current location for ${noLocationEmployees.length} employee(s). They may not have location services enabled.`,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Data Refreshed',
+        description: 'Location data refreshed, but no new location updates were received from employee devices.',
+      });
+    }
+  }, [refetchLocations, toast, previousLocations]);
 
   const isLocationOnSite = (location: any, employee: any) => {
     // Remote employees are always considered "on site"
@@ -629,13 +713,35 @@ export default function LiveTracking() {
                           </Badge>
                         </div>
                         
-                        {item.location && (
-                          <div className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-                            Last updated: {item.location.lastFetched 
-                              ? new Date(item.location.lastFetched).toLocaleTimeString()
-                              : new Date(item.location.timestamp).toLocaleTimeString()}
-                          </div>
-                        )}
+                        {item.location && (() => {
+                          const locationTime = item.location.timestamp ? new Date(item.location.timestamp) : null;
+                          const now = new Date();
+                          const ageInSeconds = locationTime ? (now.getTime() - locationTime.getTime()) / 1000 : null;
+                          const isStale = ageInSeconds !== null && ageInSeconds > 60;
+                          const hasNoLocation = !item.location.latitude || item.location.latitude === '0' || item.location.id === 0;
+                          const prevLocation = previousLocations.find(prev => prev.employee?.id === item.employee?.id);
+                          const locationChanged = prevLocation && prevLocation.location && item.location && (
+                            parseFloat(prevLocation.location.latitude || '0') !== parseFloat(item.location.latitude || '0') ||
+                            parseFloat(prevLocation.location.longitude || '0') !== parseFloat(item.location.longitude || '0')
+                          );
+                          
+                          return (
+                            <div className="mt-2 space-y-1">
+                              {locationTime && !hasNoLocation ? (
+                                <div className={`text-xs ${isStale ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-slate-400'}`}>
+                                  Last updated: {locationTime.toLocaleTimeString()}
+                                  {isStale && ` (${Math.round(ageInSeconds!)}s ago - Stale)`}
+                                  {!isStale && locationChanged && ' ✓ Updated'}
+                                  {!isStale && !locationChanged && prevLocation && ' (No change)'}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-red-600 dark:text-red-400">
+                                  ⚠️ No location data available from device
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </CardContent>
                     </Card>
                   ))
