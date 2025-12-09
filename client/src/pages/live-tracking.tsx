@@ -631,7 +631,9 @@ export default function LiveTracking() {
                         
                         {item.location && (
                           <div className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-                            Last updated: {new Date(item.location.timestamp).toLocaleTimeString()}
+                            Last updated: {item.location.lastFetched 
+                              ? new Date(item.location.lastFetched).toLocaleTimeString()
+                              : new Date(item.location.timestamp).toLocaleTimeString()}
                           </div>
                         )}
                       </CardContent>

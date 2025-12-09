@@ -2199,6 +2199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               // For remote employees, always return a location object (even if no actual location data)
               // This ensures they appear in the "on site" list
+              const currentTime = new Date().toISOString();
               return {
                 employee: {
                   ...employee,
@@ -2211,18 +2212,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   isWithinGeofence: true,
                   distanceFromSite: null,
                   geofenceRadius: null,
-                  isOnSite: true
+                  isOnSite: true,
+                  lastFetched: currentTime // Add timestamp for when this data was fetched
                 } : {
                   // Return a placeholder location object for remote employees without location data
                   id: 0,
                   employeeId: employee.id,
                   latitude: '0',
                   longitude: '0',
-                  timestamp: new Date().toISOString(),
+                  timestamp: currentTime,
                   isWithinGeofence: true,
                   isOnSite: true,
                   distanceFromSite: null,
-                  geofenceRadius: null
+                  geofenceRadius: null,
+                  lastFetched: currentTime // Add timestamp for when this data was fetched
                 },
               };
             } else if (location && assignedSite) {
@@ -2238,6 +2241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               geofenceRadius = assignedSite?.geofenceRadius ?? null;
             }
             
+            const currentTime = new Date().toISOString();
             return {
               employee: {
                 ...employee,
@@ -2248,7 +2252,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ...location,
                 isWithinGeofence: isEmployeeWithinGeofence,
                 distanceFromSite: distanceFromSite !== null ? Math.round(distanceFromSite) : null,
-                geofenceRadius
+                geofenceRadius,
+                lastFetched: currentTime // Add timestamp for when this data was fetched
               } : null,
             };
           }
