@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,8 @@ import {
   MapPin, 
   Plus,
   Minus,
-  Maximize 
+  Maximize,
+  RefreshCw
 } from 'lucide-react';
 import ExportReportDialog from '@/components/ExportReportDialog';
 
@@ -101,10 +102,11 @@ export default function LiveTracking() {
     };
   }, []);
 
-  const { data: locations = [], isLoading } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: locations = [], isLoading, refetch: refetchLocations, isRefetching } = useQuery({
     queryKey: ['/api/admin/locations'],
     enabled: !!getAuthToken() && getUserType() === 'admin',
-    refetchInterval: 60000, // Update every 1 minute
+    refetchInterval: 10000, // Update every 10 seconds for real-time tracking
   });
 
   const { data: sites = [] } = useQuery({
@@ -184,25 +186,27 @@ export default function LiveTracking() {
   const { isConnected } = useWebSocket({
     onMessage: (data) => {
       if (data.type === 'employee_location') {
-        setEmployeeLocations(prev => {
-          const updated = prev.map(item => 
-            item.employee.id === data.employeeId 
-              ? { ...item, location: data.location }
-              : item
-          );
-          
-          if (!prev.find(item => item.employee.id === data.employeeId)) {
-            updated.push({
-              employee: data.employee,
-              location: data.location
-            });
-          }
-          
-          return updated;
-        });
+        // Invalidate and refetch locations when WebSocket receives update
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/locations'] });
       }
     }
   });
+
+  // Sync locations from query data
+  React.useEffect(() => {
+    if (Array.isArray(locations)) {
+      setEmployeeLocations(locations);
+    }
+  }, [locations]);
+
+  // Manual refresh handler
+  const handleRefresh = useCallback(async () => {
+    await refetchLocations();
+    toast({
+      title: 'Location Updated',
+      description: 'Employee locations have been refreshed',
+    });
+  }, [refetchLocations, toast]);
 
   const isLocationOnSite = (location: any, employee: any) => {
     // Remote employees are always considered "on site"
@@ -502,6 +506,15 @@ export default function LiveTracking() {
                 {isConnected ? 'Live Updates' : 'Connecting...'}
               </span>
             </div>
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh}
+              disabled={isRefetching}
+              className="flex items-center space-x-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+              <span>Refresh Locations</span>
+            </Button>
             <ExportReportDialog>
               <Button variant="outline">
                 <Download className="h-4 w-4 mr-2" />
