@@ -457,15 +457,44 @@ export default function LiveTracking() {
     });
   }, []);
 
-  const goToEmployeeProfile = useCallback((employeeId: number) => {
-    setLocation(`/admin/employees/${employeeId}`);
-  }, [setLocation]);
-
   // Function to zoom to specific employee location
   const zoomToLocation = useCallback((lat: number, lng: number) => {
     setMapCenter({ lat, lng });
     setMapZoom(18); // Close zoom level to see the employee clearly
   }, []);
+
+  // Function to zoom to employee's location when card is clicked
+  const zoomToEmployee = useCallback((item: any) => {
+    if (!item.location) {
+      toast({
+        title: 'No Location Available',
+        description: `${item.employee.firstName} ${item.employee.lastName} has no location data available.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const lat = parseFloat(item.location.latitude);
+    const lng = parseFloat(item.location.longitude);
+
+    if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0 || item.location.id === 0) {
+      toast({
+        title: 'No Location Available',
+        description: `${item.employee.firstName} ${item.employee.lastName} has no valid location coordinates.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Zoom to employee location
+    setMapCenter({ lat, lng });
+    setMapZoom(18);
+    
+    toast({
+      title: 'Location Focused',
+      description: `Centered map on ${item.employee.firstName} ${item.employee.lastName}'s location`,
+    });
+  }, [toast]);
 
   const getMapMarkers = () => {
     const markers: any[] = [];
@@ -674,7 +703,7 @@ export default function LiveTracking() {
                 ) : (
                   Array.isArray(locations) && locations.map((item: any) => (
                     <Card key={item.employee.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                      <CardContent className="p-4" onClick={() => goToEmployeeProfile(item.employee.id)}>
+                      <CardContent className="p-4" onClick={() => zoomToEmployee(item)}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <div className="relative">

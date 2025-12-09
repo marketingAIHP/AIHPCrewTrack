@@ -240,7 +240,7 @@ export default function EmployeeProfile() {
 
   if (loadingEmployee) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Skeleton className="h-8 w-64 mb-8" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -255,7 +255,7 @@ export default function EmployeeProfile() {
 
   if (!employee) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Alert variant="destructive">
             <AlertDescription>Employee not found.</AlertDescription>
@@ -266,9 +266,9 @@ export default function EmployeeProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white dark:bg-slate-800 shadow-sm border-b border-gray-200 dark:border-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
@@ -277,7 +277,7 @@ export default function EmployeeProfile() {
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <h1 className="text-xl font-semibold text-gray-900">
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
                 {employee.firstName} {employee.lastName}
               </h1>
             </div>
@@ -298,7 +298,7 @@ export default function EmployeeProfile() {
           {/* Employee Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
+              <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-slate-100">
                 <User className="h-5 w-5" />
                 <span>Employee Information</span>
               </CardTitle>
@@ -311,8 +311,8 @@ export default function EmployeeProfile() {
                     alt="Employee Profile"
                     className="w-20 h-20 rounded-full object-cover"
                     fallback={
-                      <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center">
-                        <span className="text-2xl font-medium text-gray-700">
+                      <div className="w-20 h-20 bg-gray-300 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                        <span className="text-2xl font-medium text-gray-700 dark:text-slate-200">
                           {employee.firstName[0]}{employee.lastName[0]}
                         </span>
                       </div>
@@ -377,32 +377,32 @@ export default function EmployeeProfile() {
               </div>
               
               <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
                   {employee.firstName} {employee.lastName}
                 </h3>
-                <p className="text-sm text-gray-500">ID: EMP{employee.id.toString().padStart(3, '0')}</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400">ID: EMP{employee.id.toString().padStart(3, '0')}</p>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
-                  <Mail className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">{employee.email}</span>
+                  <Mail className="h-4 w-4 text-gray-400 dark:text-slate-400" />
+                  <span className="text-sm text-gray-600 dark:text-slate-300">{employee.email}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">{employee.phone}</span>
+                  <Phone className="h-4 w-4 text-gray-400 dark:text-slate-400" />
+                  <span className="text-sm text-gray-600 dark:text-slate-300">{employee.phone}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">
+                  <Calendar className="h-4 w-4 text-gray-400 dark:text-slate-400" />
+                  <span className="text-sm text-gray-600 dark:text-slate-300">
                     Joined {new Date(employee.createdAt).toLocaleDateString()}
                   </span>
                 </div>
               </div>
 
-              <div className="pt-4 border-t">
+              <div className="pt-4 border-t border-gray-200 dark:border-slate-700">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600">Status</span>
+                  <span className="text-sm font-medium text-gray-600 dark:text-slate-300">Status</span>
                   <Badge 
                     variant={employee.isActive ? "default" : "secondary"}
                     className={employee.isActive ? "bg-green-500 text-white" : ""}
@@ -417,7 +417,7 @@ export default function EmployeeProfile() {
           {/* Work Site Assignment */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
+              <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-slate-100">
                 <Building2 className="h-5 w-5" />
                 <span>Work Site Assignment</span>
               </CardTitle>
@@ -426,8 +426,8 @@ export default function EmployeeProfile() {
               {assignedSite ? (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-medium text-gray-900">{assignedSite.name}</h3>
-                    <p className="text-sm text-gray-600 flex items-center mt-1">
+                    <h3 className="font-medium text-gray-900 dark:text-slate-100">{assignedSite.name}</h3>
+                    <p className="text-sm text-gray-600 dark:text-slate-300 flex items-center mt-1">
                       <Navigation className="h-4 w-4 mr-1" />
                       {assignedSite.address}
                     </p>
@@ -435,18 +435,18 @@ export default function EmployeeProfile() {
                   
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="font-medium text-gray-700">Latitude</p>
-                      <p className="text-gray-600">{assignedSite.latitude}</p>
+                      <p className="font-medium text-gray-700 dark:text-slate-300">Latitude</p>
+                      <p className="text-gray-600 dark:text-slate-400">{assignedSite.latitude}</p>
                     </div>
                     <div>
-                      <p className="font-medium text-gray-700">Longitude</p>
-                      <p className="text-gray-600">{assignedSite.longitude}</p>
+                      <p className="font-medium text-gray-700 dark:text-slate-300">Longitude</p>
+                      <p className="text-gray-600 dark:text-slate-400">{assignedSite.longitude}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-700">Geofence Radius</span>
-                    <Badge variant="outline">{assignedSite.geofenceRadius}m</Badge>
+                    <span className="font-medium text-gray-700 dark:text-slate-300">Geofence Radius</span>
+                    <Badge variant="outline" className="dark:border-slate-600 dark:text-slate-300">{assignedSite.geofenceRadius}m</Badge>
                   </div>
                   
                   <Link href={`/admin/tracking?siteId=${assignedSite.id}`}>
@@ -458,9 +458,9 @@ export default function EmployeeProfile() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No site assigned</p>
-                  <p className="text-sm text-gray-400">This employee is not assigned to any work site</p>
+                  <Building2 className="h-12 w-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-slate-400">No site assigned</p>
+                  <p className="text-sm text-gray-400 dark:text-slate-500">This employee is not assigned to any work site</p>
                 </div>
               )}
             </CardContent>
@@ -469,11 +469,11 @@ export default function EmployeeProfile() {
           {/* Recent Activity */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
+              <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-slate-100">
                 <Clock className="h-5 w-5" />
                 <span>Recent Activity</span>
               </CardTitle>
-              <CardDescription>Latest attendance records</CardDescription>
+              <CardDescription className="text-gray-600 dark:text-slate-400">Latest attendance records</CardDescription>
             </CardHeader>
             <CardContent>
               {recentAttendance.length > 0 ? (
@@ -481,10 +481,10 @@ export default function EmployeeProfile() {
                   {recentAttendance.map((record) => (
                     <div key={record.id} className="flex items-center justify-between text-sm">
                       <div>
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-gray-900 dark:text-slate-100">
                           {new Date(record.checkInTime).toLocaleDateString()}
                         </p>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 dark:text-slate-300">
                           {new Date(record.checkInTime).toLocaleTimeString()} - 
                           {record.checkOutTime ? new Date(record.checkOutTime).toLocaleTimeString() : 'Active'}
                         </p>
@@ -501,9 +501,9 @@ export default function EmployeeProfile() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No recent activity</p>
-                  <p className="text-sm text-gray-400">Attendance records will appear here</p>
+                  <Clock className="h-12 w-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-slate-400">No recent activity</p>
+                  <p className="text-sm text-gray-400 dark:text-slate-500">Attendance records will appear here</p>
                 </div>
               )}
             </CardContent>
@@ -515,11 +515,11 @@ export default function EmployeeProfile() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center space-x-2">
+                <CardTitle className="flex items-center space-x-2 text-gray-900 dark:text-slate-100">
                   <Navigation className="h-5 w-5" />
                   <span>Recent Location History</span>
                 </CardTitle>
-                <CardDescription>Latest GPS location updates</CardDescription>
+                <CardDescription className="text-gray-600 dark:text-slate-400">Latest GPS location updates</CardDescription>
               </div>
               <Button 
                 variant="outline" 
@@ -536,27 +536,27 @@ export default function EmployeeProfile() {
           <CardContent>
             {recentLocations.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                  <thead className="bg-gray-50 dark:bg-slate-800">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                         Timestamp
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                         Location
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                         Status
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                     {recentLocations.map((location) => (
-                      <tr key={location.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <tr key={location.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-slate-100">
                           {new Date(location.timestamp).toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-slate-300">
                           {parseFloat(location.latitude).toFixed(6)}, {parseFloat(location.longitude).toFixed(6)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -574,9 +574,9 @@ export default function EmployeeProfile() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <Navigation className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No location history</p>
-                <p className="text-sm text-gray-400">GPS tracking data will appear here</p>
+                <Navigation className="h-12 w-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-slate-400">No location history</p>
+                <p className="text-sm text-gray-400 dark:text-slate-500">GPS tracking data will appear here</p>
               </div>
             )}
           </CardContent>
